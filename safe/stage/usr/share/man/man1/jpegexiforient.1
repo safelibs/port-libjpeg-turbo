@@ -50,8 +50,14 @@ tag:
 88          8888888888  8888888888          88
 .fi
 .PP
-jpegexiforient output the Exif Orientation Tag in a JPEG Exif file.
+jpegexiforient outputs the Exif Orientation Tag in a JPEG Exif file.
 With the options -1 .. -8, it can also be used to set the tag.
+.PP
+The packaged exifautotran wrapper invokes the sibling
+.B jpegexiforient
+and
+.B jpegtran
+commands from the same staged package tree.
 .
 .SS "OPTIONS"
 .TP

@@ -4,6 +4,10 @@
 # Transforms Exif files so that Orientation becomes 1
 #
 
+bindir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+jpegtran_bin="$bindir/jpegtran"
+jpegexiforient_bin="$bindir/jpegexiforient"
+
 trap "if test -n \"\$tempfile\"; then rm -f \"\$tempfile\"; fi" INT QUIT TERM
 
 for i
@@ -19,7 +23,7 @@ EOF
              exit 0;;
  esac
 
- case `jpegexiforient -n "$i"` in
+ case "$("$jpegexiforient_bin" -n "$i")" in
  1) transform="";;
  2) transform="-flip horizontal";;
  3) transform="-rotate 180";;
@@ -31,20 +35,20 @@ EOF
  *) transform="";;
  esac
  if test -n "$transform"; then
-  tempfile=`mktemp`;
+  tempfile="$(mktemp)";
   if test "$?" -ne "0"; then
     echo "Failed to create temporary file" >&2
     exit 1;
   fi
-  echo Executing: jpegtran -copy all $transform $i >&2
-  jpegtran -copy all $transform "$i" > $tempfile
+  echo Executing: "$jpegtran_bin" -copy all $transform "$i" >&2
+  "$jpegtran_bin" -copy all $transform "$i" > "$tempfile"
   if test $? -ne 0; then
    echo Error while transforming $i - skipped. >&2
    rm "$tempfile"
   else
    cp "$tempfile" "$i"
    rm "$tempfile"
-   jpegexiforient -1 "$i" > /dev/null
+   "$jpegexiforient_bin" -1 "$i" > /dev/null
   fi
  fi
 done

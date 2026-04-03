@@ -68,13 +68,13 @@ docker build -t "$IMAGE_TAG" - <<'DOCKERFILE' >/dev/null
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
       > /etc/apt/sources.list.d/ubuntu-src.sources \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential \
-      cargo \
       ca-certificates \
       cmake \
       curl \
@@ -83,7 +83,10 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       nasm \
       pkg-config \
       python3 \
-      rustc \
+ && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --profile minimal --default-toolchain stable \
+ && cargo --version \
+ && rustc --version \
  && rm -rf /var/lib/apt/lists/*
 DOCKERFILE
 
@@ -180,13 +183,40 @@ assert_any_file_under_uses_local_soname() {
   local candidate resolved
 
   while IFS= read -r -d '' candidate; do
-    resolved="$(ldd "$candidate" 2>/dev/null | awk -v soname="$soname" '$1 == soname { print $3; exit }')"
+    resolved="$(
+      ldd "$candidate" 2>/dev/null \
+        | awk -v soname="$soname" '$1 == soname { print $3; exit }' \
+        || true
+    )"
     case "$resolved" in
       "$STAGE_ROOT"/usr/lib/*)
         return 0
         ;;
     esac
   done < <(find "$root" -type f -name "$name_pattern" -print0 2>/dev/null)
+
+  die "expected $description to resolve $soname from $STAGE_ROOT/usr/lib"
+}
+
+assert_package_uses_local_soname() {
+  local package="$1"
+  local soname="$2"
+  local description="$3"
+  local candidate resolved
+
+  while IFS= read -r candidate; do
+    [[ -f "$candidate" ]] || continue
+    resolved="$(
+      ldd "$candidate" 2>/dev/null \
+        | awk -v soname="$soname" '$1 == soname { print $3; exit }' \
+        || true
+    )"
+    case "$resolved" in
+      "$STAGE_ROOT"/usr/lib/*)
+        return 0
+        ;;
+    esac
+  done < <(dpkg -L "$package" 2>/dev/null)
 
   die "expected $description to resolve $soname from $STAGE_ROOT/usr/lib"
 }
@@ -271,8 +301,14 @@ install_runtime_packages() {
   mapfile -t selected_runtime < <(list_selected_runtime)
   for runtime_name in "${selected_runtime[@]}"; do
     case "$runtime_name" in
+      dcm2niix)
+        packages+=(dcm2niix)
+        ;;
       eog)
         packages+=(eog dbus-x11 python3-pil xauth xdotool xvfb)
+        ;;
+      krita)
+        packages+=(krita xauth xvfb)
         ;;
       libcamera-tools)
         packages+=(libcamera-dev libcamera-tools libsdl2-dev)
@@ -283,8 +319,14 @@ install_runtime_packages() {
       python3-pil)
         packages+=(python3-pil)
         ;;
+      timg)
+        packages+=(timg)
+        ;;
       tracker-extract)
         packages+=(tracker tracker-extract)
+        ;;
+      xpra)
+        packages+=(xpra)
         ;;
       *)
         die "runtime smoke is not implemented for $runtime_name in this harness"
@@ -305,36 +347,62 @@ install_runtime_packages() {
 }
 
 prepare_runtime_fixtures() {
+  local -a selected_runtime=()
+  local need_quadrant_fixtures=0
+
   rm -rf "$FIXTURE_DIR"
   mkdir -p "$FIXTURE_DIR"
   cp "$WORK_ROOT/original/testimages/testorig.jpg" "$FIXTURE_DIR/input.jpg"
 
+  mapfile -t selected_runtime < <(list_selected_runtime)
+  for runtime_name in "${selected_runtime[@]}"; do
+    case "$runtime_name" in
+      eog|libcamera-tools)
+        need_quadrant_fixtures=1
+        ;;
+    esac
+  done
+
+  if [[ "$need_quadrant_fixtures" -eq 0 ]]; then
+    return 0
+  fi
+
   FIXTURE_DIR="$FIXTURE_DIR" python3 - <<'PY'
 import os
-from PIL import Image, ImageDraw
 
 fixture_dir = os.environ["FIXTURE_DIR"]
-input_jpg = os.path.join(fixture_dir, "input.jpg")
 
 
-def make_quadrant_jpeg(path, size):
+def make_quadrant_ppm(path, size):
     width, height = size
-    image = Image.new("RGB", size)
-    draw = ImageDraw.Draw(image)
     mid_x = width // 2
     mid_y = height // 2
-    draw.rectangle((0, 0, mid_x - 1, mid_y - 1), fill=(250, 20, 20))
-    draw.rectangle((mid_x, 0, width - 1, mid_y - 1), fill=(20, 250, 20))
-    draw.rectangle((0, mid_y, mid_x - 1, height - 1), fill=(20, 20, 250))
-    draw.rectangle((mid_x, mid_y, width - 1, height - 1), fill=(250, 250, 20))
-    image.save(path, format="JPEG", quality=95, subsampling=0)
+    header = f"P6\n{width} {height}\n255\n".encode("ascii")
+
+    with open(path, "wb") as handle:
+        handle.write(header)
+        for y in range(height):
+            row = bytearray()
+            for x in range(width):
+                if x < mid_x and y < mid_y:
+                    pixel = (250, 20, 20)
+                elif x >= mid_x and y < mid_y:
+                    pixel = (20, 250, 20)
+                elif x < mid_x and y >= mid_y:
+                    pixel = (20, 20, 250)
+                else:
+                    pixel = (250, 250, 20)
+                row.extend(pixel)
+            handle.write(row)
 
 
-rgb = Image.open(input_jpg).convert("RGB")
-rgb.save(os.path.join(fixture_dir, "input.png"))
-make_quadrant_jpeg(os.path.join(fixture_dir, "eog-pattern.jpg"), (1024, 768))
-make_quadrant_jpeg(os.path.join(fixture_dir, "mjpeg-pattern.jpg"), (128, 128))
+make_quadrant_ppm(os.path.join(fixture_dir, "eog-pattern.ppm"), (1024, 768))
+make_quadrant_ppm(os.path.join(fixture_dir, "mjpeg-pattern.ppm"), (128, 128))
 PY
+
+  "$STAGE_ROOT/usr/bin/cjpeg" -quality 95 -sample 1x1 "$FIXTURE_DIR/eog-pattern.ppm" > "$FIXTURE_DIR/eog-pattern.jpg"
+  "$STAGE_ROOT/usr/bin/cjpeg" -quality 95 -sample 1x1 "$FIXTURE_DIR/mjpeg-pattern.ppm" > "$FIXTURE_DIR/mjpeg-pattern.jpg"
+  rm -f "$FIXTURE_DIR/eog-pattern.ppm" "$FIXTURE_DIR/mjpeg-pattern.ppm"
 }
 
 check_eog_runtime() {
@@ -428,6 +496,25 @@ EOF
   require_nonempty_file "$dir/window-id.txt"
   require_nonempty_file "$dir/render-probe.log"
   require_contains "$dir/eog.log" "$STAGE_ROOT/usr/lib/$MULTIARCH/libjpeg.so.8"
+}
+
+check_dcm2niix_runtime() {
+  local dir status
+
+  dir="$(reset_test_dir dcm2niix-runtime)"
+  assert_package_uses_local_soname dcm2niix libturbojpeg.so.0 'dcm2niix package files'
+
+  set +e
+  dcm2niix -h >"$dir/help.log" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -eq 0 ]] || {
+    cat "$dir/help.log" >&2
+    die "dcm2niix -h failed with status $status"
+  }
+
+  require_contains "$dir/help.log" 'dcm2niix'
 }
 
 check_libcamera_tools_runtime() {
@@ -657,6 +744,49 @@ PY
   require_nonempty_file "$dir/pillow-out.jpg"
 }
 
+check_krita_runtime() {
+  local dir status
+
+  dir="$(reset_test_dir krita-runtime)"
+  assert_package_uses_local_soname krita libjpeg.so.8 'krita package files'
+  assert_package_uses_local_soname krita libturbojpeg.so.0 'krita package files'
+
+  set +e
+  timeout 60 env QT_QPA_PLATFORM=offscreen krita --help >"$dir/help.log" 2>&1
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    timeout 60 xvfb-run -a krita --help >"$dir/help.log" 2>&1
+    status=$?
+  fi
+  set -e
+
+  [[ "$status" -eq 0 ]] || {
+    cat "$dir/help.log" >&2
+    die "krita --help failed with status $status"
+  }
+
+  require_contains "$dir/help.log" 'krita'
+}
+
+check_timg_runtime() {
+  local dir status
+
+  dir="$(reset_test_dir timg-runtime)"
+  assert_package_uses_local_soname timg libturbojpeg.so.0 'timg package files'
+
+  set +e
+  TERM=xterm-256color PAGER=cat timg --help >"$dir/help.log" 2>&1
+  status=$?
+  set -e
+
+  [[ "$status" -eq 0 ]] || {
+    cat "$dir/help.log" >&2
+    die "timg --help failed with status $status"
+  }
+
+  require_contains "$dir/help.log" 'timg'
+}
+
 check_tracker_extract_runtime() {
   local dir extractor
 
@@ -674,6 +804,20 @@ check_tracker_extract_runtime() {
   require_contains "$dir/extract.log" 'nfo:height 149'
 }
 
+check_xpra_runtime() {
+  local dir
+
+  dir="$(reset_test_dir xpra-runtime)"
+  assert_package_uses_local_soname xpra libturbojpeg.so.0 'xpra package files'
+
+  python3 - <<'PY' >"$dir/version.log" 2>&1
+import xpra
+print(xpra.__version__)
+PY
+
+  require_nonempty_file "$dir/version.log"
+}
+
 run_runtime_checks() {
   local -a selected_runtime=()
   local runtime_name
@@ -688,9 +832,17 @@ run_runtime_checks() {
 
   for runtime_name in "${selected_runtime[@]}"; do
     case "$runtime_name" in
+      dcm2niix)
+        log_step 'dcm2niix runtime smoke'
+        check_dcm2niix_runtime
+        ;;
       eog)
         log_step 'eog runtime smoke'
         check_eog_runtime
+        ;;
+      krita)
+        log_step 'krita runtime smoke'
+        check_krita_runtime
         ;;
       libcamera-tools)
         log_step 'libcamera-tools runtime smoke'
@@ -704,9 +856,17 @@ run_runtime_checks() {
         log_step 'python3-pil runtime smoke'
         check_pillow_runtime
         ;;
+      timg)
+        log_step 'timg runtime smoke'
+        check_timg_runtime
+        ;;
       tracker-extract)
         log_step 'tracker-extract runtime smoke'
         check_tracker_extract_runtime
+        ;;
+      xpra)
+        log_step 'xpra runtime smoke'
+        check_xpra_runtime
         ;;
       *)
         die "runtime smoke is not implemented for $runtime_name in this harness"

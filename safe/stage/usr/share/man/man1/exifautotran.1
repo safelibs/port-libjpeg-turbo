@@ -1,11 +1,22 @@
 .TH EXIFAUTOTRAN "1" "February 2005" "exifautotran" "User Commands"
 .SH NAME
 exifautotran \- Transforms Exif files so that Orientation becomes 1
+.SH SYNOPSIS
+.B exifautotran
+.I jpegfile
+[\fIjpegfile\fR ...]
 .SH DESCRIPTION
 exifautotran [list of files]
 .PP
 Take a list of files as input and transform them in place so that the
 Orientation becomes 1.
+.PP
+The packaged wrapper resolves
+.BR jpegtran (1)
+and
+.BR jpegexiforient (1)
+relative to its own installed location so that the staged safe binaries are
+used consistently.
 .SH "AUTHOR"
     Guido Vollbeding <guido@jpegclub.org>
 .SH "SEE ALSO"

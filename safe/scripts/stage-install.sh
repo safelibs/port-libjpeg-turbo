@@ -468,17 +468,92 @@ install_committed_metadata() {
   for page in cjpeg.1 djpeg.1 jpegtran.1 rdjpgcom.1 wrjpgcom.1; do
     install -m 644 "$SAFE_ROOT/debian/$page" "$man_dir/$page"
   done
+
+  render_tjbench_manpage "$TMP_RENDER_ROOT/tjbench.1"
+  install -m 644 "$TMP_RENDER_ROOT/tjbench.1" "$man_dir/tjbench.1"
 }
 
-install_extra_tools() {
+extract_tjbench_section() {
+  local section="$1"
+  awk -v section="[$section]" '
+    $0 == section { emit = 1; next }
+    /^\[[A-Z]+\]$/ { emit = 0 }
+    emit { print }
+  ' "$SAFE_ROOT/debian/tjbench.1.in"
+}
+
+render_tjbench_manpage() {
+  local output="$1"
+  local description comment copyright
+
+  description="$(extract_tjbench_section DESCRIPTION)"
+  comment="$(extract_tjbench_section COMMENT)"
+  copyright="$(extract_tjbench_section COPYRIGHT)"
+
+  cat >"$output" <<EOF
+.TH TJBENCH 1 "03 April 2026" "libjpeg-turbo" "User Commands"
+.SH NAME
+tjbench \\- JPEG compression/decompression benchmark
+.SH SYNOPSIS
+.B tjbench
+.I input-image
+.I quality-or-output-format
+.RI [ options ]
+.SH DESCRIPTION
+$description
+.PP
+This rendered page is generated from the committed Debian template in
+\fBsafe/debian/tjbench.1.in\fR during staging.
+.SH NOTES
+.TP
+\fB-limitscans\fR
+Propagate the libjpeg/libturbojpeg scan-limit checks during benchmarked
+decompression and transforms.
+.TP
+\fB-progressive\fR
+Generate progressive JPEG output during compression benchmarks.
+.TP
+\fB-fastupsample\fR, \fB-fastdct\fR, \fB-accuratedct\fR
+Select the decompression upsampling path and DCT quality/performance tradeoff.
+.TP
+\fB-tile\fR
+Exercise the tiled encode/decode paths used by the upstream regression suite.
+.TP
+\fB-benchtime\fR, \fB-warmup\fR, \fB-quiet\fR
+Control iteration timing and output verbosity for scripted use.
+.SH AUTHOR
+$comment
+.SH COPYRIGHT
+$copyright
+EOF
+}
+
+build_rust_tool_wrappers() {
+  cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p jpeg-tools --release --bins >/dev/null
+}
+
+install_packaged_tools() {
   local bin_dir="$STAGE_DIR/usr/bin"
   local man_dir="$STAGE_DIR/usr/share/man/man1"
+  local internal_dir="$STAGE_DIR/usr/libexec/libjpeg-turbo-safe"
 
-  mkdir -p "$bin_dir" "$man_dir"
-  gcc -O2 -o "$bin_dir/jpegexiforient" "$SAFE_ROOT/debian/extra/jpegexiforient.c"
+  mkdir -p "$bin_dir" "$man_dir" "$internal_dir"
+  build_rust_tool_wrappers
+
+  for tool in cjpeg djpeg jpegtran rdjpgcom wrjpgcom tjbench; do
+    mv "$bin_dir/$tool" "$internal_dir/${tool}-real"
+    install -m 755 "$SAFE_ROOT/target/release/$tool" "$bin_dir/$tool"
+  done
+
+  gcc -O2 -o "$internal_dir/jpegexiforient-real" "$SAFE_ROOT/debian/extra/jpegexiforient.c"
+  install -m 755 "$SAFE_ROOT/target/release/jpegexiforient" "$bin_dir/jpegexiforient"
   install -m 755 "$SAFE_ROOT/debian/extra/exifautotran" "$bin_dir/exifautotran"
   install -m 644 "$SAFE_ROOT/debian/extra/jpegexiforient.1" "$man_dir/jpegexiforient.1"
   install -m 644 "$SAFE_ROOT/debian/extra/exifautotran.1" "$man_dir/exifautotran.1"
+
+  if [[ -x "$BUILD_DIR/tjexample" ]]; then
+    install -m 755 "$BUILD_DIR/tjexample" "$internal_dir/tjexample-real"
+  fi
 }
 
 if ((CLEAN)); then
@@ -524,6 +599,6 @@ rm -f "$STAGE_DIR/usr/include/jconfig.h"
 mkdir -p "$STAGE_DIR/usr/include/$MULTIARCH"
 install_committed_headers
 install_committed_metadata
-install_extra_tools
+install_packaged_tools
 
 printf 'staged bootstrap install at %s/usr\n' "$STAGE_DIR"

@@ -1,0 +1,37 @@
+.TH TJBENCH 1 "03 April 2026" "libjpeg-turbo" "User Commands"
+.SH NAME
+tjbench \- JPEG compression/decompression benchmark
+.SH SYNOPSIS
+.B tjbench
+.I input-image
+.I quality-or-output-format
+.RI [ options ]
+.SH DESCRIPTION
+tjbench is a JPEG decompression/compression benchmark part of libjpeg-turbo.
+It remains the authoritative committed input for the rendered staged tjbench(1)
+page and documents the packaged benchmark surface, including -limitscans.
+.PP
+This rendered page is generated from the committed Debian template in
+\fBsafe/debian/tjbench.1.in\fR during staging.
+.SH NOTES
+.TP
+\fB-limitscans\fR
+Propagate the libjpeg/libturbojpeg scan-limit checks during benchmarked
+decompression and transforms.
+.TP
+\fB-progressive\fR
+Generate progressive JPEG output during compression benchmarks.
+.TP
+\fB-fastupsample\fR, \fB-fastdct\fR, \fB-accuratedct\fR
+Select the decompression upsampling path and DCT quality/performance tradeoff.
+.TP
+\fB-tile\fR
+Exercise the tiled encode/decode paths used by the upstream regression suite.
+.TP
+\fB-benchtime\fR, \fB-warmup\fR, \fB-quiet\fR
+Control iteration timing and output verbosity for scripted use.
+.SH AUTHOR
+This manual page was written by Mathieu Malaterre <malat@debian.org> for the
+Debian GNU/Linux system, but may be used by others.
+.SH COPYRIGHT
+Copyright (C)2009-2019, 2021 D. R. Commander.  All Rights Reserved.
