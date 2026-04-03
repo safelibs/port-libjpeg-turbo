@@ -143,7 +143,9 @@ static void init_image(unsigned char *src_buf, int width, int height)
   }
 }
 
-static int compress_test_jpeg(unsigned char **jpeg_buf, unsigned long *jpeg_size)
+static int try_compress_test_jpeg(unsigned char **jpeg_buf,
+                                  unsigned long *jpeg_size,
+                                  char *error_message)
 {
   tjhandle handle = NULL;
   unsigned char src_buf[32 * 32 * 3];
@@ -152,21 +154,41 @@ static int compress_test_jpeg(unsigned char **jpeg_buf, unsigned long *jpeg_size
   init_image(src_buf, 32, 32);
   *jpeg_buf = NULL;
   *jpeg_size = 0;
+  if (error_message)
+    error_message[0] = '\0';
 
   handle = tjInitCompress();
   if (!handle) {
-    printf("TurboJPEG ERROR: %s\n", tjGetErrorStr2(NULL));
+    if (error_message) {
+      strncpy(error_message, tjGetErrorStr2(NULL), JMSG_LENGTH_MAX);
+      error_message[JMSG_LENGTH_MAX - 1] = '\0';
+    }
     return -1;
   }
 
   if (tjCompress2(handle, src_buf, 32, 0, 32, TJPF_RGB, jpeg_buf, jpeg_size,
                   TJSAMP_444, 75, 0) == -1) {
-    printf("TurboJPEG ERROR: %s\n", tjGetErrorStr2(handle));
+    if (error_message) {
+      strncpy(error_message, tjGetErrorStr2(handle), JMSG_LENGTH_MAX);
+      error_message[JMSG_LENGTH_MAX - 1] = '\0';
+    }
     retval = -1;
   }
 
   tjDestroy(handle);
   return retval;
+}
+
+static int compress_test_jpeg(unsigned char **jpeg_buf, unsigned long *jpeg_size)
+{
+  char error_message[JMSG_LENGTH_MAX];
+
+  if (try_compress_test_jpeg(jpeg_buf, jpeg_size, error_message) == -1) {
+    printf("TurboJPEG ERROR: %s\n", error_message);
+    return -1;
+  }
+
+  return 0;
 }
 
 static int read_jpeg_header(const unsigned char *jpeg_buf, unsigned long jpeg_size,
@@ -229,17 +251,27 @@ static int clear_env(const char *name, env_guard *guard)
 }
 
 static int verify_header(const char *label, int expected_progressive,
-                         int expected_arith, unsigned int expected_restart)
+                         int expected_arith, unsigned int expected_restart,
+                         const char *unsupported_error)
 {
   unsigned char *jpeg_buf = NULL;
   unsigned long jpeg_size = 0;
   jpeg_header_info info;
+  char error_message[JMSG_LENGTH_MAX];
   int retval = -1;
 
   printf("%s...\n", label);
 
-  if (compress_test_jpeg(&jpeg_buf, &jpeg_size) == -1)
+  if (try_compress_test_jpeg(&jpeg_buf, &jpeg_size, error_message) == -1) {
+    if (unsupported_error && !strcmp(error_message, unsupported_error)) {
+      printf("%s\n", error_message);
+      printf("SUCCESS!\n\n");
+      retval = 0;
+      goto bailout;
+    }
+    printf("TurboJPEG ERROR: %s\n", error_message);
     goto bailout;
+  }
   if (read_jpeg_header(jpeg_buf, jpeg_size, &info) == -1)
     goto bailout;
 
@@ -279,7 +311,7 @@ static int verify_default_settings(void)
       clear_env("TJ_PROGRESSIVE", &progressive) == -1)
     goto bailout;
 
-  retval = verify_header("Default TurboJPEG environment", 0, 0, 0);
+  retval = verify_header("Default TurboJPEG environment", 0, 0, 0, NULL);
 
 bailout:
   restore_env(&progressive);
@@ -359,7 +391,7 @@ static int verify_restart_interval(void)
       with_env("TJ_RESTART", "8B", &restart) == -1)
     goto bailout;
 
-  retval = verify_header("TJ_RESTART = 8B", 0, 0, 8);
+  retval = verify_header("TJ_RESTART = 8B", 0, 0, 8, NULL);
 
 bailout:
   restore_env(&restart);
@@ -385,7 +417,7 @@ static int verify_restart_rows(void)
       with_env("TJ_RESTART", "1", &restart) == -1)
     goto bailout;
 
-  retval = verify_header("TJ_RESTART = 1 MCU row", 0, 0, 4);
+  retval = verify_header("TJ_RESTART = 1 MCU row", 0, 0, 4, NULL);
 
 bailout:
   restore_env(&restart);
@@ -399,7 +431,6 @@ bailout:
   return retval;
 }
 
-#ifdef C_PROGRESSIVE_SUPPORTED
 static int verify_progressive_setting(void)
 {
   env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
@@ -412,7 +443,8 @@ static int verify_progressive_setting(void)
       with_env("TJ_PROGRESSIVE", "1", &progressive) == -1)
     goto bailout;
 
-  retval = verify_header("TJ_PROGRESSIVE = 1", 1, 0, 0);
+  retval = verify_header("TJ_PROGRESSIVE = 1", 1, 0, 0,
+                         "Requested feature was omitted at compile time");
 
 bailout:
   restore_env(&progressive);
@@ -425,9 +457,7 @@ bailout:
   free_env_guard(&optimize);
   return retval;
 }
-#endif
 
-#ifdef C_ARITH_CODING_SUPPORTED
 static int verify_arithmetic_setting(void)
 {
   env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
@@ -440,7 +470,8 @@ static int verify_arithmetic_setting(void)
       with_env("TJ_ARITHMETIC", "1", &arithmetic) == -1)
     goto bailout;
 
-  retval = verify_header("TJ_ARITHMETIC = 1", 0, 1, 0);
+  retval = verify_header("TJ_ARITHMETIC = 1", 0, 1, 0,
+                         "Sorry, arithmetic coding is not implemented");
 
 bailout:
   restore_env(&arithmetic);
@@ -453,25 +484,16 @@ bailout:
   free_env_guard(&optimize);
   return retval;
 }
-#endif
 
 int main(void)
 {
   if (verify_default_settings() == -1 ||
       verify_optimize_setting() == -1 ||
       verify_restart_interval() == -1 ||
-      verify_restart_rows() == -1)
+      verify_restart_rows() == -1 ||
+      verify_progressive_setting() == -1 ||
+      verify_arithmetic_setting() == -1)
     return -1;
-
-#ifdef C_PROGRESSIVE_SUPPORTED
-  if (verify_progressive_setting() == -1)
-    return -1;
-#endif
-
-#ifdef C_ARITH_CODING_SUPPORTED
-  if (verify_arithmetic_setting() == -1)
-    return -1;
-#endif
 
   return 0;
 }
