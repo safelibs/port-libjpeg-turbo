@@ -96,9 +96,11 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       jq \
       krita \
       libcamera-tools \
+      libcamera-dev \
       libreoffice-core \
       libreoffice-draw \
       libopencv-dev \
+      libsdl2-dev \
       libvips-dev \
       libvips-tools \
       libwebkit2gtk-4.1-dev \
@@ -423,6 +425,7 @@ prepare_fixtures() {
 import io
 import os
 from PIL import Image
+from PIL import ImageDraw
 from pydicom.dataset import FileDataset, FileMetaDataset
 from pydicom.encaps import encapsulate
 from pydicom.uid import JPEGBaseline8Bit, SecondaryCaptureImageStorage, generate_uid
@@ -433,8 +436,24 @@ input_png = os.path.join(fixture_dir, "input.png")
 dicom_dir = os.path.join(fixture_dir, "dcm")
 dicom_path = os.path.join(dicom_dir, "input.dcm")
 
+
+def make_quadrant_jpeg(path, size):
+    width, height = size
+    image = Image.new("RGB", size)
+    draw = ImageDraw.Draw(image)
+    mid_x = width // 2
+    mid_y = height // 2
+    draw.rectangle((0, 0, mid_x - 1, mid_y - 1), fill=(250, 20, 20))
+    draw.rectangle((mid_x, 0, width - 1, mid_y - 1), fill=(20, 250, 20))
+    draw.rectangle((0, mid_y, mid_x - 1, height - 1), fill=(20, 20, 250))
+    draw.rectangle((mid_x, mid_y, width - 1, height - 1), fill=(250, 250, 20))
+    image.save(path, format="JPEG", quality=95, subsampling=0)
+
+
 rgb = Image.open(input_jpg).convert("RGB")
 rgb.save(input_png)
+make_quadrant_jpeg(os.path.join(fixture_dir, "eog-pattern.jpg"), (1024, 768))
+make_quadrant_jpeg(os.path.join(fixture_dir, "mjpeg-pattern.jpg"), (128, 128))
 
 jpeg_buffer = io.BytesIO()
 rgb.save(jpeg_buffer, format="JPEG")
@@ -950,32 +969,88 @@ check_eog_runtime() {
   export XDG_RUNTIME_DIR="$dir/xdg"
   mkdir -p "$XDG_RUNTIME_DIR"
 
+  set +e
   timeout 60 dbus-run-session -- xvfb-run -a --server-args="-screen 0 1024x768x24" \
-    bash -s -- "$FIXTURE_DIR/input.jpg" "$dir/eog.log" "$dir/window-id.txt" <<'EOF'
+    bash -s -- "$FIXTURE_DIR/eog-pattern.jpg" "$dir/eog.log" "$dir/render-probe.log" "$dir/window-id.txt" <<'EOF'
 set -euo pipefail
 image="$1"
 log_path="$2"
-window_path="$3"
+probe_path="$3"
+window_path="$4"
 
-eog "$image" >"$log_path" 2>&1 &
+eog --fullscreen "$image" >"$log_path" 2>&1 &
 pid=$!
+
+cleanup() {
+  kill "$pid" || true
+  wait "$pid" || true
+}
+
+trap cleanup EXIT
 
 for _ in $(seq 1 20); do
   if xdotool search --onlyvisible --class Eog >"$window_path" 2>/dev/null; then
-    kill "$pid"
-    wait "$pid" || true
-    exit 0
+    break
   fi
   sleep 1
 done
 
-cat "$log_path" >&2
-kill "$pid" || true
-wait "$pid" || true
-exit 1
+[[ -s "$window_path" ]] || {
+  cat "$log_path" >&2
+  exit 1
+}
+
+python3 - "$probe_path" <<'PY'
+import os
+import sys
+import time
+from PIL import ImageGrab
+
+probe_path = sys.argv[1]
+expected = [
+    ("top-left", (256, 192), (250, 20, 20)),
+    ("top-right", (768, 192), (20, 250, 20)),
+    ("bottom-left", (256, 576), (20, 20, 250)),
+    ("bottom-right", (768, 576), (250, 250, 20)),
+]
+
+with open(probe_path, "w", encoding="utf-8") as probe_log:
+    for attempt in range(20):
+        time.sleep(1)
+        try:
+            image = ImageGrab.grab(xdisplay=os.environ["DISPLAY"])
+        except Exception as exc:
+            print(f"attempt {attempt}: ImageGrab failed: {type(exc).__name__}: {exc}", file=probe_log)
+            probe_log.flush()
+            continue
+
+        ok = True
+        samples = []
+        for label, coord, want in expected:
+            got = image.getpixel(coord)
+            samples.append(f"{label}={got}")
+            if any(abs(got_channel - want_channel) > 90 for got_channel, want_channel in zip(got, want)):
+                ok = False
+
+        print(f"attempt {attempt}: {' '.join(samples)}", file=probe_log)
+        probe_log.flush()
+        if ok:
+            sys.exit(0)
+
+sys.exit(1)
+PY
 EOF
+  status=$?
+  set -e
+
+  if [[ "$status" -ne 0 ]]; then
+    cat "$dir/render-probe.log" >&2 2>/dev/null || true
+    cat "$dir/eog.log" >&2 2>/dev/null || true
+    exit 1
+  fi
 
   require_nonempty_file "$dir/window-id.txt"
+  require_nonempty_file "$dir/render-probe.log"
 }
 
 check_gimp_runtime() {
@@ -1048,16 +1123,10 @@ check_krita_runtime() {
 }
 
 check_libcamera_tools_runtime() {
-  local dir status
+  local dir status source_dir
 
   dir="$(reset_test_dir libcamera-tools-runtime)"
   assert_uses_local_soname /usr/bin/cam libjpeg.so.8
-
-  cam --help >"$dir/help.log" 2>&1 || {
-    cat "$dir/help.log" >&2
-    exit 1
-  }
-  require_contains "$dir/help.log" 'List all cameras'
 
   set +e
   cam -l >"$dir/list.log" 2>&1
@@ -1070,6 +1139,156 @@ check_libcamera_tools_runtime() {
   }
 
   require_contains "$dir/list.log" 'Available cameras:'
+
+  # Containers generally have no camera hardware. Exercise cam's own MJPEG
+  # processing path directly by building a tiny probe against the source files
+  # that implement `cam --sdl` JPEG frame handling.
+  source_dir="$(fetch_ubuntu_source libcamera)"
+
+  cat >"$dir/libcamera_mjpg_probe.cpp" <<'EOF'
+#include <SDL2/SDL.h>
+#include <libcamera/base/span.h>
+
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <vector>
+
+#include "sdl_texture_mjpg.h"
+
+namespace {
+
+unsigned char pixel_at(SDL_Surface *surface, int x, int y, int channel)
+{
+  auto *row = static_cast<unsigned char *>(surface->pixels) + y * surface->pitch;
+  return row[x * 3 + channel];
+}
+
+bool within_tolerance(int got, int want)
+{
+  return got >= want - 90 && got <= want + 90;
+}
+
+}  // namespace
+
+int main(int argc, char **argv)
+{
+  if (argc != 2) {
+    std::cerr << "usage: libcamera-mjpg-probe <jpeg>\n";
+    return 1;
+  }
+
+  std::ifstream input(argv[1], std::ios::binary);
+  std::vector<unsigned char> bytes((std::istreambuf_iterator<char>(input)),
+                                   std::istreambuf_iterator<char>());
+  if (bytes.empty()) {
+    std::cerr << "empty jpeg input\n";
+    return 1;
+  }
+
+  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
+    return 1;
+  }
+
+  SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, 128, 128, 24, SDL_PIXELFORMAT_RGB24);
+  if (!surface) {
+    std::cerr << "SDL_CreateRGBSurfaceWithFormat failed: " << SDL_GetError() << "\n";
+    SDL_Quit();
+    return 1;
+  }
+
+  SDL_Renderer *renderer = SDL_CreateSoftwareRenderer(surface);
+  if (!renderer) {
+    std::cerr << "SDL_CreateSoftwareRenderer failed: " << SDL_GetError() << "\n";
+    SDL_FreeSurface(surface);
+    SDL_Quit();
+    return 1;
+  }
+
+  SDL_Rect rect{0, 0, 128, 128};
+  SDLTextureMJPG texture(rect);
+  if (texture.create(renderer) != 0) {
+    SDL_DestroyRenderer(renderer);
+    SDL_FreeSurface(surface);
+    SDL_Quit();
+    return 1;
+  }
+
+  std::vector<libcamera::Span<const uint8_t>> planes;
+  planes.emplace_back(bytes.data(), bytes.size());
+  texture.update(planes);
+
+  SDL_RenderClear(renderer);
+  SDL_RenderCopy(renderer, texture.get(), nullptr, nullptr);
+  SDL_RenderPresent(renderer);
+
+  struct Sample {
+    const char *label;
+    int x;
+    int y;
+    int r;
+    int g;
+    int b;
+  };
+
+  const Sample samples[] = {
+      { "top-left", 32, 32, 250, 20, 20 },
+      { "top-right", 96, 32, 20, 250, 20 },
+      { "bottom-left", 32, 96, 20, 20, 250 },
+      { "bottom-right", 96, 96, 250, 250, 20 },
+  };
+
+  for (const Sample &sample : samples) {
+    int r = pixel_at(surface, sample.x, sample.y, 0);
+    int g = pixel_at(surface, sample.x, sample.y, 1);
+    int b = pixel_at(surface, sample.x, sample.y, 2);
+    std::cout << sample.label << "=" << r << "," << g << "," << b << "\n";
+    if (!within_tolerance(r, sample.r) ||
+        !within_tolerance(g, sample.g) ||
+        !within_tolerance(b, sample.b)) {
+      SDL_DestroyRenderer(renderer);
+      SDL_FreeSurface(surface);
+      SDL_Quit();
+      return 1;
+    }
+  }
+
+  SDL_DestroyRenderer(renderer);
+  SDL_FreeSurface(surface);
+  SDL_Quit();
+  return 0;
+}
+EOF
+
+  c++ -std=c++17 \
+    -I"$source_dir/src/apps/cam" \
+    -I"$source_dir/src/apps/common" \
+    $(pkg-config --cflags libcamera-base sdl2) \
+    "$dir/libcamera_mjpg_probe.cpp" \
+    "$source_dir/src/apps/cam/sdl_texture.cpp" \
+    "$source_dir/src/apps/cam/sdl_texture_mjpg.cpp" \
+    -L/usr/local/lib \
+    -Wl,-rpath,/usr/local/lib \
+    $(pkg-config --libs sdl2) \
+    -ljpeg \
+    -o "$dir/libcamera-mjpg-probe" \
+    >"$dir/build.log" 2>&1 || {
+      cat "$dir/build.log" >&2
+      exit 1
+    }
+
+  assert_uses_local_soname "$dir/libcamera-mjpg-probe" libjpeg.so.8
+
+  SDL_VIDEODRIVER=dummy "$dir/libcamera-mjpg-probe" "$FIXTURE_DIR/mjpeg-pattern.jpg" >"$dir/run.log" 2>&1 || {
+    cat "$dir/run.log" >&2
+    exit 1
+  }
+
+  require_contains "$dir/run.log" 'top-left='
+  require_contains "$dir/run.log" 'top-right='
+  require_contains "$dir/run.log" 'bottom-left='
+  require_contains "$dir/run.log" 'bottom-right='
 }
 
 check_opencv_consumer() {
