@@ -7,6 +7,7 @@ BUILD_DIR="$SAFE_ROOT/target/upstream-bootstrap"
 STAGE_DIR="$SAFE_ROOT/stage"
 TMP_INSTALL_ROOT="$SAFE_ROOT/target/upstream-install"
 TMP_RENDER_ROOT="$SAFE_ROOT/target/rendered"
+SYMBOLS_TOOL="$SAFE_ROOT/scripts/debian_symbols.py"
 WITH_JAVA_MODE="auto"
 CLEAN=0
 
@@ -280,6 +281,113 @@ render_template() {
     "$input" >"$output"
 }
 
+render_version_script() {
+  local symbols_file="$1"
+  local output="$2"
+  shift 2
+  python3 "$SYMBOLS_TOOL" render-version-script "$@" "$symbols_file" "$output"
+}
+
+run_relink_from_link_txt() {
+  local link_dir="$1"
+  local link_txt="$2"
+  local output="$3"
+  local version_script="$4"
+  local extra_object="${5:-}"
+  local argv=()
+
+  mapfile -d '' -t argv < <(
+    python3 - "$link_txt" "$output.tmp" "$version_script" "$extra_object" <<'PY'
+import shlex
+import sys
+from pathlib import Path
+
+link_txt = Path(sys.argv[1])
+output = sys.argv[2]
+version_script = sys.argv[3]
+extra_object = sys.argv[4]
+
+args = shlex.split(link_txt.read_text(encoding="utf-8"))
+rewritten = []
+i = 0
+
+while i < len(args):
+    arg = args[i]
+    if arg == "-o":
+        rewritten.extend(["-o", output])
+        i += 2
+        continue
+    if arg.startswith("-Wl,--version-script,"):
+        rewritten.append(f"-Wl,--version-script,{version_script}")
+        i += 1
+        continue
+    rewritten.append(arg)
+    i += 1
+
+if extra_object:
+    rewritten.append(extra_object)
+
+sys.stdout.write("\0".join(rewritten))
+sys.stdout.write("\0")
+PY
+  )
+
+  (
+    cd "$link_dir"
+    "${argv[@]}"
+  )
+  mv "$output.tmp" "$output"
+}
+
+shared_library_target() {
+  local symlink_path="$1"
+  local target
+
+  target="$(readlink "$symlink_path")"
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$(dirname -- "$symlink_path")/$target"
+  else
+    printf '%s\n' "$symlink_path"
+  fi
+}
+
+relink_staged_libjpeg() {
+  local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
+  local output
+  local version_script="$BUILD_DIR/libjpeg-bootstrap.map"
+  local bridge_object="$BUILD_DIR/libjpeg_compat.o"
+  local link_dir="$BUILD_DIR/sharedlib"
+  local link_txt="$BUILD_DIR/sharedlib/CMakeFiles/jpeg.dir/link.txt"
+
+  render_version_script "$ROOT/original/debian/libjpeg-turbo8.symbols" "$version_script"
+  gcc -O2 -fPIC -I"$BUILD_DIR" -I"$ROOT/original" -c \
+    "$SAFE_ROOT/bridge/libjpeg_compat.c" -o "$bridge_object"
+
+  output="$(shared_library_target "$libdir/libjpeg.so.8")"
+  run_relink_from_link_txt "$link_dir" "$link_txt" "$output" "$version_script" "$bridge_object"
+}
+
+relink_staged_libturbojpeg() {
+  local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
+  local output
+  local version_script="$BUILD_DIR/libturbojpeg-bootstrap.map"
+  local link_dir="$BUILD_DIR"
+  local link_txt="$BUILD_DIR/CMakeFiles/turbojpeg.dir/link.txt"
+  local skip_args=()
+
+  if [[ "$WITH_JAVA" == "1" ]]; then
+    return
+  fi
+
+  skip_args=(--skip-regex '^Java_org_libjpegturbo_turbojpeg_')
+
+  render_version_script "$ROOT/original/debian/libturbojpeg.symbols" \
+    "$version_script" "${skip_args[@]}"
+
+  output="$(shared_library_target "$libdir/libturbojpeg.so.0")"
+  run_relink_from_link_txt "$link_dir" "$link_txt" "$output" "$version_script"
+}
+
 install_committed_headers() {
   local manifest="$SAFE_ROOT/include/install-manifest.txt"
   local header_path source_path generated_path
@@ -374,15 +482,14 @@ cmake \
   -DCMAKE_INSTALL_LIBDIR="/usr/lib/$MULTIARCH" \
   -DCMAKE_INSTALL_MANDIR=/usr/share/man
 
-# Keep the canonical bootstrap version script in-tree and feed it into the
-# upstream bridge build.
-install -m 644 "$SAFE_ROOT/link/libjpeg.map" "$BUILD_DIR/libjpeg.map"
-
 cmake --build "$BUILD_DIR" --parallel "$JOBS"
 DESTDIR="$TMP_INSTALL_ROOT" cmake --install "$BUILD_DIR"
 
 mkdir -p "$STAGE_DIR"
 cp -a "$TMP_INSTALL_ROOT/." "$STAGE_DIR/"
+
+relink_staged_libjpeg
+relink_staged_libturbojpeg
 
 rm -f "$STAGE_DIR/usr/include/jconfig.h"
 mkdir -p "$STAGE_DIR/usr/include/$MULTIARCH"
@@ -391,4 +498,3 @@ install_committed_metadata
 install_extra_tools
 
 printf 'staged bootstrap install at %s/usr\n' "$STAGE_DIR"
-

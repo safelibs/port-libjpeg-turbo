@@ -37,6 +37,10 @@ TURBOJPEG_1.2
     tjTransform;
 } TURBOJPEG_1.1;
 
+TURBOJPEG_1.3
+{
+} TURBOJPEG_1.2;
+
 TURBOJPEG_1.4
 {
   global:
@@ -53,7 +57,7 @@ TURBOJPEG_1.4
     tjPlaneHeight;
     tjPlaneSizeYUV;
     tjPlaneWidth;
-} TURBOJPEG_1.2;
+} TURBOJPEG_1.3;
 
 TURBOJPEG_2.0
 {
