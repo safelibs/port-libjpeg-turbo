@@ -1,16 +1,15 @@
 use std::{
-    env,
-    os::unix::process::CommandExt,
-    path::{Path, PathBuf},
-    process::Command,
+    ffi::CString,
+    os::{
+        raw::{c_char, c_int},
+        unix::ffi::OsStringExt,
+    },
 };
 
 pub mod cdjpeg;
 pub mod image_io;
 pub mod rdcolmap;
 pub mod rdswitch;
-
-pub const INTERNAL_TOOL_DIR: &str = "libexec/libjpeg-turbo-safe";
 
 pub const PACKAGED_TOOL_NAMES: &[&str] = &[
     "cjpeg",
@@ -21,17 +20,6 @@ pub const PACKAGED_TOOL_NAMES: &[&str] = &[
     "tjbench",
     "jpegexiforient",
     "exifautotran",
-];
-
-pub const WRAPPER_TOOL_NAMES: &[&str] = &[
-    "cjpeg",
-    "djpeg",
-    "jpegtran",
-    "rdjpgcom",
-    "wrjpgcom",
-    "tjbench",
-    "jpegexiforient",
-    "tjexample",
 ];
 
 pub const MANPAGE_NAMES: &[&str] = &[
@@ -45,44 +33,27 @@ pub const MANPAGE_NAMES: &[&str] = &[
     "exifautotran.1",
 ];
 
-pub fn internal_tools_dir_from_exe(exe_path: &Path) -> Result<PathBuf, String> {
-    if let Some(path) = env::var_os("LIBJPEG_TURBO_SAFE_INTERNAL_TOOLS_DIR") {
-        return Ok(PathBuf::from(path));
-    }
+pub type EmbeddedToolMain = unsafe extern "C" fn(argc: c_int, argv: *mut *mut c_char) -> c_int;
 
-    let usr_dir = exe_path
-        .parent()
-        .and_then(Path::parent)
-        .ok_or_else(|| format!("could not derive usr/ from {}", exe_path.display()))?;
-    Ok(usr_dir.join(INTERNAL_TOOL_DIR))
-}
-
-pub fn internal_tool_path(tool: &str) -> Result<PathBuf, String> {
-    let exe_path = env::current_exe()
-        .map_err(|error| format!("failed to resolve current executable: {error}"))?;
-    Ok(internal_tools_dir_from_exe(&exe_path)?.join(format!("{tool}-real")))
-}
-
-pub fn exec_internal_tool(tool: &str) -> ! {
-    let public_argv0 = env::args_os().next();
-    let internal = match internal_tool_path(tool) {
-        Ok(path) => path,
-        Err(error) => {
-            eprintln!("{tool}: {error}");
-            std::process::exit(127);
+pub fn run_embedded_tool(tool: &str, entry: EmbeddedToolMain) -> ! {
+    let args = match std::env::args_os()
+        .map(|arg| CString::new(arg.into_vec()))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(args) => args,
+        Err(_) => {
+            eprintln!("{tool}: arguments contain an unexpected NUL byte");
+            std::process::exit(1);
         }
     };
 
-    let mut command = Command::new(&internal);
-    if let Some(arg0) = public_argv0 {
-        command.arg0(arg0);
-    }
-    command.args(env::args_os().skip(1));
+    let mut argv = args
+        .iter()
+        .map(|arg| arg.as_ptr() as *mut c_char)
+        .collect::<Vec<_>>();
+    argv.push(std::ptr::null_mut());
 
-    let error = command.exec();
-    eprintln!(
-        "{tool}: failed to execute staged internal tool {}: {error}",
-        internal.display()
-    );
-    std::process::exit(127);
+    let argc = c_int::try_from(args.len()).unwrap_or(c_int::MAX);
+    let code = unsafe { entry(argc, argv.as_mut_ptr()) };
+    std::process::exit(code);
 }

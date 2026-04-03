@@ -543,32 +543,24 @@ $copyright
 EOF
 }
 
-build_rust_tool_wrappers() {
+build_rust_tools() {
   cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p jpeg-tools --release --bins >/dev/null
 }
 
 install_packaged_tools() {
   local bin_dir="$STAGE_DIR/usr/bin"
   local man_dir="$STAGE_DIR/usr/share/man/man1"
-  local internal_dir="$STAGE_DIR/usr/libexec/libjpeg-turbo-safe"
 
-  mkdir -p "$bin_dir" "$man_dir" "$internal_dir"
-  build_rust_tool_wrappers
+  mkdir -p "$bin_dir" "$man_dir"
+  build_rust_tools
 
-  for tool in cjpeg djpeg jpegtran rdjpgcom wrjpgcom tjbench; do
-    mv "$bin_dir/$tool" "$internal_dir/${tool}-real"
+  for tool in cjpeg djpeg jpegtran rdjpgcom wrjpgcom tjbench jpegexiforient; do
     install -m 755 "$SAFE_ROOT/target/release/$tool" "$bin_dir/$tool"
   done
 
-  gcc -O2 -o "$internal_dir/jpegexiforient-real" "$SAFE_ROOT/debian/extra/jpegexiforient.c"
-  install -m 755 "$SAFE_ROOT/target/release/jpegexiforient" "$bin_dir/jpegexiforient"
   install -m 755 "$SAFE_ROOT/debian/extra/exifautotran" "$bin_dir/exifautotran"
   install -m 644 "$SAFE_ROOT/debian/extra/jpegexiforient.1" "$man_dir/jpegexiforient.1"
   install -m 644 "$SAFE_ROOT/debian/extra/exifautotran.1" "$man_dir/exifautotran.1"
-
-  if [[ -x "$BUILD_DIR/tjexample" ]]; then
-    install -m 755 "$BUILD_DIR/tjexample" "$internal_dir/tjexample-real"
-  fi
 }
 
 if ((CLEAN)); then
