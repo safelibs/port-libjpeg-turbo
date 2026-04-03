@@ -161,6 +161,7 @@ fn main() {
 fn matrix_cases() -> Vec<MatrixCase> {
     let mut cases = baseline_decode_cases();
     cases.extend(advanced_decode_cases());
+    cases.extend(encode_transcode_cases());
     cases.extend(croptest_cases());
     cases
 }
@@ -1061,6 +1062,238 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
+        },
+    ]
+}
+
+fn encode_transcode_cases() -> Vec<MatrixCase> {
+    vec![
+        MatrixCase {
+            name: "encode-transcode-cjpeg-rgb-islow",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-rgb",
+                    "-dct",
+                    "int",
+                    "-icc",
+                    "@ORIG:test1.icc",
+                    "-outfile",
+                    "@TMP:testout_rgb_islow.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_rgb_islow.jpg", "1d44a406f61da743b5fd31c0a9abdca3")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-jpegtran-icc",
+            commands: vec![
+                rgb_islow_setup(),
+                cmd(
+                    "jpegtran",
+                    &[
+                        "-copy",
+                        "all",
+                        "-icc",
+                        "@ORIG:test2.icc",
+                        "-outfile",
+                        "@TMP:testout_rgb_islow2.jpg",
+                        "@TMP:testout_rgb_islow.jpg",
+                    ],
+                    Some(("@TMP:testout_rgb_islow2.jpg", "31d121e57b6c2934c890a7fc7763bcd4")),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-422-ifast-opt",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "2x1",
+                    "-dct",
+                    "fast",
+                    "-opt",
+                    "-outfile",
+                    "@TMP:testout_422_ifast_opt.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_422_ifast_opt.jpg", "2540287b79d913f91665e660303ab2c8")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-440-islow",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "1x2",
+                    "-dct",
+                    "int",
+                    "-outfile",
+                    "@TMP:testout_440_islow.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_440_islow.jpg", "538bc02bd4b4658fd85de6ece6cbeda6")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-420-q100-ifast-prog",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "2x2",
+                    "-quality",
+                    "100",
+                    "-dct",
+                    "fast",
+                    "-scans",
+                    "@ORIG:test.scan",
+                    "-outfile",
+                    "@TMP:testout_420_q100_ifast_prog.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_420_q100_ifast_prog.jpg", "0ba15f9dab81a703505f835f9dbbac6d")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-gray-islow",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-gray",
+                    "-dct",
+                    "int",
+                    "-outfile",
+                    "@TMP:testout_gray_islow.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_gray_islow.jpg", "72b51f894b8f4a10b3ee3066770aa38d")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-420s-ifast-opt",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "2x2",
+                    "-smooth",
+                    "1",
+                    "-dct",
+                    "int",
+                    "-opt",
+                    "-outfile",
+                    "@TMP:testout_420s_ifast_opt.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_420s_ifast_opt.jpg", "388708217ac46273ca33086b22827ed8")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-3x2-ifast-prog",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "3x2",
+                    "-dct",
+                    "fast",
+                    "-prog",
+                    "-outfile",
+                    "@TMP:testout_3x2_ifast_prog.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_3x2_ifast_prog.jpg", "1ee5d2c1a77f2da495f993c8c7cceca5")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-420-islow-ari",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-dct",
+                    "int",
+                    "-arithmetic",
+                    "-outfile",
+                    "@TMP:testout_420_islow_ari.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_420_islow_ari.jpg", "e986fb0a637a8d833d96e8a6d6d84ea1")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-jpegtran-420-islow-ari",
+            commands: vec![cmd(
+                "jpegtran",
+                &[
+                    "-arithmetic",
+                    "-outfile",
+                    "@TMP:testout_420_islow_ari2.jpg",
+                    "@ORIG:testimgint.jpg",
+                ],
+                Some(("@TMP:testout_420_islow_ari2.jpg", "e986fb0a637a8d833d96e8a6d6d84ea1")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-cjpeg-444-islow-progari",
+            commands: vec![cmd(
+                "cjpeg",
+                &[
+                    "-sample",
+                    "1x1",
+                    "-dct",
+                    "int",
+                    "-prog",
+                    "-arithmetic",
+                    "-outfile",
+                    "@TMP:testout_444_islow_progari.jpg",
+                    "@ORIG:testorig.ppm",
+                ],
+                Some(("@TMP:testout_444_islow_progari.jpg", "0a8f1c8f66e113c3cf635df0a475a617")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-jpegtran-420-islow",
+            commands: vec![cmd(
+                "jpegtran",
+                &[
+                    "-outfile",
+                    "@TMP:testout_420_islow.jpg",
+                    "@ORIG:testimgari.jpg",
+                ],
+                Some(("@TMP:testout_420_islow.jpg", "9a68f56bc76e466aa7e52f415d0f4a5f")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "encode-transcode-jpegtran-crop",
+            commands: vec![cmd(
+                "jpegtran",
+                &[
+                    "-crop",
+                    "120x90+20+50",
+                    "-transpose",
+                    "-perfect",
+                    "-outfile",
+                    "@TMP:testout_crop.jpg",
+                    "@ORIG:testorig.jpg",
+                ],
+                Some(("@TMP:testout_crop.jpg", "b4197f377e621c4e9b1d20471432610d")),
+            )],
             runner: None,
         },
     ]
