@@ -1,11 +1,19 @@
 use std::{
-    ffi::OsString,
+    ffi::{CStr, CString, OsString},
     fs,
+    mem::MaybeUninit,
+    os::raw::{c_char, c_int, c_void},
     path::{Path, PathBuf},
     process::{Command, Output},
     sync::OnceLock,
 };
 
+use ffi_types::{
+    boolean, int, j_decompress_ptr, jpeg_decompress_struct, jpeg_error_mgr, JSAMPARRAY,
+    DSTATE_BUFIMAGE, DSTATE_SCANNING, JDIMENSION, JPEG_HEADER_OK, JPEG_LIB_VERSION,
+    JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED, JDCT_IFAST,
+    TRUE, ulong,
+};
 use libtest_mimic::{Arguments, Failed, Trial};
 
 #[derive(Clone)]
@@ -29,6 +37,114 @@ struct StagePaths {
 }
 
 static STAGE_PATHS: OnceLock<Result<StagePaths, String>> = OnceLock::new();
+
+unsafe extern "C" {
+    fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    fn dlclose(handle: *mut c_void) -> c_int;
+    fn dlerror() -> *const c_char;
+}
+
+const RTLD_NOW: c_int = 2;
+
+type JpegStdErrorFn = unsafe extern "C" fn(*mut jpeg_error_mgr) -> *mut jpeg_error_mgr;
+type JpegCreateDecompressFn = unsafe extern "C" fn(j_decompress_ptr, int, usize);
+type JpegDestroyDecompressFn = unsafe extern "C" fn(j_decompress_ptr);
+type JpegMemSrcFn = unsafe extern "C" fn(j_decompress_ptr, *const u8, ulong);
+type JpegReadHeaderFn = unsafe extern "C" fn(j_decompress_ptr, boolean) -> int;
+type JpegHasMultipleScansFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+type JpegStartDecompressFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+type JpegConsumeInputFn = unsafe extern "C" fn(j_decompress_ptr) -> int;
+type JpegStartOutputFn = unsafe extern "C" fn(j_decompress_ptr, int) -> boolean;
+type JpegReadScanlinesFn =
+    unsafe extern "C" fn(j_decompress_ptr, JSAMPARRAY, JDIMENSION) -> JDIMENSION;
+type JpegFinishOutputFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+type JpegInputCompleteFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+type JpegFinishDecompressFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+
+struct LoadedLibjpeg {
+    handle: *mut c_void,
+    jpeg_std_error: JpegStdErrorFn,
+    jpeg_create_decompress: JpegCreateDecompressFn,
+    jpeg_destroy_decompress: JpegDestroyDecompressFn,
+    jpeg_mem_src: JpegMemSrcFn,
+    jpeg_read_header: JpegReadHeaderFn,
+    jpeg_has_multiple_scans: JpegHasMultipleScansFn,
+    jpeg_start_decompress: JpegStartDecompressFn,
+    jpeg_consume_input: JpegConsumeInputFn,
+    jpeg_start_output: JpegStartOutputFn,
+    jpeg_read_scanlines: JpegReadScanlinesFn,
+    jpeg_finish_output: JpegFinishOutputFn,
+    jpeg_input_complete: JpegInputCompleteFn,
+    jpeg_finish_decompress: JpegFinishDecompressFn,
+}
+
+impl LoadedLibjpeg {
+    fn open(path: &Path) -> Result<Self, String> {
+        unsafe {
+            let path = CString::new(path.to_string_lossy().into_owned())
+                .map_err(|error| format!("invalid dlopen path {}: {error}", path.display()))?;
+            let handle = dlopen(path.as_ptr(), RTLD_NOW);
+            if handle.is_null() {
+                return Err(format!(
+                    "dlopen {} failed: {}",
+                    path.to_string_lossy(),
+                    dlerror_message()
+                ));
+            }
+
+            Ok(Self {
+                handle,
+                jpeg_std_error: load_symbol(handle, b"jpeg_std_error\0")?,
+                jpeg_create_decompress: load_symbol(handle, b"jpeg_CreateDecompress\0")?,
+                jpeg_destroy_decompress: load_symbol(handle, b"jpeg_destroy_decompress\0")?,
+                jpeg_mem_src: load_symbol(handle, b"jpeg_mem_src\0")?,
+                jpeg_read_header: load_symbol(handle, b"jpeg_read_header\0")?,
+                jpeg_has_multiple_scans: load_symbol(handle, b"jpeg_has_multiple_scans\0")?,
+                jpeg_start_decompress: load_symbol(handle, b"jpeg_start_decompress\0")?,
+                jpeg_consume_input: load_symbol(handle, b"jpeg_consume_input\0")?,
+                jpeg_start_output: load_symbol(handle, b"jpeg_start_output\0")?,
+                jpeg_read_scanlines: load_symbol(handle, b"jpeg_read_scanlines\0")?,
+                jpeg_finish_output: load_symbol(handle, b"jpeg_finish_output\0")?,
+                jpeg_input_complete: load_symbol(handle, b"jpeg_input_complete\0")?,
+                jpeg_finish_decompress: load_symbol(handle, b"jpeg_finish_decompress\0")?,
+            })
+        }
+    }
+}
+
+impl Drop for LoadedLibjpeg {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe {
+                let _ = dlclose(self.handle);
+            }
+        }
+    }
+}
+
+unsafe fn load_symbol<T>(handle: *mut c_void, symbol: &'static [u8]) -> Result<T, String> {
+    let symbol_name = CStr::from_bytes_with_nul(symbol)
+        .expect("symbol names are static and NUL-terminated");
+    let ptr = dlsym(handle, symbol_name.as_ptr());
+    if ptr.is_null() {
+        return Err(format!(
+            "dlsym({}) failed: {}",
+            symbol_name.to_string_lossy(),
+            dlerror_message()
+        ));
+    }
+    Ok(std::mem::transmute_copy(&ptr))
+}
+
+unsafe fn dlerror_message() -> String {
+    let message = dlerror();
+    if message.is_null() {
+        "unknown dlerror".to_string()
+    } else {
+        CStr::from_ptr(message).to_string_lossy().into_owned()
+    }
+}
 
 fn main() {
     let args = Arguments::from_args();
@@ -705,6 +821,11 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
             runner: None,
         },
         MatrixCase {
+            name: "advanced-decode-buffered-image-progressive",
+            commands: Vec::new(),
+            runner: Some(run_buffered_image_case),
+        },
+        MatrixCase {
             name: "advanced-decode-arithmetic-420m-ifast-skip",
             commands: vec![cmd(
                 "djpeg",
@@ -1164,12 +1285,236 @@ fn command_failure(tool: &str, output: &Output) -> String {
     )
 }
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 struct PpmImage {
     width: usize,
     height: usize,
     maxval: usize,
     data: Vec<u8>,
+}
+
+fn run_buffered_image_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
+    let jpeg_path = temp_dir.join("buffered_prog.jpg");
+    let reference_path = temp_dir.join("buffered_prog_reference.ppm");
+
+    let output = run_stage_command(
+        stage,
+        temp_dir,
+        "cjpeg",
+        vec![
+            OsString::from("-quality"),
+            OsString::from("100"),
+            OsString::from("-dct"),
+            OsString::from("fast"),
+            OsString::from("-scans"),
+            stage.original_testimages.join("test.scan").into_os_string(),
+            OsString::from("-outfile"),
+            jpeg_path.clone().into_os_string(),
+            stage.original_testimages.join("testorig.ppm").into_os_string(),
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(command_failure("cjpeg", &output));
+    }
+
+    let output = run_stage_command(
+        stage,
+        temp_dir,
+        "djpeg",
+        vec![
+            OsString::from("-dct"),
+            OsString::from("fast"),
+            OsString::from("-ppm"),
+            OsString::from("-outfile"),
+            reference_path.clone().into_os_string(),
+            jpeg_path.clone().into_os_string(),
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(command_failure("djpeg", &output));
+    }
+
+    let jpeg_bytes =
+        fs::read(&jpeg_path).map_err(|error| format!("read {}: {error}", jpeg_path.display()))?;
+    let reference = read_ppm(&reference_path)?;
+    let (first_pass, final_pass, passes) = decode_buffered_image_passes(stage, &jpeg_bytes)?;
+
+    if passes < 2 {
+        return Err(format!(
+            "buffered-image decode completed in only {passes} pass(es)"
+        ));
+    }
+    if first_pass == final_pass {
+        return Err("buffered-image first pass unexpectedly matched final output".to_string());
+    }
+    if final_pass != reference {
+        return Err("buffered-image final pass did not match normal decode output".to_string());
+    }
+
+    Ok(())
+}
+
+fn decode_buffered_image_passes(
+    stage: &StagePaths,
+    jpeg_bytes: &[u8],
+) -> Result<(PpmImage, PpmImage, usize), String> {
+    unsafe {
+        let libjpeg = LoadedLibjpeg::open(&stage.stage_lib.join("libjpeg.so.8"))?;
+        let mut cinfo = MaybeUninit::<jpeg_decompress_struct>::zeroed().assume_init();
+        let mut err = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
+        cinfo.err = (libjpeg.jpeg_std_error)(&mut err);
+        (libjpeg.jpeg_create_decompress)(
+            &mut cinfo,
+            JPEG_LIB_VERSION,
+            std::mem::size_of::<jpeg_decompress_struct>(),
+        );
+
+        let result = (|| -> Result<(PpmImage, PpmImage, usize), String> {
+            (libjpeg.jpeg_mem_src)(
+                &mut cinfo,
+                jpeg_bytes.as_ptr(),
+                jpeg_bytes.len() as _,
+            );
+            let header_status = (libjpeg.jpeg_read_header)(&mut cinfo, TRUE);
+            if header_status != JPEG_HEADER_OK {
+                return Err(format!(
+                    "jpeg_read_header returned unexpected status {header_status}"
+                ));
+            }
+            if (libjpeg.jpeg_has_multiple_scans)(&mut cinfo) == 0 {
+                return Err("progressive buffered-image input did not report multiple scans".into());
+            }
+
+            cinfo.buffered_image = TRUE;
+            cinfo.dct_method = JDCT_IFAST;
+            if (libjpeg.jpeg_start_decompress)(&mut cinfo) == 0 {
+                return Err("jpeg_start_decompress suspended unexpectedly".into());
+            }
+            if cinfo.global_state != DSTATE_BUFIMAGE {
+                return Err(format!(
+                    "jpeg_start_decompress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+
+            let mut first_pass = None;
+            let mut final_pass: Option<PpmImage>;
+            let mut passes = 0usize;
+
+            loop {
+                loop {
+                    let ret = (libjpeg.jpeg_consume_input)(&mut cinfo);
+                    if ret != JPEG_ROW_COMPLETED && ret != JPEG_SCAN_COMPLETED {
+                        if ret != JPEG_REACHED_SOS && ret != JPEG_REACHED_EOI {
+                            return Err(format!("unexpected jpeg_consume_input return {ret}"));
+                        }
+                        break;
+                    }
+                }
+
+                passes += 1;
+                if passes > 64 {
+                    return Err("buffered-image decode exceeded 64 output passes".into());
+                }
+
+                if (libjpeg.jpeg_start_output)(&mut cinfo, cinfo.input_scan_number) == 0 {
+                    return Err("jpeg_start_output suspended unexpectedly".into());
+                }
+                if cinfo.global_state != DSTATE_SCANNING {
+                    return Err(format!(
+                        "jpeg_start_output left unexpected state {}",
+                        cinfo.global_state
+                    ));
+                }
+
+                let image = read_buffered_pass_output(&libjpeg, &mut cinfo)?;
+                if first_pass.is_none() {
+                    first_pass = Some(image.clone());
+                }
+                final_pass = Some(image);
+
+                if (libjpeg.jpeg_finish_output)(&mut cinfo) == 0 {
+                    return Err("jpeg_finish_output suspended unexpectedly".into());
+                }
+                if cinfo.global_state != DSTATE_BUFIMAGE {
+                    return Err(format!(
+                        "jpeg_finish_output left unexpected state {}",
+                        cinfo.global_state
+                    ));
+                }
+
+                if (libjpeg.jpeg_input_complete)(&mut cinfo) != 0
+                    && cinfo.input_scan_number == cinfo.output_scan_number
+                {
+                    break;
+                }
+            }
+
+            if (libjpeg.jpeg_finish_decompress)(&mut cinfo) == 0 {
+                return Err("jpeg_finish_decompress suspended unexpectedly".into());
+            }
+
+            Ok((
+                first_pass.expect("buffered-image decode must produce a first pass"),
+                final_pass.expect("buffered-image decode must produce a final pass"),
+                passes,
+            ))
+        })();
+
+        (libjpeg.jpeg_destroy_decompress)(&mut cinfo);
+        result
+    }
+}
+
+fn read_buffered_pass_output(
+    libjpeg: &LoadedLibjpeg,
+    cinfo: &mut jpeg_decompress_struct,
+) -> Result<PpmImage, String> {
+    let width = cinfo.output_width as usize;
+    let height = cinfo.output_height as usize;
+    let components = cinfo.output_components as usize;
+    if width == 0 || height == 0 || components == 0 {
+        return Err(format!(
+            "invalid buffered-image dimensions {width}x{height}x{components}"
+        ));
+    }
+
+    let row_stride = width
+        .checked_mul(components)
+        .ok_or_else(|| "buffered-image row stride overflow".to_string())?;
+    let total_bytes = row_stride
+        .checked_mul(height)
+        .ok_or_else(|| "buffered-image output size overflow".to_string())?;
+    let mut data = vec![0u8; total_bytes];
+    let mut row = vec![0u8; row_stride];
+    let mut scanlines = [row.as_mut_ptr()];
+    let mut offset = 0usize;
+
+    while cinfo.output_scanline < cinfo.output_height {
+        let before = cinfo.output_scanline;
+        let rows_read = unsafe { (libjpeg.jpeg_read_scanlines)(cinfo, scanlines.as_mut_ptr(), 1) };
+        if rows_read == 0 {
+            return Err(format!(
+                "jpeg_read_scanlines returned 0 at output scanline {before}"
+            ));
+        }
+
+        let bytes_read = row_stride
+            .checked_mul(rows_read as usize)
+            .ok_or_else(|| "buffered-image bytes_read overflow".to_string())?;
+        let end = offset
+            .checked_add(bytes_read)
+            .ok_or_else(|| "buffered-image output offset overflow".to_string())?;
+        data[offset..end].copy_from_slice(&row[..bytes_read]);
+        offset = end;
+    }
+
+    Ok(PpmImage {
+        width,
+        height,
+        maxval: 255,
+        data,
+    })
 }
 
 fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
