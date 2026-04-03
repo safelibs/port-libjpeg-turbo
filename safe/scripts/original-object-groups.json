@@ -1,0 +1,129 @@
+{
+  "groups": {
+    "smoke": [
+      "jcstest",
+      "strtest"
+    ],
+    "decompress": [
+      "djpeg"
+    ],
+    "compress": [
+      "cjpeg",
+      "jpegtran"
+    ],
+    "turbojpeg": [
+      "tjunittest",
+      "tjbench",
+      "tjexample"
+    ],
+    "all": [
+      "jcstest",
+      "strtest",
+      "djpeg",
+      "cjpeg",
+      "jpegtran",
+      "tjunittest",
+      "tjbench",
+      "tjexample"
+    ]
+  },
+  "targets": {
+    "jcstest": {
+      "sources": [
+        "jcstest.c"
+      ],
+      "libs": [
+        "jpeg"
+      ]
+    },
+    "strtest": {
+      "sources": [
+        "strtest.c"
+      ],
+      "libs": [
+        "turbojpeg",
+        "jpeg"
+      ]
+    },
+    "djpeg": {
+      "sources": [
+        "djpeg.c",
+        "cdjpeg.c",
+        "rdcolmap.c",
+        "rdswitch.c",
+        "wrgif.c",
+        "wrppm.c",
+        "wrbmp.c",
+        "wrtarga.c"
+      ],
+      "cflags": [
+        "-DBMP_SUPPORTED",
+        "-DGIF_SUPPORTED",
+        "-DPPM_SUPPORTED",
+        "-DTARGA_SUPPORTED"
+      ],
+      "libs": [
+        "jpeg"
+      ]
+    },
+    "cjpeg": {
+      "sources": [
+        "cjpeg.c",
+        "cdjpeg.c",
+        "rdgif.c",
+        "rdppm.c",
+        "rdswitch.c",
+        "rdbmp.c",
+        "rdtarga.c"
+      ],
+      "cflags": [
+        "-DBMP_SUPPORTED",
+        "-DGIF_SUPPORTED",
+        "-DPPM_SUPPORTED",
+        "-DTARGA_SUPPORTED"
+      ],
+      "libs": [
+        "jpeg"
+      ]
+    },
+    "jpegtran": {
+      "sources": [
+        "jpegtran.c",
+        "cdjpeg.c",
+        "rdswitch.c",
+        "transupp.c"
+      ],
+      "libs": [
+        "jpeg"
+      ]
+    },
+    "tjunittest": {
+      "sources": [
+        "tjunittest.c",
+        "md5/md5.c",
+        "md5/md5hl.c"
+      ],
+      "libs": [
+        "turbojpeg"
+      ]
+    },
+    "tjbench": {
+      "sources": [
+        "tjbench.c"
+      ],
+      "libs": [
+        "turbojpeg",
+        "m"
+      ]
+    },
+    "tjexample": {
+      "sources": [
+        "tjexample.c"
+      ],
+      "libs": [
+        "turbojpeg"
+      ]
+    }
+  }
+}
+

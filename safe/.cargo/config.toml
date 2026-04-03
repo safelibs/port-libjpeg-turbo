@@ -1,0 +1,6 @@
+[build]
+target-dir = "target"
+
+[env]
+LIBJPEG_TURBO_SAFE_ROOT = { value = ".", relative = true }
+

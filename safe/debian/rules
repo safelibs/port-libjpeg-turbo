@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_build:
+	cargo build --manifest-path Cargo.toml --workspace --release
+
+override_dh_auto_install:
+	bash scripts/stage-install.sh
+	mkdir -p debian/tmp
+	cp -a stage/usr debian/tmp/
+
+override_dh_auto_test:
+	:
+

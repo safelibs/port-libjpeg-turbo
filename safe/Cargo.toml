@@ -1,0 +1,29 @@
+[package]
+name = "safe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+build = "build.rs"
+
+[workspace]
+members = [
+  "crates/ffi-types",
+  "crates/jpeg-core",
+  "crates/libjpeg-abi",
+  "crates/libturbojpeg-abi",
+  "crates/jpeg-tools",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ffi-types = { path = "crates/ffi-types" }
+jpeg-core = { path = "crates/jpeg-core" }
+jpeg-tools = { path = "crates/jpeg-tools" }
+libjpeg-abi = { path = "crates/libjpeg-abi" }
+libturbojpeg-abi = { path = "crates/libturbojpeg-abi" }
+

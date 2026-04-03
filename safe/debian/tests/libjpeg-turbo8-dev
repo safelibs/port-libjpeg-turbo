@@ -1,0 +1,83 @@
+#!/bin/sh
+# Copyright 2021 Simon McVittie
+# SPDX-License-Identifier: MIT
+
+set -eux
+
+mode=dynamic
+
+getopt_temp="$(getopt -o '' --long 'static' -n debian/tests/libjpeg-turbo8-dev -- "$@")"
+eval set -- "$getopt_temp"
+
+while true; do
+    case "$1" in
+        (--static)
+            mode=static
+            shift
+            continue
+            ;;
+
+        (--)
+            shift
+            break
+            ;;
+
+        (*)
+            echo "getopt: Internal error" >&2
+            exit 2
+    esac
+done
+
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' 0 INT QUIT ABRT PIPE TERM
+
+if [ -n "${DEB_HOST_GNU_TYPE:-}" ]; then
+    CROSS_COMPILE="$DEB_HOST_GNU_TYPE-"
+else
+    CROSS_COMPILE=
+fi
+
+CC="${CROSS_COMPILE}gcc"
+PKG_CONFIG="${CROSS_COMPILE}pkg-config"
+
+cd "$WORKDIR"
+cat <<EOF > use-libjpeg.c
+/* jpeglib.h is intentionally not self-contained, see
+   https://github.com/libjpeg-turbo/libjpeg-turbo/issues/17 and
+   https://bugs.debian.org/994835 */
+#include <stdio.h>
+
+#include <jpeglib.h>
+
+int main(void)
+{
+    struct jpeg_error_mgr err;
+    struct jpeg_compress_struct state;
+
+    state.err = jpeg_std_error(&err);
+    jpeg_create_compress(&state);
+    jpeg_destroy_compress(&state);
+
+    return 0;
+}
+EOF
+
+cflags=
+pcflags=
+
+case "$mode" in
+(static)
+    cflags=-static
+    pcflags=--static
+    ;;
+esac
+
+exe="use-libjpeg-$mode"
+
+# Deliberately word-splitting cflags, pcflags, pkg-config output
+# shellcheck disable=SC2046,SC2086
+"$CC" $cflags -o "${exe}" use-libjpeg.c $("$PKG_CONFIG" $pcflags --cflags --libs libjpeg)
+[ -x "${exe}" ]
+echo "build ($mode): OK"
+./"${exe}"
+echo "run ($mode): OK"

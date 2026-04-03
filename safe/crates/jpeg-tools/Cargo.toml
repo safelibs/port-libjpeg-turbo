@@ -1,0 +1,9 @@
+[package]
+name = "jpeg-tools"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
