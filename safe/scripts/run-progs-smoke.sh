@@ -104,7 +104,7 @@ esac
 
 (
   cd "$TMPDIR"
-  "$BINDIR/tjbench" "$ROOT/original/testimages/testorig.ppm" 95 \
+  "$BINDIR/tjbench" "$TMPDIR/testorig.ppm" 95 \
     -rgb -quiet -benchtime 0.01 -warmup 0 >/dev/null 2>&1
 )
 
