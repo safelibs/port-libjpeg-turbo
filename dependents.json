@@ -1,0 +1,218 @@
+{
+  "generated_at": "2026-04-02",
+  "distribution": "Ubuntu 24.04 LTS (noble)",
+  "scope": {
+    "direct_dependencies_only": true,
+    "notes": [
+      "Ubuntu's `libjpeg8` compatibility package depends on `libjpeg-turbo8`.",
+      "Ubuntu's `libjpeg-dev` compatibility package resolves through `libjpeg8-dev` to `libjpeg-turbo8-dev`.",
+      "`libturbojpeg` and `libturbojpeg0-dev` expose the TurboJPEG-specific API; `libturbojpeg-dev` is a virtual package provided by `libturbojpeg0-dev`."
+    ]
+  },
+  "runtime_dependents": [
+    {
+      "name": "dcm2niix",
+      "summary": "next generation DICOM to NIfTI converter",
+      "dependency_path": [
+        "libturbojpeg"
+      ],
+      "runtime_functionality": "Decodes JPEG-compressed DICOM pixel data while converting medical images to NIfTI."
+    },
+    {
+      "name": "eog",
+      "summary": "Eye of GNOME graphics viewer program",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Displays JPEG images in the GNOME image viewer."
+    },
+    {
+      "name": "gimp",
+      "summary": "GNU Image Manipulation Program",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Opens, edits, and exports JPEG photos and artwork."
+    },
+    {
+      "name": "gphoto2",
+      "summary": "digital camera command-line client",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Downloads and works with JPEG photos from digital cameras."
+    },
+    {
+      "name": "krita",
+      "summary": "pixel-based image manipulation program",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8",
+        "libturbojpeg"
+      ],
+      "runtime_functionality": "Imports and exports JPEG images in the raster editor and also links to the TurboJPEG API directly."
+    },
+    {
+      "name": "libcamera-tools",
+      "summary": "complex camera support library (tools)",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Saves or processes JPEG frames in the `cam` and `qcam` camera tools."
+    },
+    {
+      "name": "libopencv-imgcodecs406t64",
+      "summary": "computer vision Image Codecs library",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Provides JPEG decode and encode support in OpenCV image I/O pipelines."
+    },
+    {
+      "name": "libreoffice-core",
+      "summary": "office productivity suite -- arch-dependent files",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Imports, renders, and exports JPEG images embedded in office documents, spreadsheets, and presentations."
+    },
+    {
+      "name": "libvips42t64",
+      "summary": "image processing system good for very large ones",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Loads and saves JPEG images in high-performance image-processing workloads."
+    },
+    {
+      "name": "libwebkit2gtk-4.1-0",
+      "summary": "Web content engine library for GTK",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Decodes and renders JPEG images in embedded web views."
+    },
+    {
+      "name": "openjdk-17-jre-headless",
+      "summary": "OpenJDK Java runtime, using Hotspot JIT (headless)",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Provides JPEG codec support for headless Java applications using the standard image APIs."
+    },
+    {
+      "name": "python3-pil",
+      "summary": "Python Imaging Library (Python3)",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Adds JPEG read and write support to Pillow-based Python code."
+    },
+    {
+      "name": "timg",
+      "summary": "terminal image and video viewer",
+      "dependency_path": [
+        "libturbojpeg"
+      ],
+      "runtime_functionality": "Uses fast JPEG decoding for terminal image viewing."
+    },
+    {
+      "name": "tracker-extract",
+      "summary": "metadata database, indexer and search tool - metadata extractors",
+      "dependency_path": [
+        "libjpeg8 -> libjpeg-turbo8"
+      ],
+      "runtime_functionality": "Reads JPEG metadata and other searchable content during desktop indexing."
+    },
+    {
+      "name": "xpra",
+      "summary": "tool to detach/reattach running X programs",
+      "dependency_path": [
+        "libturbojpeg"
+      ],
+      "runtime_functionality": "JPEG-compresses remote display updates for forwarded X11 applications."
+    }
+  ],
+  "build_time_dependents": [
+    {
+      "source_package": "dcm2niix",
+      "binary_examples": [
+        "dcm2niix"
+      ],
+      "build_dependency_path": [
+        "libturbojpeg0-dev"
+      ],
+      "runtime_functionality": "Builds in support for decoding JPEG-compressed DICOM images."
+    },
+    {
+      "source_package": "krita",
+      "binary_examples": [
+        "krita"
+      ],
+      "build_dependency_path": [
+        "libjpeg-dev -> libjpeg8-dev -> libjpeg-turbo8-dev",
+        "libturbojpeg0-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG import and export support, including direct TurboJPEG usage."
+    },
+    {
+      "source_package": "libreoffice",
+      "binary_examples": [
+        "libreoffice-core"
+      ],
+      "build_dependency_path": [
+        "libjpeg-dev -> libjpeg8-dev -> libjpeg-turbo8-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG handling for document import, rendering, and export."
+    },
+    {
+      "source_package": "opencv",
+      "binary_examples": [
+        "libopencv-imgcodecs406t64"
+      ],
+      "build_dependency_path": [
+        "libjpeg-dev -> libjpeg8-dev -> libjpeg-turbo8-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG codec support for the OpenCV `imgcodecs` module."
+    },
+    {
+      "source_package": "timg",
+      "binary_examples": [
+        "timg"
+      ],
+      "build_dependency_path": [
+        "libturbojpeg-dev -> libturbojpeg0-dev"
+      ],
+      "runtime_functionality": "Builds in fast JPEG decoding for terminal image display."
+    },
+    {
+      "source_package": "vips",
+      "binary_examples": [
+        "libvips42t64"
+      ],
+      "build_dependency_path": [
+        "libjpeg-dev -> libjpeg8-dev -> libjpeg-turbo8-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG load and save support for libvips image-processing pipelines."
+    },
+    {
+      "source_package": "webkit2gtk",
+      "binary_examples": [
+        "libwebkit2gtk-4.1-0"
+      ],
+      "build_dependency_path": [
+        "libjpeg-dev -> libjpeg8-dev -> libjpeg-turbo8-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG decoding support for GTK web views."
+    },
+    {
+      "source_package": "xpra",
+      "binary_examples": [
+        "xpra"
+      ],
+      "build_dependency_path": [
+        "libturbojpeg0-dev"
+      ],
+      "runtime_functionality": "Builds in JPEG-compressed transport for remote X11 session updates."
+    }
+  ]
+}
