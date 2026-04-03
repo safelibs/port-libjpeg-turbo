@@ -1,16 +1,47 @@
 #!/usr/bin/make -f
 
+include /usr/share/dpkg/default.mk
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_STRIP = -Wl,-Bsymbolic-functions
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
 %:
-	dh $@ --with javahelper
+	dh $@
 
 override_dh_auto_build:
 	cargo build --manifest-path Cargo.toml --workspace --release
 
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf stage target/upstream-bootstrap target/upstream-install target/upstream-source target/rendered
+
 override_dh_auto_install:
-	bash scripts/stage-install.sh
+	bash scripts/stage-install.sh --with-java=1
+	rm -rf debian/tmp
 	mkdir -p debian/tmp
 	cp -a stage/usr debian/tmp/
+	rm -rf debian/tmp/usr/share/doc/libjpeg-turbo
 
 override_dh_auto_test:
 	:
 
+override_dh_install:
+	dh_install -X.la -X/usr/share/doc
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+execute_after_dh_gencontrol:
+	dh_gencontrol -p libturbojpeg0-dev -- -v1:$(DEB_VERSION)
+	dh_gencontrol -p libturbojpeg -- -v1:$(DEB_VERSION)
+
+override_dh_makeshlibs:
+	: # keep the original libjpeg symbol version
+	dh_makeshlibs -- -v8c
+	: # ... and mark libjpeg-turbo only symbols with a different version
+	sed -i "$$(for i in $$(cat debian/libjpeg-turbo-only.symbols); do echo "/^ $$i/s/8c$$/8c-2ubuntu5~/;"; done)" debian/libjpeg-turbo8/DEBIAN/symbols
+
+override_dh_installchangelogs:
+	dh_installchangelogs -plibjpeg-turbo8-dev change.log
+	dh_installchangelogs -Nlibjpeg-turbo8-dev

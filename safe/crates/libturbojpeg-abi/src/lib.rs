@@ -107,6 +107,42 @@ pub const EXPECTED_NON_JNI_SYMBOLS: &[&str] = &[
     "tjTransform",
 ];
 
+pub const EXPECTED_JNI_SYMBOLS: &[&str] = &[
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_compressFromYUV___3_3B_3II_3III_3BII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_compress___3BIIIIII_3BIII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_compress___3BIIII_3BIII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_compress___3IIIIIII_3BIII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_compress___3IIIII_3BIII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_destroy",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_encodeYUV___3BIIIIII_3_3B_3I_3III",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_encodeYUV___3BIIII_3BII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_encodeYUV___3IIIIIII_3_3B_3I_3III",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_encodeYUV___3IIIII_3BII",
+    "Java_org_libjpegturbo_turbojpeg_TJCompressor_init",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decodeYUV___3_3B_3I_3II_3BIIIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decodeYUV___3_3B_3I_3II_3IIIIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompressHeader",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompressToYUV___3BI_3BI",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompressToYUV___3BI_3_3B_3II_3III",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompress___3BI_3BIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompress___3BI_3BIIIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompress___3BI_3IIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_decompress___3BI_3IIIIIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_destroy",
+    "Java_org_libjpegturbo_turbojpeg_TJDecompressor_init",
+    "Java_org_libjpegturbo_turbojpeg_TJTransformer_init",
+    "Java_org_libjpegturbo_turbojpeg_TJTransformer_transform",
+    "Java_org_libjpegturbo_turbojpeg_TJ_bufSize",
+    "Java_org_libjpegturbo_turbojpeg_TJ_bufSizeYUV__III",
+    "Java_org_libjpegturbo_turbojpeg_TJ_bufSizeYUV__IIII",
+    "Java_org_libjpegturbo_turbojpeg_TJ_getScalingFactors",
+    "Java_org_libjpegturbo_turbojpeg_TJ_planeHeight__III",
+    "Java_org_libjpegturbo_turbojpeg_TJ_planeSizeYUV__IIIII",
+    "Java_org_libjpegturbo_turbojpeg_TJ_planeWidth__III",
+];
+
+pub const BACKEND_LIBRARY_ENV_VAR: &str = "LIBJPEG_TURBO_BACKEND_LIB";
+
 const RTLD_NOW: c_int = 2;
 
 #[repr(C)]
@@ -234,7 +270,7 @@ fn find_safe_root_from(path: &Path) -> Result<PathBuf, String> {
 }
 
 fn backend_library_path() -> Result<PathBuf, String> {
-    if let Some(path) = std::env::var_os("LIBJPEG_TURBO_BACKEND_LIB") {
+    if let Some(path) = std::env::var_os(BACKEND_LIBRARY_ENV_VAR) {
         return Ok(PathBuf::from(path));
     }
 

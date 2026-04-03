@@ -4,12 +4,25 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
 BUILD_DIR="$SAFE_ROOT/target/upstream-bootstrap"
+SOURCE_ROOT="$SAFE_ROOT/target/upstream-source"
 STAGE_DIR="$SAFE_ROOT/stage"
 TMP_INSTALL_ROOT="$SAFE_ROOT/target/upstream-install"
 TMP_RENDER_ROOT="$SAFE_ROOT/target/rendered"
+JAVA_TOOL_ROOT="$SAFE_ROOT/target/java-tools"
+JAVA_TOOL_BIN_DIR="$JAVA_TOOL_ROOT/bin"
 SYMBOLS_TOOL="$SAFE_ROOT/scripts/debian_symbols.py"
 WITH_JAVA_MODE="auto"
 CLEAN=0
+ARGV=("$@")
+JAVA_DOCKER_IMAGE="${LIBJPEG_TURBO_JAVA_BUILD_IMAGE:-libjpeg-turbo-java-build:ubuntu24.04-r2}"
+
+JAVA_BIN=""
+JAVAC_BIN=""
+JAR_BIN=""
+JAVA_INCLUDE_PATH=""
+JAVA_INCLUDE_PATH2=""
+JAVA_AWT_LIBRARY=""
+JAVA_JVM_LIBRARY=""
 
 UPSTREAM_VERSION="2.1.5"
 COPYRIGHT_YEAR="1991-2023"
@@ -26,9 +39,10 @@ the Debian-style install tree under safe/stage/usr/.
 --build-dir overrides the upstream CMake build directory.
 --stage-dir overrides the staged install root.
 --with-java controls whether the upstream TurboJPEG JNI wrapper is built:
-  auto: enable only when javac is available
+  auto: enable when the local host can satisfy the Java/JNI build or when
+        Docker is available as a fallback builder
   0: disable JNI build and export surface
-  1: require javac and enable JNI build
+  1: require the local host (or Docker fallback) to satisfy the Java/JNI build
 --clean removes the cached bootstrap build and staged output first.
 EOF
 }
@@ -57,6 +71,10 @@ while (($#)); do
     --with-java)
       WITH_JAVA_MODE="${2:?missing value for --with-java}"
       shift 2
+      ;;
+    --with-java=*)
+      WITH_JAVA_MODE="${1#--with-java=}"
+      shift
       ;;
     --clean)
       CLEAN=1
@@ -100,22 +118,209 @@ cpu_count() {
   fi
 }
 
+java_bin_path() {
+  command -v java 2>/dev/null || true
+}
+
+java_module_tool_available() {
+  local module_class="$1"
+  local java_bin
+
+  java_bin="$(java_bin_path)"
+  [[ -n "$java_bin" ]] || return 1
+  "$java_bin" --module "$module_class" -version >/dev/null 2>&1
+}
+
+have_java_compiler() {
+  command -v javac >/dev/null 2>&1 || java_module_tool_available jdk.compiler/com.sun.tools.javac.Main
+}
+
+have_java_archiver() {
+  command -v jar >/dev/null 2>&1 || java_module_tool_available jdk.jartool/sun.tools.jar.Main
+}
+
+java_home_dir() {
+  local java_bin
+  java_bin="$(java_bin_path)"
+  [[ -n "$java_bin" ]] || return 1
+  dirname -- "$(dirname -- "$(readlink -f "$java_bin")")"
+}
+
+find_java_tree_file() {
+  local name="$1"
+  local java_home
+
+  java_home="$(java_home_dir 2>/dev/null || true)"
+  if [[ -n "$java_home" ]]; then
+    find "$java_home" -name "$name" -print -quit 2>/dev/null && return 0
+  fi
+  find /usr/lib/jvm -name "$name" -print -quit 2>/dev/null
+}
+
+refresh_java_paths() {
+  local java_home
+
+  JAVA_BIN="$(java_bin_path)"
+  JAVAC_BIN="$(command -v javac 2>/dev/null || true)"
+  JAR_BIN="$(command -v jar 2>/dev/null || true)"
+  JAVA_INCLUDE_PATH=""
+  JAVA_INCLUDE_PATH2=""
+  JAVA_AWT_LIBRARY=""
+  JAVA_JVM_LIBRARY=""
+
+  if [[ -n "$JAVA_BIN" ]]; then
+    java_home="$(java_home_dir 2>/dev/null || true)"
+    if [[ -n "$java_home" && -f "$java_home/include/jni.h" ]]; then
+      JAVA_INCLUDE_PATH="$java_home/include"
+      if [[ -f "$java_home/include/linux/jni_md.h" ]]; then
+        JAVA_INCLUDE_PATH2="$java_home/include/linux"
+      else
+        JAVA_INCLUDE_PATH2="$(find "$java_home/include" -mindepth 1 -maxdepth 1 -type d -print -quit 2>/dev/null || true)"
+      fi
+    fi
+  fi
+
+  JAVA_AWT_LIBRARY="$(find_java_tree_file libjawt.so || true)"
+  JAVA_JVM_LIBRARY="$(find_java_tree_file libjvm.so || true)"
+}
+
+prepare_java_tool_wrappers() {
+  local java_bin
+  java_bin="$(java_bin_path)"
+  [[ -n "$java_bin" ]] || return 0
+
+  rm -rf "$JAVA_TOOL_ROOT"
+  mkdir -p "$JAVA_TOOL_BIN_DIR"
+
+  if ! command -v javac >/dev/null 2>&1 && java_module_tool_available jdk.compiler/com.sun.tools.javac.Main; then
+    cat >"$JAVA_TOOL_BIN_DIR/javac" <<EOF
+#!/usr/bin/env bash
+exec "$java_bin" --module jdk.compiler/com.sun.tools.javac.Main "\$@"
+EOF
+    chmod +x "$JAVA_TOOL_BIN_DIR/javac"
+  fi
+
+  if ! command -v jar >/dev/null 2>&1 && java_module_tool_available jdk.jartool/sun.tools.jar.Main; then
+    cat >"$JAVA_TOOL_BIN_DIR/jar" <<EOF
+#!/usr/bin/env bash
+exec "$java_bin" --module jdk.jartool/sun.tools.jar.Main "\$@"
+EOF
+    chmod +x "$JAVA_TOOL_BIN_DIR/jar"
+  fi
+
+  export PATH="$JAVA_TOOL_BIN_DIR:$PATH"
+  refresh_java_paths
+}
+
+local_java_build_available() {
+  refresh_java_paths
+  have_java_compiler &&
+    have_java_archiver &&
+    [[ -n "$JAVA_INCLUDE_PATH" ]] &&
+    [[ -n "$JAVA_INCLUDE_PATH2" ]] &&
+    [[ -n "$JAVA_AWT_LIBRARY" ]] &&
+    [[ -n "$JAVA_JVM_LIBRARY" ]]
+}
+
+build_java_fallback_image() {
+  docker image inspect "$JAVA_DOCKER_IMAGE" >/dev/null 2>&1 && return 0
+
+  docker build -t "$JAVA_DOCKER_IMAGE" - <<'DOCKERFILE'
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/opt/cargo
+ENV RUSTUP_HOME=/opt/rustup
+ENV PATH=/opt/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential \
+      ca-certificates \
+      cargo \
+      cmake \
+      curl \
+      nasm \
+      openjdk-17-jdk \
+      pkg-config \
+      python3 \
+      rustc \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.85.1 \
+ && chmod -R a+rX /opt/cargo /opt/rustup
+DOCKERFILE
+}
+
+reexec_stage_install_in_docker() {
+  local docker_home="$SAFE_ROOT/target/docker-home"
+  local uid gid
+
+  uid="$(id -u)"
+  gid="$(id -g)"
+  mkdir -p "$docker_home"
+  build_java_fallback_image
+  docker run --rm \
+    --user "$uid:$gid" \
+    -e LIBJPEG_TURBO_STAGE_INSTALL_IN_DOCKER=1 \
+    -e HOME="$docker_home" \
+    -e CARGO_HOME=/opt/cargo \
+    -e RUSTUP_HOME=/opt/rustup \
+    -v "$ROOT":"$ROOT" \
+    -w "$ROOT" \
+    "$JAVA_DOCKER_IMAGE" \
+    bash "$SAFE_ROOT/scripts/stage-install.sh" "${ARGV[@]}"
+  exit $?
+}
+
+maybe_reexec_for_java() {
+  [[ "$WITH_JAVA_MODE" != "0" ]] || return 0
+
+  prepare_java_tool_wrappers
+  if local_java_build_available; then
+    return 0
+  fi
+
+  if [[ -n "${LIBJPEG_TURBO_STAGE_INSTALL_IN_DOCKER:-}" ]]; then
+    if [[ "$WITH_JAVA_MODE" == "1" ]]; then
+      die "--with-java=1 requires Java compiler tools and JNI headers inside the Docker fallback image"
+    fi
+    return 0
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    reexec_stage_install_in_docker
+  fi
+
+  if [[ "$WITH_JAVA_MODE" == "1" ]]; then
+    die "--with-java=1 requires Java compiler tools and JNI headers, or Docker for fallback"
+  fi
+}
+
 resolve_with_java() {
   case "$WITH_JAVA_MODE" in
     auto)
-      if command -v javac >/dev/null 2>&1; then
+      if local_java_build_available; then
         printf '1\n'
       else
         printf '0\n'
       fi
       ;;
     0|1)
-      if [[ "$WITH_JAVA_MODE" == "1" ]] && ! command -v javac >/dev/null 2>&1; then
-        die "--with-java=1 requires javac"
+      if [[ "$WITH_JAVA_MODE" == "1" ]] && ! local_java_build_available; then
+        die "--with-java=1 requires Java compiler tools and JNI headers"
       fi
       printf '%s\n' "$WITH_JAVA_MODE"
       ;;
   esac
+}
+
+prepare_upstream_source_tree() {
+  rm -rf "$SOURCE_ROOT"
+  cp -a "$ROOT/original" "$SOURCE_ROOT"
+  mkdir -p "$SOURCE_ROOT/java"
+  cp -a "$SAFE_ROOT/java/." "$SOURCE_ROOT/java/"
+  install -m 644 "$SAFE_ROOT/java/tjbenchtest.java.in" "$SOURCE_ROOT/tjbenchtest.java.in"
+  install -m 644 "$SAFE_ROOT/java/tjexampletest.java.in" "$SOURCE_ROOT/tjexampletest.java.in"
 }
 
 render_jconfig_h() {
@@ -382,8 +587,8 @@ relink_staged_libjpeg() {
   local rust_staticlib
   local skip_basenames
 
-  render_version_script "$ROOT/original/debian/libjpeg-turbo8.symbols" "$version_script"
-  gcc -O2 -fPIC -I"$BUILD_DIR" -I"$ROOT/original" -c \
+  render_version_script "$SAFE_ROOT/debian/libjpeg-turbo8.symbols" "$version_script"
+  gcc -O2 -fPIC -I"$BUILD_DIR" -I"$SOURCE_ROOT" -c \
     "$SAFE_ROOT/bridge/libjpeg_compat.c" -o "$bridge_object"
   rust_staticlib="$(ensure_rust_libjpeg_staticlib)"
   skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o,jcapimin.c.o,jcapistd.c.o,jcarith.c.o,jccoefct.c.o,jccolor.c.o,jcdctmgr.c.o,jchuff.c.o,jcinit.c.o,jcmainct.c.o,jcmarker.c.o,jcmaster.c.o,jcparam.c.o,jcphuff.c.o,jcprepct.c.o,jcsample.c.o,jctrans.c.o,jdapimin.c.o,jdapistd.c.o,jdarith.c.o,jdcoefct.c.o,jdpostct.c.o,jdinput.c.o,jdmarker.c.o,jdhuff.c.o,jdphuff.c.o,jdmainct.c.o,jdmaster.c.o,jdmerge.c.o,jdsample.c.o,jdcolor.c.o,jddctmgr.c.o,jdtrans.c.o,jquant1.c.o,jquant2.c.o,jfdctint.c.o,jfdctfst.c.o,jfdctflt.c.o,jidctint.c.o,jidctfst.c.o,jidctflt.c.o,jidctred.c.o"
@@ -412,9 +617,9 @@ relink_staged_libturbojpeg() {
   local skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o,jcapimin.c.o,jcapistd.c.o,jcarith.c.o,jccoefct.c.o,jccolor.c.o,jcdctmgr.c.o,jchuff.c.o,jcinit.c.o,jcmainct.c.o,jcmarker.c.o,jcmaster.c.o,jcparam.c.o,jcphuff.c.o,jcprepct.c.o,jcsample.c.o,jctrans.c.o,jdapimin.c.o,jdapistd.c.o,jdarith.c.o,jdcoefct.c.o,jdpostct.c.o,jdinput.c.o,jdmarker.c.o,jdhuff.c.o,jdphuff.c.o,jdmainct.c.o,jdmaster.c.o,jdmerge.c.o,jdsample.c.o,jdcolor.c.o,jddctmgr.c.o,jdtrans.c.o,jquant1.c.o,jquant2.c.o,jfdctint.c.o,jfdctfst.c.o,jfdctflt.c.o,jidctint.c.o,jidctfst.c.o,jidctflt.c.o,jidctred.c.o,turbojpeg.c.o,transupp.c.o,jdatadst-tj.c.o,jdatasrc-tj.c.o,rdbmp.c.o,rdppm.c.o,wrbmp.c.o,wrppm.c.o"
 
   if [[ "$WITH_JAVA" == "1" ]]; then
-    version_script="$ROOT/original/turbojpeg-mapfile.jni"
+    version_script="$SAFE_ROOT/link/turbojpeg-mapfile.jni"
   else
-    render_version_script "$ROOT/original/debian/libturbojpeg.symbols" \
+    render_version_script "$SAFE_ROOT/debian/libturbojpeg.symbols" \
       "$version_script" --skip-regex '^Java_org_libjpegturbo_turbojpeg_'
   fi
 
@@ -564,34 +769,54 @@ install_packaged_tools() {
 }
 
 if ((CLEAN)); then
-  rm -rf "$BUILD_DIR" "$STAGE_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT"
+  rm -rf "$BUILD_DIR" "$SOURCE_ROOT" "$STAGE_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT" \
+    "$JAVA_TOOL_ROOT"
 fi
 
 [[ -d "$ROOT/original" ]] || die "missing original source tree"
+[[ -d "$SAFE_ROOT/java" ]] || die "missing safe/java source tree"
 
 MULTIARCH="$(multiarch)"
+maybe_reexec_for_java
 WITH_JAVA="$(resolve_with_java)"
 JOBS="${JOBS:-$(cpu_count)}"
 
-rm -rf "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT" "$STAGE_DIR"
+rm -rf "$BUILD_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT" "$STAGE_DIR"
 mkdir -p "$BUILD_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT"
+prepare_upstream_source_tree
 
-cmake \
-  -S "$ROOT/original" \
-  -B "$BUILD_DIR" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DENABLE_SHARED=1 \
-  -DENABLE_STATIC=1 \
-  -DWITH_ARITH_DEC=1 \
-  -DWITH_ARITH_ENC=1 \
-  -DWITH_JPEG8=1 \
-  -DWITH_JAVA="$WITH_JAVA" \
-  -DWITH_TURBOJPEG=1 \
-  -DCMAKE_INSTALL_PREFIX=/usr \
-  -DCMAKE_INSTALL_BINDIR=/usr/bin \
-  -DCMAKE_INSTALL_INCLUDEDIR=/usr/include \
-  -DCMAKE_INSTALL_LIBDIR="/usr/lib/$MULTIARCH" \
+cmake_args=(
+  -S "$SOURCE_ROOT"
+  -B "$BUILD_DIR"
+  -DCMAKE_BUILD_TYPE=Release
+  -DENABLE_SHARED=1
+  -DENABLE_STATIC=1
+  -DWITH_ARITH_DEC=1
+  -DWITH_ARITH_ENC=1
+  -DWITH_JPEG8=1
+  -DWITH_JAVA="$WITH_JAVA"
+  -DWITH_TURBOJPEG=1
+  -DCMAKE_INSTALL_PREFIX=/usr
+  -DCMAKE_INSTALL_BINDIR=/usr/bin
+  -DCMAKE_INSTALL_INCLUDEDIR=/usr/include
+  -DCMAKE_INSTALL_LIBDIR="/usr/lib/$MULTIARCH"
   -DCMAKE_INSTALL_MANDIR=/usr/share/man
+)
+
+if [[ "$WITH_JAVA" == "1" ]]; then
+  refresh_java_paths
+  cmake_args+=(
+    -DJava_JAVA_EXECUTABLE="$JAVA_BIN"
+    -DJava_JAVAC_EXECUTABLE="$JAVAC_BIN"
+    -DJava_JAR_EXECUTABLE="$JAR_BIN"
+    -DJAVA_AWT_LIBRARY="$JAVA_AWT_LIBRARY"
+    -DJAVA_JVM_LIBRARY="$JAVA_JVM_LIBRARY"
+    -DJAVA_INCLUDE_PATH="$JAVA_INCLUDE_PATH"
+    -DJAVA_INCLUDE_PATH2="$JAVA_INCLUDE_PATH2"
+  )
+fi
+
+cmake "${cmake_args[@]}"
 
 cmake --build "$BUILD_DIR" --parallel "$JOBS"
 DESTDIR="$TMP_INSTALL_ROOT" cmake --install "$BUILD_DIR"

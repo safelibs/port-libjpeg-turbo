@@ -10,15 +10,15 @@ usage() {
   cat <<'EOF'
 usage: test-original.sh [--checks runtime|compile|all] [--only <runtime-package-or-source-package>]
 
-Builds the original libjpeg-turbo from ./original inside an Ubuntu 24.04 Docker
-container, installs it into /usr/local with the libjpeg v8 ABI enabled, and
-then exercises the direct dependent software listed in dependents.json.
+Builds the safe Debian packages from ./safe inside an Ubuntu 24.04 Docker
+container, installs them into the container, and then exercises the direct
+dependent software listed in dependents.json.
 
 --checks defaults to all.
 runtime runs the runtime-dependent package smoke tests.
 compile runs the build-time matrix by building package-native targets from each
 source package in build_time_dependents[] and checking that the resulting
-artifacts resolve libjpeg/libturbojpeg from /usr/local.
+artifacts resolve libjpeg/libturbojpeg from the installed safe Debian packages.
 all runs compile checks first and runtime checks second.
 
 --only filters by exact runtime package name from runtime_dependents[].name or
@@ -77,6 +77,9 @@ docker build -t "$IMAGE_TAG" - <<'DOCKERFILE'
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/opt/cargo
+ENV RUSTUP_HOME=/opt/rustup
+ENV PATH=/opt/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
       > /etc/apt/sources.list.d/ubuntu-src.sources \
@@ -84,15 +87,19 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
  && apt-get install -y --no-install-recommends \
       build-essential \
       ca-certificates \
+      cargo \
       cmake \
       curl \
+      debhelper \
       dbus-x11 \
       dcm2niix \
+      dpkg-dev \
       eog \
       file \
       gimp \
       git \
       gphoto2 \
+      help2man \
       jq \
       krita \
       libcamera-tools \
@@ -107,7 +114,7 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       meson \
       nasm \
       ninja-build \
-      openjdk-17-jdk-headless \
+      openjdk-17-jdk \
       pkg-config \
       python3 \
       python3-pil \
@@ -119,7 +126,9 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       xdotool \
       xpra \
       xvfb \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.85.1 \
+ && chmod -R a+rX /opt/cargo /opt/rustup
 DOCKERFILE
 
 docker run --rm -i \
@@ -140,8 +149,7 @@ MULTIARCH="$(gcc -print-multiarch)"
 HOME=/tmp/libjpeg-home
 FIXTURE_DIR=/tmp/libjpeg-fixtures
 TEST_ROOT=/tmp/libjpeg-dependent-tests
-ORIGINAL_SRC_COPY=/tmp/libjpeg-original-src
-ORIGINAL_BUILD_DIR=/tmp/libjpeg-original-build
+SAFE_SRC_COPY=/tmp/libjpeg-safe-src
 DEPENDENT_SOURCE_ROOT=/tmp/libjpeg-dependent-sources
 APT_UPDATED=0
 
@@ -199,10 +207,10 @@ assert_uses_local_soname() {
   [[ -n "$resolved" ]] || die "ldd did not report $soname for $target"
 
   case "$resolved" in
-    /usr/local/lib/*|/usr/local/lib/"$MULTIARCH"/*)
+    /usr/lib/*|/usr/lib/"$MULTIARCH"/*|/lib/*|/lib/"$MULTIARCH"/*)
       ;;
     *)
-      printf 'expected %s to resolve %s from /usr/local, got %s\n' "$target" "$soname" "$resolved" >&2
+      printf 'expected %s to resolve %s from a system libdir, got %s\n' "$target" "$soname" "$resolved" >&2
       ldd "$target" >&2
       exit 1
       ;;
@@ -220,13 +228,13 @@ assert_any_file_under_uses_local_soname() {
     resolved="$(ldd "$candidate" 2>/dev/null | awk -v soname="$soname" '$1 == soname { print $3; exit }')"
 
     case "$resolved" in
-      /usr/local/lib/*|/usr/local/lib/"$MULTIARCH"/*)
+      /usr/lib/*|/usr/lib/"$MULTIARCH"/*|/lib/*|/lib/"$MULTIARCH"/*)
         return 0
         ;;
     esac
   done < <(find "$root" -type f -name "$name_pattern" -print0 2>/dev/null)
 
-  die "expected $description to resolve $soname from /usr/local"
+  die "expected $description to resolve $soname from a system libdir"
 }
 
 find_first_file() {
@@ -378,37 +386,34 @@ assert_dependents_inventory() {
   fi
 }
 
-build_original_libjpeg() {
-  rm -rf "$ORIGINAL_SRC_COPY" "$ORIGINAL_BUILD_DIR"
-  cp -a "$ROOT/original" "$ORIGINAL_SRC_COPY"
+build_safe_packages() {
+  local -a debs
 
-  cmake -S "$ORIGINAL_SRC_COPY" -B "$ORIGINAL_BUILD_DIR" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DWITH_JPEG8=1 \
-    -DENABLE_SHARED=TRUE \
-    -DENABLE_STATIC=FALSE \
-    >/tmp/libjpeg-original-configure.log 2>&1 || {
-      cat /tmp/libjpeg-original-configure.log >&2
-      exit 1
-    }
+  rm -rf "$SAFE_SRC_COPY"
+  mkdir -p "$SAFE_SRC_COPY"
+  cp -a "$ROOT/safe" "$SAFE_SRC_COPY/safe"
+  cp -a "$ROOT/original" "$SAFE_SRC_COPY/original"
 
-  cmake --build "$ORIGINAL_BUILD_DIR" -j"$(nproc)" >/tmp/libjpeg-original-build.log 2>&1 || {
-    cat /tmp/libjpeg-original-build.log >&2
+  (
+    cd "$SAFE_SRC_COPY/safe"
+    dpkg-buildpackage -us -uc -b >/tmp/libjpeg-safe-build.log 2>&1
+  ) || {
+    cat /tmp/libjpeg-safe-build.log >&2
     exit 1
   }
 
-  cmake --install "$ORIGINAL_BUILD_DIR" >/tmp/libjpeg-original-install.log 2>&1 || {
-    cat /tmp/libjpeg-original-install.log >&2
+  mapfile -t debs < <(find "$SAFE_SRC_COPY" -maxdepth 1 -type f -name '*.deb' | sort)
+  ((${#debs[@]} > 0)) || die "dpkg-buildpackage did not produce any .deb files"
+
+  dpkg -i "${debs[@]}" >/tmp/libjpeg-safe-install.log 2>&1 || {
+    cat /tmp/libjpeg-safe-install.log >&2
     exit 1
   }
 
-  printf '/usr/local/lib\n/usr/local/lib/%s\n' "$MULTIARCH" > /etc/ld.so.conf.d/zz-libjpeg-local.conf
+  export LIBJPEG_TURBO_BACKEND_LIB="$SAFE_SRC_COPY/safe/target/upstream-bootstrap/libturbojpeg.so.0"
+  [[ -f "$LIBJPEG_TURBO_BACKEND_LIB" ]] || die "missing TurboJPEG backend library: $LIBJPEG_TURBO_BACKEND_LIB"
+
   ldconfig
-
-  export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$MULTIARCH${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib/$MULTIARCH/pkgconfig:/usr/local/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-  export CMAKE_PREFIX_PATH="/usr/local${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 
   assert_uses_local_soname /usr/bin/dcm2niix libturbojpeg.so.0
   assert_uses_local_soname /usr/lib/jvm/java-17-openjdk-amd64/lib/libjavajpeg.so libjpeg.so.8
@@ -621,8 +626,6 @@ check_libreoffice_source_build() {
   (
     cd "$source_dir"
     rm -f autogen.lastrun config.status
-    export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib/$multiarch/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-    export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$multiarch${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     export SAL_USE_VCLPLUGIN=headless
 
     ./autogen.sh \
@@ -1268,8 +1271,8 @@ EOF
     "$dir/libcamera_mjpg_probe.cpp" \
     "$source_dir/src/apps/cam/sdl_texture.cpp" \
     "$source_dir/src/apps/cam/sdl_texture_mjpg.cpp" \
-    -L/usr/local/lib \
-    -Wl,-rpath,/usr/local/lib \
+    -L"/usr/lib/$MULTIARCH" \
+    -Wl,-rpath,"/usr/lib/$MULTIARCH" \
     $(pkg-config --libs sdl2) \
     -ljpeg \
     -o "$dir/libcamera-mjpg-probe" \
@@ -1620,8 +1623,8 @@ run_runtime_checks() {
 }
 
 assert_dependents_inventory
-log_step 'Building original libjpeg-turbo with libjpeg v8 ABI'
-build_original_libjpeg
+log_step 'Building and installing safe Debian packages'
+build_safe_packages
 log_step 'Preparing JPEG, PNG, HTML, DICOM, and pseudo-camera fixtures'
 prepare_fixtures
 

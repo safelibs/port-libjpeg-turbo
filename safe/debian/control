@@ -7,9 +7,7 @@ Uploaders: Mike Gabriel <sunweaver@debian.org>
 Build-Depends: cargo,
                cmake (>= 2.8.12),
                debhelper-compat (= 13),
-               default-jdk,
                help2man,
-               javahelper,
 	       nasm,
                pkg-config,
                rustc
@@ -135,8 +133,7 @@ Package: libturbojpeg-java
 Architecture: all
 Section: java
 Depends: ${misc:Depends},
-         ${shlibs:Depends},
-         ${java:Depends},
+         default-jre-headless | java-runtime-headless,
          libturbojpeg (>= ${source:Version})
 Description: Java bindings for the TurboJPEG library
  The libjpeg-turbo JPEG library is a library for handling JPEG files.

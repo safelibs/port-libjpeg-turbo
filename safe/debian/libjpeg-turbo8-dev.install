@@ -1,4 +1,4 @@
-jpegint.h usr/include/
+usr/include/jpegint.h
 usr/include/j*.h
 usr/include/*/*.h
 usr/lib/*/libjpeg.a
