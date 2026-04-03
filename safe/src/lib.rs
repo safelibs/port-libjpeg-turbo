@@ -10,6 +10,10 @@ pub fn safe_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
 
+pub fn repo_root() -> &'static Path {
+    safe_root().parent().expect("safe root has parent")
+}
+
 pub fn stage_root() -> PathBuf {
     safe_root().join("stage")
 }

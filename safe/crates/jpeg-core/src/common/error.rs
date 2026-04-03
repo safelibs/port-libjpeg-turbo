@@ -6,9 +6,14 @@ use ffi_types::{
     JPOOL_PERMANENT, CSTATE_START, FALSE,
 };
 
-use crate::common::memory;
+use crate::common::{memory, registry};
 
 const EXIT_FAILURE: int = 1;
+const JMSG_SCAN_LIMIT: int = JMSG_LASTMSGCODE;
+
+#[no_mangle]
+pub static mut jpeg_rs_message_table: [*const c_char; 1] =
+    [cstr(b"JPEG image has more than %d scans\0")];
 
 const fn cstr(bytes: &'static [u8]) -> *const c_char {
     bytes.as_ptr() as *const c_char
@@ -234,6 +239,13 @@ pub unsafe fn errexit2(cinfo: j_common_ptr, code: J_MESSAGE_CODE, p1: int, p2: i
     abort_if_returns()
 }
 
+pub unsafe fn errexit_scan_limit(cinfo: j_common_ptr, limit: int) -> ! {
+    (*err(cinfo)).msg_code = JMSG_SCAN_LIMIT;
+    set_i(cinfo, 0, limit);
+    jpeg_rs_invoke_error_exit(cinfo);
+    abort_if_returns()
+}
+
 unsafe extern "C" fn error_exit(cinfo: j_common_ptr) {
     if let Some(output_message) = (*err(cinfo)).output_message {
         output_message(cinfo);
@@ -259,6 +271,12 @@ unsafe extern "C" fn emit_message(cinfo: j_common_ptr, msg_level: int) {
             }
         }
         (*err).num_warnings += 1;
+        if (*cinfo).is_decompressor != FALSE
+            && registry::decompress_warnings_fatal(cinfo as j_decompress_ptr)
+        {
+            jpeg_rs_invoke_error_exit(cinfo);
+            abort_if_returns();
+        }
     } else if (*err).trace_level >= msg_level {
         if let Some(output_message) = (*err).output_message {
             output_message(cinfo);
@@ -335,9 +353,9 @@ pub unsafe fn std_error(err: *mut jpeg_error_mgr) -> *mut jpeg_error_mgr {
     (*err).msg_code = 0;
     (*err).jpeg_message_table = core::ptr::addr_of!(jpeg_std_message_table) as *const *const c_char;
     (*err).last_jpeg_message = JMSG_LASTMSGCODE - 1;
-    (*err).addon_message_table = core::ptr::null();
-    (*err).first_addon_message = 0;
-    (*err).last_addon_message = 0;
+    (*err).addon_message_table = core::ptr::addr_of!(jpeg_rs_message_table) as *const *const c_char;
+    (*err).first_addon_message = JMSG_SCAN_LIMIT;
+    (*err).last_addon_message = JMSG_SCAN_LIMIT;
     err
 }
 
@@ -362,6 +380,9 @@ pub unsafe fn abort(cinfo: j_common_ptr) {
 }
 
 pub unsafe fn destroy(cinfo: j_common_ptr) {
+    if (*cinfo).is_decompressor != FALSE {
+        registry::clear_decompress_policy(cinfo as j_decompress_ptr);
+    }
     if !(*cinfo).mem.is_null() {
         let self_destruct = (*(*cinfo).mem).self_destruct.unwrap();
         self_destruct(cinfo);

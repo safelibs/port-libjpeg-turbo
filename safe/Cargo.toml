@@ -34,3 +34,6 @@ md5 = "0.7"
 [[test]]
 name = "upstream_matrix"
 harness = false
+
+[[test]]
+name = "cve_regressions"

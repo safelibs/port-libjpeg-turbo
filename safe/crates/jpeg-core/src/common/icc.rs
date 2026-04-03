@@ -138,7 +138,13 @@ pub unsafe fn jpeg_read_icc_profile(
             return FALSE;
         }
         data_offset[seq_no] = total_length;
-        total_length = total_length.wrapping_add(data_length[seq_no]);
+        total_length = match total_length.checked_add(data_length[seq_no]) {
+            Some(length) => length,
+            None => {
+                error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
+                return FALSE;
+            }
+        };
         seq_no += 1;
     }
 

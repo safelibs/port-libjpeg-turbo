@@ -2,7 +2,7 @@ use core::ffi::c_uint;
 
 use ffi_types::{
     boolean, int, j_decompress_ptr, jpeg_component_info, jpeg_marker_parser_method, JCOEFPTR,
-    JSAMPARRAY, JSAMPIMAGE, JDIMENSION,
+    JSAMPARRAY, JSAMPIMAGE, JDIMENSION, jvirt_barray_ptr,
 };
 
 #[no_mangle]
@@ -100,6 +100,13 @@ pub unsafe extern "C" fn jpeg_finish_output(cinfo: j_decompress_ptr) -> boolean 
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn jpeg_read_coefficients(
+    cinfo: j_decompress_ptr,
+) -> *mut jvirt_barray_ptr {
+    jpeg_core::ported::decompress::jdtrans::jpeg_read_coefficients(cinfo)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn jinit_color_deconverter(cinfo: j_decompress_ptr) {
     jpeg_core::ported::decompress::jdcolor::jinit_color_deconverter(cinfo)
 }
@@ -123,6 +130,44 @@ pub unsafe extern "C" fn jinit_d_main_controller(
 #[no_mangle]
 pub unsafe extern "C" fn jinit_huff_decoder(cinfo: j_decompress_ptr) {
     jpeg_core::ported::decompress::jdhuff::jinit_huff_decoder(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jinit_phuff_decoder(cinfo: j_decompress_ptr) {
+    jpeg_core::ported::decompress::jdphuff::jinit_phuff_decoder(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jinit_arith_decoder(cinfo: j_decompress_ptr) {
+    jpeg_core::ported::decompress::jdarith::jinit_arith_decoder(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jinit_d_post_controller(
+    cinfo: j_decompress_ptr,
+    need_full_buffer: boolean,
+) {
+    jpeg_core::ported::decompress::jdpostct::jinit_d_post_controller(cinfo, need_full_buffer)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jinit_1pass_quantizer(cinfo: j_decompress_ptr) {
+    jpeg_core::ported::decompress::jquant1::jinit_1pass_quantizer(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jinit_2pass_quantizer(cinfo: j_decompress_ptr) {
+    jpeg_core::ported::decompress::jquant2::jinit_2pass_quantizer(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_rs_set_max_scans(cinfo: j_decompress_ptr, max_scans: int) {
+    jpeg_core::common::registry::set_decompress_scan_limit(cinfo, max_scans)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_rs_set_warnings_fatal(cinfo: j_decompress_ptr, fatal: boolean) {
+    jpeg_core::common::registry::set_decompress_warnings_fatal(cinfo, fatal)
 }
 
 #[no_mangle]

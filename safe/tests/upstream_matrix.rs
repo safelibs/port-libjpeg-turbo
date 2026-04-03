@@ -2,7 +2,7 @@ use std::{
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Output},
     sync::OnceLock,
 };
 
@@ -19,6 +19,7 @@ struct MatrixCommand {
 struct MatrixCase {
     name: &'static str,
     commands: Vec<MatrixCommand>,
+    runner: Option<fn(&StagePaths, &Path) -> Result<(), String>>,
 }
 
 struct StagePaths {
@@ -31,7 +32,7 @@ static STAGE_PATHS: OnceLock<Result<StagePaths, String>> = OnceLock::new();
 
 fn main() {
     let args = Arguments::from_args();
-    let trials = baseline_decode_cases()
+    let trials = matrix_cases()
         .into_iter()
         .map(|case| {
             let name = case.name;
@@ -39,6 +40,13 @@ fn main() {
         })
         .collect();
     libtest_mimic::run(&args, trials).exit();
+}
+
+fn matrix_cases() -> Vec<MatrixCase> {
+    let mut cases = baseline_decode_cases();
+    cases.extend(advanced_decode_cases());
+    cases.extend(croptest_cases());
+    cases
 }
 
 fn baseline_decode_cases() -> Vec<MatrixCase> {
@@ -78,6 +86,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-rgb-islow-icc",
@@ -114,6 +123,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-rgb-islow-565",
@@ -138,6 +148,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-rgb-islow-565d",
@@ -160,6 +171,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-422-ifast",
@@ -193,6 +205,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-440-islow",
@@ -225,6 +238,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-422m-ifast",
@@ -259,6 +273,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-422m-ifast-565",
@@ -297,6 +312,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-422m-ifast-565d",
@@ -333,6 +349,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-gray-islow",
@@ -353,6 +370,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-gray-islow-rgb",
@@ -374,6 +392,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-gray-islow-565",
@@ -398,6 +417,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-gray-islow-565d",
@@ -420,6 +440,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     )),
                 ),
             ],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-420-islow-256",
@@ -440,6 +461,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     "4980185e3776e89bd931736e1cddeee6",
                 )),
             )],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-420-islow-565",
@@ -461,6 +483,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     "bf9d13e16c4923b92e1faa604d7922cb",
                 )),
             )],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-420-islow-565d",
@@ -480,6 +503,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     "6bde71526acc44bcff76f696df8638d2",
                 )),
             )],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-420m-islow-565",
@@ -502,6 +526,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     "8dc0185245353cfa32ad97027342216f",
                 )),
             )],
+            runner: None,
         },
         MatrixCase {
             name: "baseline-decode-420m-islow-565d",
@@ -522,6 +547,7 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     "ce034037d212bc403330df6f915c161b",
                 )),
             )],
+            runner: None,
         },
     ];
 
@@ -560,10 +586,371 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                     md5,
                 )),
             )],
+            runner: None,
         });
     }
 
     cases
+}
+
+fn advanced_decode_cases() -> Vec<MatrixCase> {
+    vec![
+        MatrixCase {
+            name: "advanced-decode-progressive-420-q100-ifast",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-sample",
+                        "2x2",
+                        "-quality",
+                        "100",
+                        "-dct",
+                        "fast",
+                        "-scans",
+                        "@ORIG:test.scan",
+                        "-outfile",
+                        "@TMP:testout_420_q100_ifast_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "fast",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_420_q100_ifast.ppm",
+                        "@TMP:testout_420_q100_ifast_prog.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_420_q100_ifast.ppm",
+                        "5a732542015c278ff43635e473a8a294",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-progressive-420m-q100-ifast",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-sample",
+                        "2x2",
+                        "-quality",
+                        "100",
+                        "-dct",
+                        "fast",
+                        "-scans",
+                        "@ORIG:test.scan",
+                        "-outfile",
+                        "@TMP:testout_420_q100_ifast_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "fast",
+                        "-nosmooth",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_420m_q100_ifast.ppm",
+                        "@TMP:testout_420_q100_ifast_prog.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_420m_q100_ifast.ppm",
+                        "ff692ee9323a3b424894862557c092f1",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-progressive-3x2-ifast",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-sample",
+                        "3x2",
+                        "-dct",
+                        "fast",
+                        "-prog",
+                        "-outfile",
+                        "@TMP:testout_3x2_ifast_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "fast",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_3x2_ifast.ppm",
+                        "@TMP:testout_3x2_ifast_prog.jpg",
+                    ],
+                    Some(("@TMP:testout_3x2_ifast.ppm", "fd283664b3b49127984af0a7f118fccd")),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-arithmetic-420m-ifast-skip",
+            commands: vec![cmd(
+                "djpeg",
+                &[
+                    "-fast",
+                    "-skip",
+                    "1,20",
+                    "-ppm",
+                    "-outfile",
+                    "@TMP:testout_420m_ifast_ari.ppm",
+                    "@ORIG:testimgari.jpg",
+                ],
+                Some(("@TMP:testout_420m_ifast_ari.ppm", "57251da28a35b46eecb7177d82d10e0e")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-coefficients-jpegtran-arithmetic",
+            commands: vec![cmd(
+                "jpegtran",
+                &[
+                    "-outfile",
+                    "@TMP:testout_420_islow.jpg",
+                    "@ORIG:testimgari.jpg",
+                ],
+                Some(("@TMP:testout_420_islow.jpg", "9a68f56bc76e466aa7e52f415d0f4a5f")),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-skip-420-islow",
+            commands: vec![cmd(
+                "djpeg",
+                &[
+                    "-dct",
+                    "int",
+                    "-skip",
+                    "15,31",
+                    "-ppm",
+                    "-outfile",
+                    "@TMP:testout_420_islow_skip15_31.ppm",
+                    "@ORIG:testorig.jpg",
+                ],
+                Some((
+                    "@TMP:testout_420_islow_skip15_31.ppm",
+                    "c4c65c1e43d7275cd50328a61e6534f0",
+                )),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-skip-420-ari",
+            commands: vec![cmd(
+                "djpeg",
+                &[
+                    "-dct",
+                    "int",
+                    "-skip",
+                    "16,139",
+                    "-ppm",
+                    "-outfile",
+                    "@TMP:testout_420_islow_ari_skip16_139.ppm",
+                    "@ORIG:testimgari.jpg",
+                ],
+                Some((
+                    "@TMP:testout_420_islow_ari_skip16_139.ppm",
+                    "087c6b123db16ac00cb88c5b590bb74a",
+                )),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-crop-420-prog",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-prog",
+                        "-outfile",
+                        "@TMP:testout_420_islow_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-crop",
+                        "62x62+71+71",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_420_islow_prog_crop62x62_71_71.ppm",
+                        "@TMP:testout_420_islow_prog.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_420_islow_prog_crop62x62_71_71.ppm",
+                        "26eb36ccc7d1f0cb80cdabb0ac8b5d99",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-crop-420-ari",
+            commands: vec![cmd(
+                "djpeg",
+                &[
+                    "-dct",
+                    "int",
+                    "-crop",
+                    "53x53+4+4",
+                    "-ppm",
+                    "-outfile",
+                    "@TMP:testout_420_islow_ari_crop53x53_4_4.ppm",
+                    "@ORIG:testimgari.jpg",
+                ],
+                Some((
+                    "@TMP:testout_420_islow_ari_crop53x53_4_4.ppm",
+                    "886c6775af22370257122f8b16207e6d",
+                )),
+            )],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-skip-444-islow",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-sample",
+                        "1x1",
+                        "-outfile",
+                        "@TMP:testout_444_islow.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-skip",
+                        "1,6",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_444_islow_skip1_6.ppm",
+                        "@TMP:testout_444_islow.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_444_islow_skip1_6.ppm",
+                        "5606f86874cf26b8fcee1117a0a436a6",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-crop-444-prog",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-prog",
+                        "-sample",
+                        "1x1",
+                        "-outfile",
+                        "@TMP:testout_444_islow_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-crop",
+                        "98x98+13+13",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_444_islow_prog_crop98x98_13_13.ppm",
+                        "@TMP:testout_444_islow_prog.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_444_islow_prog_crop98x98_13_13.ppm",
+                        "db87dc7ce26bcdc7a6b56239ce2b9d6c",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
+            name: "advanced-decode-crop-444-ari",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-arithmetic",
+                        "-sample",
+                        "1x1",
+                        "-outfile",
+                        "@TMP:testout_444_islow_ari.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-dct",
+                        "int",
+                        "-crop",
+                        "37x37+0+0",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_444_islow_ari_crop37x37_0_0.ppm",
+                        "@TMP:testout_444_islow_ari.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_444_islow_ari_crop37x37_0_0.ppm",
+                        "cb57b32bd6d03e35432362f7bf184b6d",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+    ]
+}
+
+fn croptest_cases() -> Vec<MatrixCase> {
+    vec![MatrixCase {
+        name: "croptest",
+        commands: Vec::new(),
+        runner: Some(run_croptest_case),
+    }]
 }
 
 fn rgb_islow_setup() -> MatrixCommand {
@@ -614,34 +1001,12 @@ fn run_case(case: &MatrixCase) -> Result<(), String> {
     let stage = stage_paths()?;
     let temp_dir = new_temp_dir(case.name)?;
 
-    for command in &case.commands {
-        let status = Command::new(stage.stage_bin.join(command.tool))
-            .env("LD_LIBRARY_PATH", &stage.stage_lib)
-            .current_dir(&temp_dir)
-            .args(
-                command
-                    .args
-                    .iter()
-                    .map(|arg| expand_arg(arg, stage, &temp_dir)),
-            )
-            .status()
-            .map_err(|error| format!("failed to spawn {}: {error}", command.tool))?;
-        if !status.success() {
-            return Err(format!("{} exited with status {status}", command.tool));
-        }
+    if let Some(runner) = case.runner {
+        return runner(stage, &temp_dir);
+    }
 
-        if let Some((file, expected_md5)) = command.verify {
-            let path = expand_path(file, stage, &temp_dir);
-            let digest = md5_file(&path)?;
-            if digest != expected_md5 {
-                return Err(format!(
-                    "md5 mismatch for {}: expected {}, got {}",
-                    path.display(),
-                    expected_md5,
-                    digest
-                ));
-            }
-        }
+    for command in &case.commands {
+        run_matrix_command(stage, &temp_dir, command)?;
     }
 
     Ok(())
@@ -735,4 +1100,286 @@ fn new_temp_dir(name: &str) -> Result<PathBuf, String> {
 fn md5_file(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path).map_err(|error| format!("read {}: {error}", path.display()))?;
     Ok(format!("{:x}", md5::compute(bytes)))
+}
+
+fn run_matrix_command(stage: &StagePaths, temp_dir: &Path, command: &MatrixCommand) -> Result<(), String> {
+    let output = run_stage_command(
+        stage,
+        temp_dir,
+        command.tool,
+        command
+            .args
+            .iter()
+            .map(|arg| expand_arg(arg, stage, temp_dir))
+            .collect::<Vec<_>>(),
+    )?;
+
+    if !output.status.success() {
+        return Err(command_failure(command.tool, &output));
+    }
+
+    if let Some((file, expected_md5)) = command.verify {
+        let path = expand_path(file, stage, temp_dir);
+        let digest = md5_file(&path)?;
+        if digest != expected_md5 {
+            return Err(format!(
+                "md5 mismatch for {}: expected {}, got {}",
+                path.display(),
+                expected_md5,
+                digest
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn run_stage_command(
+    stage: &StagePaths,
+    temp_dir: &Path,
+    tool: &str,
+    args: Vec<OsString>,
+) -> Result<Output, String> {
+    Command::new(stage.stage_bin.join(tool))
+        .env("LD_LIBRARY_PATH", &stage.stage_lib)
+        .current_dir(temp_dir)
+        .args(args)
+        .output()
+        .map_err(|error| format!("failed to spawn {tool}: {error}"))
+}
+
+fn command_failure(tool: &str, output: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    format!(
+        "{tool} exited with status {}{}\n{}{}",
+        output.status,
+        if stdout.is_empty() { "" } else { " (stdout follows)" },
+        stdout,
+        if stderr.is_empty() {
+            String::new()
+        } else {
+            format!("\n{stderr}")
+        }
+    )
+}
+
+#[derive(Clone)]
+struct PpmImage {
+    width: usize,
+    height: usize,
+    maxval: usize,
+    data: Vec<u8>,
+}
+
+fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
+    const IMAGE: &str = "vgl_6548_0026a.bmp";
+    const WIDTH: usize = 128;
+    const HEIGHT: usize = 95;
+    const SAMPLES: [(&str, &[&str]); 5] = [
+        ("GRAY", &["-grayscale"]),
+        ("420", &["-sample", "2x2"]),
+        ("422", &["-sample", "2x1"]),
+        ("440", &["-sample", "1x2"]),
+        ("444", &["-sample", "1x1"]),
+    ];
+    const NOSMOOTH: [Option<&str>; 2] = [None, Some("-nosmooth")];
+    const QUANT_ARGS: [&[&str]; 2] = [&[], &["-colors", "256", "-dither", "none", "-onepass"]];
+    const CROPS: [(usize, usize); 8] = [(0, 1), (0, 16), (1, 7), (5, 9), (15, 1), (15, 16), (16, 1), (16, 16)];
+
+    let source = stage.original_testimages.join(IMAGE);
+    let basename = "vgl_6548_0026a";
+
+    for progressive in [false, true] {
+        let prog_tag = if progressive { "prog" } else { "base" };
+
+        for (sample_name, sample_args) in SAMPLES {
+            let mut args = Vec::new();
+            if progressive {
+                args.push(OsString::from("-progressive"));
+            }
+            args.extend(sample_args.iter().map(|arg| OsString::from(*arg)));
+            args.push(OsString::from("-outfile"));
+            args.push(temp_dir.join(format!("{basename}_{prog_tag}_{sample_name}.jpg")).into_os_string());
+            args.push(source.clone().into_os_string());
+
+            let output = run_stage_command(stage, temp_dir, "cjpeg", args)?;
+            if !output.status.success() {
+                return Err(command_failure("cjpeg", &output));
+            }
+        }
+
+        for nosmooth in NOSMOOTH {
+            let ns_tag = if nosmooth.is_some() { "nosmooth" } else { "smooth" };
+            for quant_args in QUANT_ARGS {
+                let quant_tag = if quant_args.is_empty() { "full" } else { "quant256" };
+
+                for (sample_name, _) in SAMPLES {
+                    let jpeg_path = temp_dir.join(format!("{basename}_{prog_tag}_{sample_name}.jpg"));
+                    let full_path =
+                        temp_dir.join(format!("{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_full.ppm"));
+                    let mut args = Vec::new();
+                    if let Some(flag) = nosmooth {
+                        args.push(OsString::from(flag));
+                    }
+                    args.extend(quant_args.iter().map(|arg| OsString::from(*arg)));
+                    args.push(OsString::from("-rgb"));
+                    args.push(OsString::from("-outfile"));
+                    args.push(full_path.clone().into_os_string());
+                    args.push(jpeg_path.clone().into_os_string());
+
+                    let output = run_stage_command(stage, temp_dir, "djpeg", args)?;
+                    if !output.status.success() {
+                        return Err(command_failure("djpeg", &output));
+                    }
+                    let full = read_ppm(&full_path)?;
+
+                    for (y, h) in CROPS {
+                        let x = (y * 16) % WIDTH;
+                        let w = WIDTH - x - 7;
+                        let y0 = if y <= 15 { y } else { HEIGHT - h };
+                        let cropspec = format!("{w}x{h}+{x}+{y0}");
+                        let cropped_path = temp_dir.join(format!(
+                            "{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_{x}_{y0}_{w}_{h}.ppm"
+                        ));
+
+                        let mut args = Vec::new();
+                        if let Some(flag) = nosmooth {
+                            args.push(OsString::from(flag));
+                        }
+                        args.extend(quant_args.iter().map(|arg| OsString::from(*arg)));
+                        args.push(OsString::from("-crop"));
+                        args.push(OsString::from(cropspec));
+                        args.push(OsString::from("-rgb"));
+                        args.push(OsString::from("-outfile"));
+                        args.push(cropped_path.clone().into_os_string());
+                        args.push(jpeg_path.clone().into_os_string());
+
+                        let output = run_stage_command(stage, temp_dir, "djpeg", args)?;
+                        if !output.status.success() {
+                            return Err(command_failure("djpeg", &output));
+                        }
+
+                        let expected = crop_ppm(&full, x, y0, w, h)?;
+                        let actual = read_ppm(&cropped_path)?;
+                        if expected.width != actual.width
+                            || expected.height != actual.height
+                            || expected.maxval != actual.maxval
+                            || expected.data != actual.data
+                        {
+                            return Err(format!(
+                                "croptest mismatch for progressive={progressive} nosmooth={:?} quant={} sample={} crop={x},{y0} {w}x{h}",
+                                nosmooth,
+                                quant_tag,
+                                sample_name
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn read_ppm(path: &Path) -> Result<PpmImage, String> {
+    let bytes = fs::read(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let mut offset = 0usize;
+    let magic = next_ppm_token(&bytes, &mut offset)?;
+    if magic != "P6" {
+        return Err(format!("{} is not a binary PPM file", path.display()));
+    }
+    let width = next_ppm_token(&bytes, &mut offset)?
+        .parse::<usize>()
+        .map_err(|error| format!("invalid PPM width in {}: {error}", path.display()))?;
+    let height = next_ppm_token(&bytes, &mut offset)?
+        .parse::<usize>()
+        .map_err(|error| format!("invalid PPM height in {}: {error}", path.display()))?;
+    let maxval = next_ppm_token(&bytes, &mut offset)?
+        .parse::<usize>()
+        .map_err(|error| format!("invalid PPM maxval in {}: {error}", path.display()))?;
+    if maxval > 255 {
+        return Err(format!("{} uses unsupported PPM maxval {maxval}", path.display()));
+    }
+    skip_ppm_separators(&bytes, &mut offset);
+    let expected_len = width
+        .checked_mul(height)
+        .and_then(|pixels| pixels.checked_mul(3))
+        .ok_or_else(|| format!("PPM dimensions overflow for {}", path.display()))?;
+    let data = bytes
+        .get(offset..)
+        .ok_or_else(|| format!("missing PPM pixel data in {}", path.display()))?
+        .to_vec();
+    if data.len() != expected_len {
+        return Err(format!(
+            "PPM pixel length mismatch for {}: expected {}, got {}",
+            path.display(),
+            expected_len,
+            data.len()
+        ));
+    }
+    Ok(PpmImage {
+        width,
+        height,
+        maxval,
+        data,
+    })
+}
+
+fn crop_ppm(image: &PpmImage, x: usize, y: usize, width: usize, height: usize) -> Result<PpmImage, String> {
+    if x + width > image.width || y + height > image.height {
+        return Err(format!(
+            "crop {x},{y} {width}x{height} falls outside {}x{} image",
+            image.width,
+            image.height
+        ));
+    }
+
+    let row_stride = image.width * 3;
+    let crop_stride = width * 3;
+    let mut data = Vec::with_capacity(height * crop_stride);
+    for row in y..(y + height) {
+        let start = row * row_stride + x * 3;
+        let end = start + crop_stride;
+        data.extend_from_slice(&image.data[start..end]);
+    }
+
+    Ok(PpmImage {
+        width,
+        height,
+        maxval: image.maxval,
+        data,
+    })
+}
+
+fn next_ppm_token(bytes: &[u8], offset: &mut usize) -> Result<String, String> {
+    skip_ppm_separators(bytes, offset);
+    let start = *offset;
+    while *offset < bytes.len()
+        && !bytes[*offset].is_ascii_whitespace()
+        && bytes[*offset] != b'#'
+    {
+        *offset += 1;
+    }
+    if start == *offset {
+        return Err("unexpected end of PPM header".to_string());
+    }
+    String::from_utf8(bytes[start..*offset].to_vec())
+        .map_err(|error| format!("invalid PPM header token: {error}"))
+}
+
+fn skip_ppm_separators(bytes: &[u8], offset: &mut usize) {
+    loop {
+        while *offset < bytes.len() && bytes[*offset].is_ascii_whitespace() {
+            *offset += 1;
+        }
+        if *offset < bytes.len() && bytes[*offset] == b'#' {
+            while *offset < bytes.len() && bytes[*offset] != b'\n' {
+                *offset += 1;
+            }
+            continue;
+        }
+        break;
+    }
 }

@@ -7,7 +7,7 @@ use ffi_types::{
     MAX_COMPONENTS, MAX_COMPS_IN_SCAN, MAX_SAMP_FACTOR, NUM_QUANT_TBLS, TRUE,
 };
 
-use crate::common::{error, utils};
+use crate::common::{error, registry, utils};
 
 const BITS_IN_JSAMPLE: int = 8;
 
@@ -236,6 +236,9 @@ unsafe extern "C" fn consume_markers(cinfo: j_decompress_ptr) -> int {
                     error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_EOI_EXPECTED);
                 }
                 start_input_pass(cinfo);
+            }
+            if let Some(limit) = registry::decompress_scan_limit_exceeded(cinfo) {
+                error::errexit_scan_limit(cinfo as j_common_ptr, limit);
             }
         }
         JPEG_REACHED_EOI => {

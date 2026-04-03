@@ -9,7 +9,7 @@ use ffi_types::{
 };
 
 use crate::{
-    common::{error, memory},
+    common::{error, memory, registry},
     ported::decompress::{jdinput, jdmarker, jdmaster::my_decomp_master},
 };
 
@@ -19,6 +19,7 @@ pub unsafe fn jpeg_CreateDecompress(
     version: int,
     structsize: usize,
 ) {
+    registry::clear_decompress_policy(cinfo);
     (*cinfo).mem = ptr::null_mut();
     if version != JPEG_LIB_VERSION {
         error::errexit2(
