@@ -320,6 +320,79 @@ bailout:
 
 #define PAD(v, p)  ((v + (p) - 1) & (~((p) - 1)))
 
+static int planeCount(int subsamp)
+{
+  return subsamp == TJSAMP_GRAY ? 1 : 3;
+}
+
+static int refPlaneWidth(int componentID, int width, int subsamp)
+{
+  int pw = PAD(width, tjMCUWidth[subsamp] / 8);
+
+  if (componentID == 0)
+    return pw;
+
+  return pw * 8 / tjMCUWidth[subsamp];
+}
+
+static int refPlaneHeight(int componentID, int height, int subsamp)
+{
+  int ph = PAD(height, tjMCUHeight[subsamp] / 8);
+
+  if (componentID == 0)
+    return ph;
+
+  return ph * 8 / tjMCUHeight[subsamp];
+}
+
+static unsigned long refPlaneSize(int componentID, int width, int stride,
+                                  int height, int subsamp)
+{
+  unsigned long pw = refPlaneWidth(componentID, width, subsamp);
+  unsigned long ph = refPlaneHeight(componentID, height, subsamp);
+  unsigned long absStride = stride == 0 ? pw : abs(stride);
+
+  return absStride * (ph - 1) + pw;
+}
+
+static int checkPlaneGeometry(int width, int height, int subsamp,
+                              const int *strides)
+{
+  int i, nc = planeCount(subsamp);
+
+  for (i = 0; i < nc; i++) {
+    int expectedWidth = refPlaneWidth(i, width, subsamp);
+    int expectedHeight = refPlaneHeight(i, height, subsamp);
+    int actualWidth = tjPlaneWidth(i, width, subsamp);
+    int actualHeight = tjPlaneHeight(i, height, subsamp);
+    unsigned long expectedSize =
+      refPlaneSize(i, width, strides ? strides[i] : 0, height, subsamp);
+    unsigned long actualSize =
+      tjPlaneSizeYUV(i, width, strides ? strides[i] : 0, height, subsamp);
+
+    if (actualWidth != expectedWidth || actualHeight != expectedHeight ||
+        actualSize != expectedSize) {
+      printf("Plane %d geometry mismatch for %s:\n", i, subNameLong[subsamp]);
+      printf("  width=%d (expected %d)\n", actualWidth, expectedWidth);
+      printf("  height=%d (expected %d)\n", actualHeight, expectedHeight);
+      printf("  size=%lu (expected %lu)\n", actualSize, expectedSize);
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+static void freePlaneBuffers(unsigned char **planes)
+{
+  int i;
+
+  for (i = 0; i < 3; i++) {
+    tjFree(planes[i]);
+    planes[i] = NULL;
+  }
+}
+
 static int checkBufYUV(unsigned char *buf, int w, int h, int subsamp,
                        tjscalingfactor sf)
 {
@@ -809,6 +882,116 @@ bailout:
   if (handle) tjDestroy(handle);
 }
 
+static void planarYUVTest(void)
+{
+  static const int subsamps[] = {
+    TJSAMP_444, TJSAMP_422, TJSAMP_420, TJSAMP_440, TJSAMP_411, TJSAMP_GRAY
+  };
+  static const int imageFlags[] = { 0, TJFLAG_BOTTOMUP };
+  tjhandle chandle = NULL, dhandle = NULL;
+  unsigned char *srcBuf = NULL, *dstBuf = NULL, *jpegBuf = NULL;
+  unsigned char *srcPlanes[3] = { NULL, NULL, NULL };
+  unsigned char *dstPlanes[3] = { NULL, NULL, NULL };
+  const unsigned char *srcPlanePtrs[3] = { NULL, NULL, NULL };
+  const unsigned char *dstPlanePtrs[3] = { NULL, NULL, NULL };
+  unsigned long jpegSize = 0;
+  int srcStrides[3] = { 0, 0, 0 }, dstStrides[3] = { 0, 0, 0 };
+  int w = 35, h = 39, s, f, i;
+  tjscalingfactor sf = { 1, 1 };
+
+  if ((srcBuf = (unsigned char *)malloc(w * h * tjPixelSize[TJPF_RGB])) == NULL)
+    THROW("Memory allocation failure");
+  if ((chandle = tjInitCompress()) == NULL ||
+      (dhandle = tjInitDecompress()) == NULL)
+    THROW_TJ();
+
+  for (s = 0; s < (int)(sizeof(subsamps) / sizeof(subsamps[0])); s++) {
+    int subsamp = subsamps[s];
+    int nc = planeCount(subsamp);
+
+    for (f = 0; f < 2; f++) {
+      int flags = imageFlags[f];
+      int decodeFlags = flags;
+      int hdrw = 0, hdrh = 0, hdrsubsamp = -1, hdrcolorspace = -1;
+
+      if (subsamp == TJSAMP_422 || subsamp == TJSAMP_420 ||
+          subsamp == TJSAMP_440 || subsamp == TJSAMP_411)
+        decodeFlags |= TJFLAG_FASTUPSAMPLE;
+
+      memset(srcStrides, 0, sizeof(srcStrides));
+      memset(dstStrides, 0, sizeof(dstStrides));
+      memset(srcPlanePtrs, 0, sizeof(srcPlanePtrs));
+      memset(dstPlanePtrs, 0, sizeof(dstPlanePtrs));
+      jpegSize = 0;
+
+      initBuf(srcBuf, w, h, TJPF_RGB, flags);
+      printf("Planar YUV %s %s ... ", subNameLong[subsamp],
+             (flags & TJFLAG_BOTTOMUP) ? "Bottom-Up" : "Top-Down");
+
+      for (i = 0; i < nc; i++) {
+        unsigned long planeSize;
+        int planeWidth = refPlaneWidth(i, w, subsamp);
+
+        srcStrides[i] = (i == 0) ? 0 : planeWidth + i;
+        planeSize = tjPlaneSizeYUV(i, w, srcStrides[i], h, subsamp);
+        if ((srcPlanes[i] = (unsigned char *)tjAlloc(planeSize)) == NULL)
+          THROW("Memory allocation failure");
+        memset(srcPlanes[i], 0, planeSize);
+        srcPlanePtrs[i] = srcPlanes[i];
+
+        dstStrides[i] = (i == 0) ? planeWidth + 3 : 0;
+        planeSize = tjPlaneSizeYUV(i, w, dstStrides[i], h, subsamp);
+        if ((dstPlanes[i] = (unsigned char *)tjAlloc(planeSize)) == NULL)
+          THROW("Memory allocation failure");
+        memset(dstPlanes[i], 0, planeSize);
+        dstPlanePtrs[i] = dstPlanes[i];
+      }
+
+      if (!checkPlaneGeometry(w, h, subsamp, srcStrides) ||
+          !checkPlaneGeometry(w, h, subsamp, dstStrides))
+        BAILOUT();
+
+      TRY_TJ(tjEncodeYUVPlanes(chandle, srcBuf, w, 0, h, TJPF_RGB, srcPlanes,
+                               srcStrides, subsamp, flags));
+      TRY_TJ(tjCompressFromYUVPlanes(chandle, srcPlanePtrs, w, srcStrides, h,
+                                     subsamp, &jpegBuf, &jpegSize,
+                                     100, 0));
+      TRY_TJ(tjDecompressHeader3(dhandle, jpegBuf, jpegSize, &hdrw,
+                                 &hdrh, &hdrsubsamp, &hdrcolorspace));
+      if (hdrw != w || hdrh != h || hdrsubsamp != subsamp ||
+          hdrcolorspace !=
+          (subsamp == TJSAMP_GRAY ? TJCS_GRAY : TJCS_YCbCr))
+        THROW("Incorrect JPEG header");
+
+      TRY_TJ(tjDecompressToYUVPlanes(dhandle, jpegBuf, jpegSize,
+                                     dstPlanes, w, dstStrides, h, 0));
+      if ((dstBuf = (unsigned char *)malloc(w * h * tjPixelSize[TJPF_RGB])) ==
+          NULL)
+        THROW("Memory allocation failure");
+      memset(dstBuf, 0, w * h * tjPixelSize[TJPF_RGB]);
+      TRY_TJ(tjDecodeYUVPlanes(dhandle, dstPlanePtrs, dstStrides, subsamp,
+                               dstBuf, w, 0, h, TJPF_RGB, decodeFlags));
+      if (!checkBuf(dstBuf, w, h, TJPF_RGB, subsamp, sf, flags))
+        BAILOUT();
+
+      printf("Passed.\n");
+      free(dstBuf);  dstBuf = NULL;
+      tjFree(jpegBuf);  jpegBuf = NULL;
+      freePlaneBuffers(srcPlanes);
+      freePlaneBuffers(dstPlanes);
+    }
+  }
+
+bailout:
+  free(dstBuf);
+  tjFree(jpegBuf);
+  freePlaneBuffers(srcPlanes);
+  freePlaneBuffers(dstPlanes);
+  free(srcBuf);
+  if (chandle) tjDestroy(chandle);
+  if (dhandle) tjDestroy(dhandle);
+}
+
 
 static void initBitmap(unsigned char *buf, int width, int pitch, int height,
                        int pf, int flags)
@@ -1054,6 +1237,7 @@ int main(int argc, char *argv[])
   doTest(39, 41, _onlyGray, 1, TJSAMP_GRAY, "test");
   doTest(41, 35, _3byteFormats, 2, TJSAMP_GRAY, "test");
   doTest(35, 39, _4byteFormats, 4, TJSAMP_GRAY, "test");
+  planarYUVTest();
   bufSizeTest();
   if (doYUV) {
     printf("\n--------------------\n\n");
