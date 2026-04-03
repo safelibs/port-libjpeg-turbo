@@ -1,0 +1,121 @@
+{
+  "product": "libjpeg-turbo",
+  "source_file": "/home/yans/code/safelibs/ported/libjpeg-turbo/all_cves.json",
+  "source_as_of_date": "2026-04-02",
+  "analyzed_at_utc": "2026-04-03T04:27:31Z",
+  "analysis_scope": "CVEs from all_cves.json that are not primarily memory-corruption bugs and that could still affect a Rust reimplementation.",
+  "selection_criteria": [
+    "Included arithmetic, state-machine, EOF-handling, and resource-exhaustion issues, because safe Rust does not automatically prevent those bug classes.",
+    "Included NULL-dereference CVEs only when the bundled upstream evidence showed that the root cause was an API-state or control-flow bug that could still become a panic, explicit error, or incorrect behavior in Rust.",
+    "Excluded CVEs whose primary exploit mechanism was buffer overflow, buffer over-read, or uninitialized-memory exposure, because those are chiefly memory-safety failures rather than porting-relevant logic bugs.",
+    "Excluded issues that the maintainer described as downstream misuse of the libjpeg API rather than a defect that a clean Rust reimplementation should inherit."
+  ],
+  "summary": {
+    "total_cves_reviewed": 21,
+    "relevant_cves": 6,
+    "core_codec_or_core_api_relevant": 3,
+    "helper_io_or_cli_relevant_if_reimplemented": 3
+  },
+  "relevant_cves": [
+    {
+      "cve_id": "CVE-2017-15232",
+      "bug_class": "decoder state-machine / unsupported API-state handling",
+      "port_surface": "core decompression API",
+      "affected_entry_points": [
+        "jpeg_skip_scanlines()"
+      ],
+      "why_relevant_to_rust": "Rust removes the segfault primitive, but a Rust port still has to reject or correctly handle skip-scanlines when color quantization is enabled. Otherwise the same invalid state transition can still produce a panic, hard error, or incorrect decoder behavior.",
+      "evidence": [
+        "all_cves.json: description says the issue was a NULL pointer dereference in jdpostct.c and jquant1.c via a crafted JPEG file.",
+        "original/ChangeLog.md:798 says `jpeg_skip_scanlines()` would segfault if color quantization was enabled."
+      ]
+    },
+    {
+      "cve_id": "CVE-2018-1152",
+      "bug_class": "input validation / divide by zero",
+      "port_surface": "TurboJPEG helper I/O API",
+      "affected_entry_points": [
+        "tjLoadImage()"
+      ],
+      "why_relevant_to_rust": "Rust integer division by zero still panics, so malformed-image arithmetic has to be validated explicitly. This is relevant if the Rust port includes the TurboJPEG convenience loaders for BMP input.",
+      "evidence": [
+        "all_cves.json: description says a crafted BMP image triggered a divide by zero.",
+        "original/ChangeLog.md:617 says a malformed BMP with width 1073741824 triggered a floating point exception in `tjLoadImage()` when loading into a 4-component image buffer."
+      ]
+    },
+    {
+      "cve_id": "CVE-2018-11813",
+      "bug_class": "EOF handling / unbounded output amplification",
+      "port_surface": "CLI and auxiliary image readers",
+      "affected_entry_points": [
+        "cjpeg Targa reader"
+      ],
+      "why_relevant_to_rust": "Safe Rust does not prevent logic that keeps synthesizing output after truncated input. If the Rust port reimplements cjpeg or the Targa reader, it still needs explicit EOF handling and output-growth limits.",
+      "evidence": [
+        "all_cves.json: description says `read_pixel` in rdtarga.c mishandled EOF and caused a large loop.",
+        "original/ChangeLog.md:598 says an input file with a valid Targa header but incomplete pixel data caused cjpeg to generate a JPEG file potentially thousands of times larger than the input."
+      ]
+    },
+    {
+      "cve_id": "CVE-2019-13960",
+      "bug_class": "resource exhaustion / oversized allocation",
+      "port_surface": "core progressive JPEG decompression",
+      "affected_entry_points": [
+        "progressive JPEG decoding"
+      ],
+      "why_relevant_to_rust": "Memory-safe code can still allocate excessive memory. A Rust reimplementation still needs hard limits on dimensions, scan structure, or warning handling for malformed progressive JPEGs.",
+      "evidence": [
+        "all_cves.json: description says invalid progressive JPEG headers with incorrect width and height could consume a large amount of memory.",
+        "all_cves.json: vendor note says callers should treat warnings as fatal and-or set limits on resource consumption or image sizes."
+      ]
+    },
+    {
+      "cve_id": "CVE-2020-35538",
+      "bug_class": "decoder state-machine / scanline skipping bug",
+      "port_surface": "core decompression API",
+      "affected_entry_points": [
+        "jpeg_skip_scanlines()"
+      ],
+      "why_relevant_to_rust": "The C manifestation was a null-pointer dereference, but the underlying issue was incorrect skip-scanline behavior for specific subsampling and merged-upsampling paths. That control-flow bug can still survive a Rust port as a panic, explicit failure, or wrong output unless the state machine is redesigned carefully.",
+      "evidence": [
+        "all_cves.json: description says a crafted input file could cause a null pointer dereference in `jcopy_sample_rows()`.",
+        "original/ChangeLog.md:383 says `jpeg_skip_scanlines()` had segfaults or premature-data-segment errors for 4:2:2 and 4:2:0 JPEGs using merged upsampling/color conversion."
+      ]
+    },
+    {
+      "cve_id": "CVE-2021-20205",
+      "bug_class": "input validation / divide by zero",
+      "port_surface": "CLI and auxiliary image readers",
+      "affected_entry_points": [
+        "cjpeg GIF reader"
+      ],
+      "why_relevant_to_rust": "Rust will still panic on division by zero. If the Rust port includes cjpeg or GIF-to-JPEG helper paths, zero-width and similar malformed-header cases still require explicit validation.",
+      "evidence": [
+        "all_cves.json: description says a crafted GIF image caused a divide by zero.",
+        "original/ChangeLog.md:193 says the fault occurred when compressing a malformed GIF image with a specified width of 0 using cjpeg."
+      ]
+    }
+  ],
+  "borderline_exclusions": [
+    {
+      "cve_id": "CVE-2013-6629",
+      "reason_not_selected": "Information disclosure from uninitialized memory after malformed SOS parsing. The exploit depends on exposing uninitialized memory, which safe Rust normally avoids unless the port uses unsafe uninitialized buffers incorrectly."
+    },
+    {
+      "cve_id": "CVE-2013-6630",
+      "reason_not_selected": "Information disclosure from partially uninitialized Huffman-table state. This is primarily an uninitialized-memory exposure issue rather than a logic flaw that would normally survive a safe Rust port."
+    },
+    {
+      "cve_id": "CVE-2014-9092",
+      "reason_not_selected": "Although the short CVE text says only 'crash via crafted JPEG', the bundled repo evidence identifies it as a Huffman local buffer overrun, so it is a memory-corruption bug."
+    },
+    {
+      "cve_id": "CVE-2016-3616",
+      "reason_not_selected": "The record is utility-specific (`cjpeg`), lacks bundled upstream evidence in this source snapshot, and its public description conflates NULL dereference with possible arbitrary code execution. That makes it too ambiguous to treat as a clearly non-memory-corruption issue for the Rust port."
+    },
+    {
+      "cve_id": "CVE-2017-9614",
+      "reason_not_selected": "The NVD description itself notes the maintainer's position that this was downstream misuse of the libjpeg API rather than a libjpeg-turbo defect. It should not be treated as a porting requirement for a clean Rust implementation."
+    }
+  ]
+}
