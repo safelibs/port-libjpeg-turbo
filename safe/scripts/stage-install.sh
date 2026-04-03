@@ -293,11 +293,17 @@ run_relink_from_link_txt() {
   local link_txt="$2"
   local output="$3"
   local version_script="$4"
-  local extra_object="${5:-}"
+  local skip_basenames="${5:-}"
+  if (($# >= 5)); then
+    shift 5
+  else
+    shift "$#"
+  fi
+  local extra_args=("$@")
   local argv=()
 
   mapfile -d '' -t argv < <(
-    python3 - "$link_txt" "$output.tmp" "$version_script" "$extra_object" <<'PY'
+    python3 - "$link_txt" "$output.tmp" "$version_script" "$skip_basenames" "${extra_args[@]}" <<'PY'
 import shlex
 import sys
 from pathlib import Path
@@ -305,7 +311,8 @@ from pathlib import Path
 link_txt = Path(sys.argv[1])
 output = sys.argv[2]
 version_script = sys.argv[3]
-extra_object = sys.argv[4]
+skip_basenames = {name for name in sys.argv[4].split(",") if name}
+extra_args = sys.argv[5:]
 
 args = shlex.split(link_txt.read_text(encoding="utf-8"))
 rewritten = []
@@ -313,6 +320,9 @@ i = 0
 
 while i < len(args):
     arg = args[i]
+    if Path(arg).name in skip_basenames:
+        i += 1
+        continue
     if arg == "-o":
         rewritten.extend(["-o", output])
         i += 2
@@ -324,8 +334,7 @@ while i < len(args):
     rewritten.append(arg)
     i += 1
 
-if extra_object:
-    rewritten.append(extra_object)
+rewritten.extend(extra_args)
 
 sys.stdout.write("\0".join(rewritten))
 sys.stdout.write("\0")
@@ -337,6 +346,14 @@ PY
     "${argv[@]}"
   )
   mv "$output.tmp" "$output"
+}
+
+ensure_rust_libjpeg_staticlib() {
+  local staticlib="$SAFE_ROOT/target/release/liblibjpeg_abi.a"
+  if [[ ! -f "$staticlib" ]]; then
+    cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libjpeg-abi --release >/dev/null
+  fi
+  printf '%s\n' "$staticlib"
 }
 
 shared_library_target() {
@@ -358,13 +375,27 @@ relink_staged_libjpeg() {
   local bridge_object="$BUILD_DIR/libjpeg_compat.o"
   local link_dir="$BUILD_DIR/sharedlib"
   local link_txt="$BUILD_DIR/sharedlib/CMakeFiles/jpeg.dir/link.txt"
+  local rust_staticlib
+  local skip_basenames
 
   render_version_script "$ROOT/original/debian/libjpeg-turbo8.symbols" "$version_script"
   gcc -O2 -fPIC -I"$BUILD_DIR" -I"$ROOT/original" -c \
     "$SAFE_ROOT/bridge/libjpeg_compat.c" -o "$bridge_object"
+  rust_staticlib="$(ensure_rust_libjpeg_staticlib)"
+  skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o"
 
   output="$(shared_library_target "$libdir/libjpeg.so.8")"
-  run_relink_from_link_txt "$link_dir" "$link_txt" "$output" "$version_script" "$bridge_object"
+  run_relink_from_link_txt \
+    "$link_dir" \
+    "$link_txt" \
+    "$output" \
+    "$version_script" \
+    "$skip_basenames" \
+    "$bridge_object" \
+    -Wl,--whole-archive \
+    "$rust_staticlib" \
+    -Wl,--no-whole-archive \
+    -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
 }
 
 relink_staged_libturbojpeg() {

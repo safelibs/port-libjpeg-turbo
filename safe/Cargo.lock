@@ -9,6 +9,9 @@ version = "0.1.0"
 [[package]]
 name = "jpeg-core"
 version = "0.1.0"
+dependencies = [
+ "ffi-types",
+]
 
 [[package]]
 name = "jpeg-tools"
@@ -17,6 +20,10 @@ version = "0.1.0"
 [[package]]
 name = "libjpeg-abi"
 version = "0.1.0"
+dependencies = [
+ "ffi-types",
+ "jpeg-core",
+]
 
 [[package]]
 name = "libturbojpeg-abi"

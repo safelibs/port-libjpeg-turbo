@@ -7,3 +7,5 @@ publish.workspace = true
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+ffi-types = { path = "../ffi-types" }

@@ -1,5 +1,4 @@
-pub const TEMPORARY_UPSTREAM_BRIDGE_NOTE: &str =
-    "Bootstrap phases stage the upstream C implementation through safe/scripts/stage-install.sh. Remove this bridge in Phase 8.";
+pub mod common;
 
 pub mod jc {
     pub const PREFIX: &str = "jc";
@@ -16,4 +15,3 @@ pub mod transupp {
 pub mod turbojpeg {
     pub const FILE_BASENAME: &str = "turbojpeg";
 }
-
