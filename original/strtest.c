@@ -41,6 +41,10 @@ typedef struct _error_mgr {
 } error_mgr;
 
 typedef struct {
+  struct jpeg_source_mgr pub;
+} memory_src_mgr;
+
+typedef struct {
   int progressive_mode;
   int arith_code;
   unsigned int restart_interval;
@@ -191,6 +195,61 @@ static int compress_test_jpeg(unsigned char **jpeg_buf, unsigned long *jpeg_size
   return 0;
 }
 
+static void init_memory_src(j_decompress_ptr cinfo)
+{
+  (void)cinfo;
+}
+
+static boolean fill_memory_src(j_decompress_ptr cinfo)
+{
+  static const JOCTET buffer[2] = { 0xFF, JPEG_EOI };
+
+  cinfo->src->next_input_byte = buffer;
+  cinfo->src->bytes_in_buffer = sizeof(buffer);
+  return TRUE;
+}
+
+static void skip_memory_src(j_decompress_ptr cinfo, long num_bytes)
+{
+  if (num_bytes <= 0)
+    return;
+
+  while (num_bytes > (long)cinfo->src->bytes_in_buffer) {
+    num_bytes -= (long)cinfo->src->bytes_in_buffer;
+    fill_memory_src(cinfo);
+  }
+
+  cinfo->src->next_input_byte += num_bytes;
+  cinfo->src->bytes_in_buffer -= (size_t)num_bytes;
+}
+
+static void term_memory_src(j_decompress_ptr cinfo)
+{
+  (void)cinfo;
+}
+
+/* Avoid depending on the optional jpeg_mem_src() helper. */
+static void set_memory_src(j_decompress_ptr cinfo, const unsigned char *jpeg_buf,
+                           unsigned long jpeg_size)
+{
+  memory_src_mgr *src;
+
+  if (!cinfo->src) {
+    cinfo->src = (struct jpeg_source_mgr *)
+      (*cinfo->mem->alloc_small)((j_common_ptr)cinfo, JPOOL_PERMANENT,
+                                 sizeof(memory_src_mgr));
+  }
+
+  src = (memory_src_mgr *)cinfo->src;
+  src->pub.init_source = init_memory_src;
+  src->pub.fill_input_buffer = fill_memory_src;
+  src->pub.skip_input_data = skip_memory_src;
+  src->pub.resync_to_restart = jpeg_resync_to_restart;
+  src->pub.term_source = term_memory_src;
+  src->pub.bytes_in_buffer = (size_t)jpeg_size;
+  src->pub.next_input_byte = (const JOCTET *)jpeg_buf;
+}
+
 static int read_jpeg_header(const unsigned char *jpeg_buf, unsigned long jpeg_size,
                             jpeg_header_info *info)
 {
@@ -213,7 +272,7 @@ static int read_jpeg_header(const unsigned char *jpeg_buf, unsigned long jpeg_si
   }
 
   jpeg_create_decompress(&cinfo);
-  jpeg_mem_src(&cinfo, jpeg_buf, jpeg_size);
+  set_memory_src(&cinfo, jpeg_buf, jpeg_size);
   jpeg_read_header(&cinfo, TRUE);
 
   info->progressive_mode = cinfo.progressive_mode ? 1 : 0;
