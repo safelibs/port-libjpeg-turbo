@@ -40,15 +40,26 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
-#include "tjutil.h"
 #include "turbojpeg.h"
 #include "md5/md5.h"
-#include "cmyk.h"
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
 #ifdef _WIN32
+#include <io.h>
 #include <time.h>
 #define random()  rand()
+#define unlink  _unlink
 #else
 #include <unistd.h>
+#endif
+
+#ifdef _MSC_VER
+#define SNPRINTF(str, n, format, ...) \
+  _snprintf_s(str, n, _TRUNCATE, format, ##__VA_ARGS__)
+#define strcasecmp  _stricmp
+#else
+#define SNPRINTF  snprintf
 #endif
 
 
@@ -100,6 +111,39 @@ int doYUV = 0, alloc = 0, yuvAlign = 4;
 
 int exitStatus = 0;
 #define BAILOUT() { exitStatus = -1;  goto bailout; }
+
+static void rgb_to_cmyk(unsigned char r, unsigned char g, unsigned char b,
+                        unsigned char *c, unsigned char *m, unsigned char *y,
+                        unsigned char *k)
+{
+  double ctmp = 1.0 - ((double)r / 255.0);
+  double mtmp = 1.0 - ((double)g / 255.0);
+  double ytmp = 1.0 - ((double)b / 255.0);
+  double ktmp = ctmp;
+
+  if (mtmp < ktmp) ktmp = mtmp;
+  if (ytmp < ktmp) ktmp = ytmp;
+
+  if (ktmp == 1.0) ctmp = mtmp = ytmp = 0.0;
+  else {
+    ctmp = (ctmp - ktmp) / (1.0 - ktmp);
+    mtmp = (mtmp - ktmp) / (1.0 - ktmp);
+    ytmp = (ytmp - ktmp) / (1.0 - ktmp);
+  }
+  *c = (unsigned char)(255.0 - ctmp * 255.0 + 0.5);
+  *m = (unsigned char)(255.0 - mtmp * 255.0 + 0.5);
+  *y = (unsigned char)(255.0 - ytmp * 255.0 + 0.5);
+  *k = (unsigned char)(255.0 - ktmp * 255.0 + 0.5);
+}
+
+static void cmyk_to_rgb(unsigned char c, unsigned char m, unsigned char y,
+                        unsigned char k, unsigned char *r, unsigned char *g,
+                        unsigned char *b)
+{
+  *r = (unsigned char)((double)c * (double)k / 255.0 + 0.5);
+  *g = (unsigned char)((double)m * (double)k / 255.0 + 0.5);
+  *b = (unsigned char)((double)y * (double)k / 255.0 + 0.5);
+}
 
 
 static void initBuf(unsigned char *buf, int w, int h, int pf, int flags)
@@ -567,13 +611,79 @@ bailout:
 }
 
 
-#if SIZEOF_SIZE_T == 8
-#define CHECKSIZE(function) { \
-  if ((unsigned long long)size < (unsigned long long)0xFFFFFFFF) \
-    THROW(#function " overflow"); \
+#if ULONG_MAX > 0xFFFFFFFFUL
+static int expectedPlaneWidth(int componentID, int width, int subsamp)
+{
+  int pw = PAD(width, tjMCUWidth[subsamp] / 8);
+
+  if (componentID == 0)
+    return pw;
+
+  return pw * 8 / tjMCUWidth[subsamp];
+}
+
+static int expectedPlaneHeight(int componentID, int height, int subsamp)
+{
+  int ph = PAD(height, tjMCUHeight[subsamp] / 8);
+
+  if (componentID == 0)
+    return ph;
+
+  return ph * 8 / tjMCUHeight[subsamp];
+}
+
+static unsigned long expectedBufSize64(int width, int height, int subsamp)
+{
+  int mcuw = tjMCUWidth[subsamp];
+  int mcuh = tjMCUHeight[subsamp];
+  int chromasf = subsamp == TJSAMP_GRAY ? 0 : 4 * 64 / (mcuw * mcuh);
+  unsigned long long expected =
+    PAD(width, mcuw) * PAD(height, mcuh) * (2ULL + chromasf) + 2048ULL;
+
+  return (unsigned long)expected;
+}
+
+static unsigned long expectedLegacyBufSize64(int width, int height)
+{
+  unsigned long long expected =
+    PAD(width, 16) * PAD(height, 16) * 6ULL + 2048ULL;
+
+  return (unsigned long)expected;
+}
+
+static unsigned long expectedBufSizeYUV64(int width, int align, int height,
+                                          int subsamp)
+{
+  unsigned long long expected = 0;
+  int nc = subsamp == TJSAMP_GRAY ? 1 : 3;
+  int i;
+
+  for (i = 0; i < nc; i++) {
+    int pw = expectedPlaneWidth(i, width, subsamp);
+    int ph = expectedPlaneHeight(i, height, subsamp);
+
+    expected += (unsigned long long)PAD(pw, align) * ph;
+  }
+
+  return (unsigned long)expected;
+}
+
+static unsigned long expectedPlaneSize64(int componentID, int width, int stride,
+                                         int height, int subsamp)
+{
+  unsigned long long pw = expectedPlaneWidth(componentID, width, subsamp);
+  unsigned long long ph = expectedPlaneHeight(componentID, height, subsamp);
+  unsigned long long abs_stride = stride == 0 ? pw : abs(stride);
+
+  return (unsigned long)(abs_stride * (ph - 1) + pw);
+}
+
+#define CHECKSIZE(function, expected) { \
+  if (size != (expected)) \
+    THROW(#function " returned an unexpected size"); \
 }
 #else
-#define CHECKSIZE(function) { \
+#define CHECKSIZE(function, expected) { \
   if (size != (unsigned long)(-1) || \
       !strcmp(tjGetErrorStr2(NULL), "No error")) \
     THROW(#function " overflow"); \
@@ -591,21 +701,24 @@ static void overflowTest(void)
   int intsize;
 
   size = tjBufSize(26755, 26755, TJSAMP_444);
-  CHECKSIZE(tjBufSize());
+  CHECKSIZE(tjBufSize(), expectedBufSize64(26755, 26755, TJSAMP_444));
   size = TJBUFSIZE(26755, 26755);
-  CHECKSIZE(TJBUFSIZE());
+  CHECKSIZE(TJBUFSIZE(), expectedLegacyBufSize64(26755, 26755));
   size = tjBufSizeYUV2(37838, 1, 37838, TJSAMP_444);
-  CHECKSIZE(tjBufSizeYUV2());
+  CHECKSIZE(tjBufSizeYUV2(),
+            expectedBufSizeYUV64(37838, 1, 37838, TJSAMP_444));
   size = tjBufSizeYUV2(37837, 3, 37837, TJSAMP_444);
-  CHECKSIZE(tjBufSizeYUV2());
+  CHECKSIZE(tjBufSizeYUV2(), (unsigned long)(-1));
   size = tjBufSizeYUV2(37837, -1, 37837, TJSAMP_444);
-  CHECKSIZE(tjBufSizeYUV2());
+  CHECKSIZE(tjBufSizeYUV2(), (unsigned long)(-1));
   size = TJBUFSIZEYUV(37838, 37838, TJSAMP_444);
-  CHECKSIZE(TJBUFSIZEYUV());
+  CHECKSIZE(TJBUFSIZEYUV(),
+            expectedBufSizeYUV64(37838, 4, 37838, TJSAMP_444));
   size = tjBufSizeYUV(37838, 37838, TJSAMP_444);
-  CHECKSIZE(tjBufSizeYUV());
+  CHECKSIZE(tjBufSizeYUV(), expectedBufSizeYUV64(37838, 4, 37838, TJSAMP_444));
   size = tjPlaneSizeYUV(0, 65536, 0, 65536, TJSAMP_444);
-  CHECKSIZE(tjPlaneSizeYUV());
+  CHECKSIZE(tjPlaneSizeYUV(),
+            expectedPlaneSize64(0, 65536, 0, 65536, TJSAMP_444));
   intsize = tjPlaneWidth(0, INT_MAX, TJSAMP_420);
   CHECKSIZEINT(tjPlaneWidth());
   intsize = tjPlaneHeight(0, INT_MAX, TJSAMP_420);

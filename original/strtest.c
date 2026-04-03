@@ -1,5 +1,5 @@
 /*
- * Copyright (C)2022 D. R. Commander.  All Rights Reserved.
+ * Copyright (C)2022, 2026 D. R. Commander.  All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -26,141 +26,452 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "jinclude.h"
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <setjmp.h>
+#include <jpeglib.h>
+#include <jerror.h>
+#include "turbojpeg.h"
+
+typedef struct _error_mgr {
+  struct jpeg_error_mgr pub;
+  jmp_buf jb;
+  char message[JMSG_LENGTH_MAX];
+} error_mgr;
+
+typedef struct {
+  int progressive_mode;
+  int arith_code;
+  unsigned int restart_interval;
+} jpeg_header_info;
+
+typedef struct {
+  const char *name;
+  char *value;
+  int was_set;
+} env_guard;
 
 
-#define CHECK_VALUE(actual, expected, desc) \
-  if (actual != expected) { \
-    printf("ERROR in line %d: " desc " is %d, should be %d\n", \
-           __LINE__, actual, expected); \
-    return -1; \
-  }
-
-#define CHECK_ERRNO(errno_return, expected_errno) \
-  CHECK_VALUE(errno_return, expected_errno, "Return value") \
-  CHECK_VALUE(errno, expected_errno, "errno") \
-
-
-#ifdef _MSC_VER
-
-void invalid_parameter_handler(const wchar_t *expression,
-                               const wchar_t *function, const wchar_t *file,
-                               unsigned int line, uintptr_t pReserved)
+static void my_error_exit(j_common_ptr cinfo)
 {
+  error_mgr *myerr = (error_mgr *)cinfo->err;
+
+  (*cinfo->err->format_message)(cinfo, myerr->message);
+  longjmp(myerr->jb, 1);
 }
 
-#endif
-
-
-int main(int argc, char **argv)
+static char *dup_string(const char *src)
 {
-  int err;
-  char env[3];
+  size_t len;
+  char *dst;
 
-#ifdef _MSC_VER
-  _set_invalid_parameter_handler(invalid_parameter_handler);
+  if (!src)
+    return NULL;
+  len = strlen(src) + 1;
+  dst = (char *)malloc(len);
+  if (!dst)
+    return NULL;
+  memcpy(dst, src, len);
+  return dst;
+}
+
+static int save_env(env_guard *guard, const char *name)
+{
+  const char *value = getenv(name);
+
+  guard->name = name;
+  guard->value = NULL;
+  guard->was_set = value ? 1 : 0;
+  if (value) {
+    guard->value = dup_string(value);
+    if (!guard->value) {
+      printf("ERROR: Memory allocation failure\n");
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+static void free_env_guard(env_guard *guard)
+{
+  free(guard->value);
+  guard->value = NULL;
+}
+
+static int set_env_value(const char *name, const char *value)
+{
+#ifdef _WIN32
+  return _putenv_s(name, value);
+#else
+  return setenv(name, value, 1);
 #endif
+}
 
-  /***************************************************************************/
+static int unset_env_value(const char *name)
+{
+#ifdef _WIN32
+  return _putenv_s(name, "");
+#else
+  return unsetenv(name);
+#endif
+}
 
-#ifndef NO_PUTENV
+static int restore_env(const env_guard *guard)
+{
+  if (!guard->name)
+    return 0;
+  if (guard->was_set)
+    return set_env_value(guard->name, guard->value);
 
-  printf("PUTENV_S():\n");
+  return unset_env_value(guard->name);
+}
 
-  errno = 0;
-  err = PUTENV_S(NULL, "12");
-  CHECK_ERRNO(err, EINVAL);
+static void init_image(unsigned char *src_buf, int width, int height)
+{
+  int x, y;
 
-  errno = 0;
-  err = PUTENV_S("TESTENV", NULL);
-  CHECK_ERRNO(err, EINVAL);
+  for (y = 0; y < height; y++) {
+    for (x = 0; x < width; x++) {
+      int index = (y * width + x) * 3;
 
-  errno = 0;
-  err = PUTENV_S("TESTENV", "12");
-  CHECK_ERRNO(err, 0);
+      src_buf[index + 0] = (y < height / 2) ? 0 : 255;
+      src_buf[index + 1] = (x < width / 2) ? 64 : 192;
+      src_buf[index + 2] = ((x / 8 + y / 8) & 1) ? 32 : 224;
+    }
+  }
+}
+
+static int compress_test_jpeg(unsigned char **jpeg_buf, unsigned long *jpeg_size)
+{
+  tjhandle handle = NULL;
+  unsigned char src_buf[32 * 32 * 3];
+  int retval = 0;
+
+  init_image(src_buf, 32, 32);
+  *jpeg_buf = NULL;
+  *jpeg_size = 0;
+
+  handle = tjInitCompress();
+  if (!handle) {
+    printf("TurboJPEG ERROR: %s\n", tjGetErrorStr2(NULL));
+    return -1;
+  }
+
+  if (tjCompress2(handle, src_buf, 32, 0, 32, TJPF_RGB, jpeg_buf, jpeg_size,
+                  TJSAMP_444, 75, 0) == -1) {
+    printf("TurboJPEG ERROR: %s\n", tjGetErrorStr2(handle));
+    retval = -1;
+  }
+
+  tjDestroy(handle);
+  return retval;
+}
+
+static int read_jpeg_header(const unsigned char *jpeg_buf, unsigned long jpeg_size,
+                            jpeg_header_info *info)
+{
+  struct jpeg_decompress_struct cinfo;
+  error_mgr jerr;
+
+  memset(&cinfo, 0, sizeof(cinfo));
+  memset(&jerr, 0, sizeof(jerr));
+  info->progressive_mode = 0;
+  info->arith_code = 0;
+  info->restart_interval = 0;
+
+  cinfo.err = jpeg_std_error(&jerr.pub);
+  jerr.pub.error_exit = my_error_exit;
+
+  if (setjmp(jerr.jb)) {
+    printf("libjpeg ERROR: %s\n", jerr.message);
+    jpeg_destroy_decompress(&cinfo);
+    return -1;
+  }
+
+  jpeg_create_decompress(&cinfo);
+  jpeg_mem_src(&cinfo, jpeg_buf, jpeg_size);
+  jpeg_read_header(&cinfo, TRUE);
+
+  info->progressive_mode = cinfo.progressive_mode ? 1 : 0;
+  info->arith_code = cinfo.arith_code ? 1 : 0;
+  info->restart_interval = cinfo.restart_interval;
+
+  jpeg_destroy_decompress(&cinfo);
+  return 0;
+}
+
+static int with_env(const char *name, const char *value, env_guard *guard)
+{
+  if (save_env(guard, name) == -1)
+    return -1;
+  if (set_env_value(name, value) == -1) {
+    printf("ERROR: Could not set %s\n", name);
+    free_env_guard(guard);
+    return -1;
+  }
+
+  return 0;
+}
+
+static int clear_env(const char *name, env_guard *guard)
+{
+  if (save_env(guard, name) == -1)
+    return -1;
+  if (unset_env_value(name) == -1) {
+    printf("ERROR: Could not clear %s\n", name);
+    free_env_guard(guard);
+    return -1;
+  }
+
+  return 0;
+}
+
+static int verify_header(const char *label, int expected_progressive,
+                         int expected_arith, unsigned int expected_restart)
+{
+  unsigned char *jpeg_buf = NULL;
+  unsigned long jpeg_size = 0;
+  jpeg_header_info info;
+  int retval = -1;
+
+  printf("%s...\n", label);
+
+  if (compress_test_jpeg(&jpeg_buf, &jpeg_size) == -1)
+    goto bailout;
+  if (read_jpeg_header(jpeg_buf, jpeg_size, &info) == -1)
+    goto bailout;
+
+  if (info.progressive_mode != expected_progressive) {
+    printf("ERROR: progressive_mode is %d, should be %d\n",
+           info.progressive_mode, expected_progressive);
+    goto bailout;
+  }
+  if (info.arith_code != expected_arith) {
+    printf("ERROR: arith_code is %d, should be %d\n",
+           info.arith_code, expected_arith);
+    goto bailout;
+  }
+  if (info.restart_interval != expected_restart) {
+    printf("ERROR: restart_interval is %u, should be %u\n",
+           info.restart_interval, expected_restart);
+    goto bailout;
+  }
 
   printf("SUCCESS!\n\n");
+  retval = 0;
 
-#endif
+bailout:
+  tjFree(jpeg_buf);
+  return retval;
+}
 
-  /***************************************************************************/
+static int verify_default_settings(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  int retval = -1;
 
-#ifndef NO_GETENV
+  if (clear_env("TJ_OPTIMIZE", &optimize) == -1 ||
+      clear_env("TJ_ARITHMETIC", &arithmetic) == -1 ||
+      clear_env("TJ_RESTART", &restart) == -1 ||
+      clear_env("TJ_PROGRESSIVE", &progressive) == -1)
+    goto bailout;
 
-  printf("GETENV_S():\n");
+  retval = verify_header("Default TurboJPEG environment", 0, 0, 0);
 
-  errno = 0;
-  env[0] = 1;
-  env[1] = 2;
-  env[2] = 3;
-  err = GETENV_S(env, 3, NULL);
-  CHECK_ERRNO(err, 0);
-  CHECK_VALUE(env[0], 0, "env[0]");
-  CHECK_VALUE(env[1], 2, "env[1]");
-  CHECK_VALUE(env[2], 3, "env[2]");
+bailout:
+  restore_env(&progressive);
+  restore_env(&restart);
+  restore_env(&arithmetic);
+  restore_env(&optimize);
+  free_env_guard(&progressive);
+  free_env_guard(&restart);
+  free_env_guard(&arithmetic);
+  free_env_guard(&optimize);
+  return retval;
+}
 
-  errno = 0;
-  env[0] = 1;
-  env[1] = 2;
-  env[2] = 3;
-  err = GETENV_S(env, 3, "TESTENV2");
-  CHECK_ERRNO(err, 0);
-  CHECK_VALUE(env[0], 0, "env[0]");
-  CHECK_VALUE(env[1], 2, "env[1]");
-  CHECK_VALUE(env[2], 3, "env[2]");
+static int verify_optimize_setting(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  unsigned char *default_buf = NULL, *optimized_buf = NULL;
+  unsigned long default_size = 0, optimized_size = 0;
+  int retval = -1;
 
-  errno = 0;
-  err = GETENV_S(NULL, 3, "TESTENV");
-  CHECK_ERRNO(err, EINVAL);
+  printf("TJ_OPTIMIZE...\n");
 
-  errno = 0;
-  err = GETENV_S(NULL, 0, "TESTENV");
-  CHECK_ERRNO(err, 0);
+  if (clear_env("TJ_ARITHMETIC", &arithmetic) == -1 ||
+      clear_env("TJ_RESTART", &restart) == -1 ||
+      clear_env("TJ_PROGRESSIVE", &progressive) == -1)
+    goto bailout;
 
-  errno = 0;
-  env[0] = 1;
-  err = GETENV_S(env, 0, "TESTENV");
-  CHECK_ERRNO(err, EINVAL);
-  CHECK_VALUE(env[0], 1, "env[0]");
+  if (save_env(&optimize, "TJ_OPTIMIZE") == -1)
+    goto bailout;
+  if (unset_env_value("TJ_OPTIMIZE") == -1) {
+    printf("ERROR: Could not clear TJ_OPTIMIZE\n");
+    goto bailout;
+  }
+  if (compress_test_jpeg(&default_buf, &default_size) == -1)
+    goto bailout;
 
-  errno = 0;
-  env[0] = 1;
-  env[1] = 2;
-  env[2] = 3;
-  err = GETENV_S(env, 1, "TESTENV");
-  CHECK_VALUE(err, ERANGE, "Return value");
-  CHECK_VALUE(errno, 0, "errno");
-  CHECK_VALUE(env[0], 0, "env[0]");
-  CHECK_VALUE(env[1], 2, "env[1]");
-  CHECK_VALUE(env[2], 3, "env[2]");
+  if (set_env_value("TJ_OPTIMIZE", "1") == -1) {
+    printf("ERROR: Could not set TJ_OPTIMIZE\n");
+    goto bailout;
+  }
+  if (compress_test_jpeg(&optimized_buf, &optimized_size) == -1)
+    goto bailout;
 
-  errno = 0;
-  env[0] = 1;
-  env[1] = 2;
-  env[2] = 3;
-  err = GETENV_S(env, 2, "TESTENV");
-  CHECK_VALUE(err, ERANGE, "Return value");
-  CHECK_VALUE(errno, 0, "errno");
-  CHECK_VALUE(env[0], 0, "env[0]");
-  CHECK_VALUE(env[1], 2, "env[1]");
-  CHECK_VALUE(env[2], 3, "env[2]");
-
-  errno = 0;
-  env[0] = 1;
-  env[1] = 2;
-  env[2] = 3;
-  err = GETENV_S(env, 3, "TESTENV");
-  CHECK_ERRNO(err, 0);
-  CHECK_VALUE(env[0], '1', "env[0]");
-  CHECK_VALUE(env[1], '2', "env[1]");
-  CHECK_VALUE(env[2], 0, "env[2]");
+  if (optimized_size >= default_size) {
+    printf("ERROR: Optimized JPEG is %lu bytes, default JPEG is %lu bytes\n",
+           optimized_size, default_size);
+    goto bailout;
+  }
 
   printf("SUCCESS!\n\n");
+  retval = 0;
 
+bailout:
+  restore_env(&progressive);
+  restore_env(&restart);
+  restore_env(&arithmetic);
+  restore_env(&optimize);
+  free_env_guard(&progressive);
+  free_env_guard(&restart);
+  free_env_guard(&arithmetic);
+  free_env_guard(&optimize);
+  tjFree(optimized_buf);
+  tjFree(default_buf);
+  return retval;
+}
+
+static int verify_restart_interval(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  int retval = -1;
+
+  if (clear_env("TJ_OPTIMIZE", &optimize) == -1 ||
+      clear_env("TJ_ARITHMETIC", &arithmetic) == -1 ||
+      clear_env("TJ_PROGRESSIVE", &progressive) == -1 ||
+      with_env("TJ_RESTART", "8B", &restart) == -1)
+    goto bailout;
+
+  retval = verify_header("TJ_RESTART = 8B", 0, 0, 8);
+
+bailout:
+  restore_env(&restart);
+  restore_env(&progressive);
+  restore_env(&arithmetic);
+  restore_env(&optimize);
+  free_env_guard(&restart);
+  free_env_guard(&progressive);
+  free_env_guard(&arithmetic);
+  free_env_guard(&optimize);
+  return retval;
+}
+
+static int verify_restart_rows(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  int retval = -1;
+
+  if (clear_env("TJ_OPTIMIZE", &optimize) == -1 ||
+      clear_env("TJ_ARITHMETIC", &arithmetic) == -1 ||
+      clear_env("TJ_PROGRESSIVE", &progressive) == -1 ||
+      with_env("TJ_RESTART", "1", &restart) == -1)
+    goto bailout;
+
+  retval = verify_header("TJ_RESTART = 1 MCU row", 0, 0, 4);
+
+bailout:
+  restore_env(&restart);
+  restore_env(&progressive);
+  restore_env(&arithmetic);
+  restore_env(&optimize);
+  free_env_guard(&restart);
+  free_env_guard(&progressive);
+  free_env_guard(&arithmetic);
+  free_env_guard(&optimize);
+  return retval;
+}
+
+#ifdef C_PROGRESSIVE_SUPPORTED
+static int verify_progressive_setting(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  int retval = -1;
+
+  if (clear_env("TJ_OPTIMIZE", &optimize) == -1 ||
+      clear_env("TJ_ARITHMETIC", &arithmetic) == -1 ||
+      clear_env("TJ_RESTART", &restart) == -1 ||
+      with_env("TJ_PROGRESSIVE", "1", &progressive) == -1)
+    goto bailout;
+
+  retval = verify_header("TJ_PROGRESSIVE = 1", 1, 0, 0);
+
+bailout:
+  restore_env(&progressive);
+  restore_env(&restart);
+  restore_env(&arithmetic);
+  restore_env(&optimize);
+  free_env_guard(&progressive);
+  free_env_guard(&restart);
+  free_env_guard(&arithmetic);
+  free_env_guard(&optimize);
+  return retval;
+}
 #endif
 
-  /***************************************************************************/
+#ifdef C_ARITH_CODING_SUPPORTED
+static int verify_arithmetic_setting(void)
+{
+  env_guard optimize = { 0 }, arithmetic = { 0 }, restart = { 0 },
+    progressive = { 0 };
+  int retval = -1;
+
+  if (clear_env("TJ_OPTIMIZE", &optimize) == -1 ||
+      clear_env("TJ_PROGRESSIVE", &progressive) == -1 ||
+      clear_env("TJ_RESTART", &restart) == -1 ||
+      with_env("TJ_ARITHMETIC", "1", &arithmetic) == -1)
+    goto bailout;
+
+  retval = verify_header("TJ_ARITHMETIC = 1", 0, 1, 0);
+
+bailout:
+  restore_env(&arithmetic);
+  restore_env(&restart);
+  restore_env(&progressive);
+  restore_env(&optimize);
+  free_env_guard(&arithmetic);
+  free_env_guard(&restart);
+  free_env_guard(&progressive);
+  free_env_guard(&optimize);
+  return retval;
+}
+#endif
+
+int main(void)
+{
+  if (verify_default_settings() == -1 ||
+      verify_optimize_setting() == -1 ||
+      verify_restart_interval() == -1 ||
+      verify_restart_rows() == -1)
+    return -1;
+
+#ifdef C_PROGRESSIVE_SUPPORTED
+  if (verify_progressive_setting() == -1)
+    return -1;
+#endif
+
+#ifdef C_ARITH_CODING_SUPPORTED
+  if (verify_arithmetic_setting() == -1)
+    return -1;
+#endif
 
   return 0;
 }

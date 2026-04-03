@@ -660,8 +660,11 @@ if(WITH_TURBOJPEG)
         LINK_FLAGS "${TJMAPFLAG}${TJMAPFILE}")
     endif()
 
-    add_executable(tjunittest tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)
+    add_executable(tjunittest tjunittest.c md5/md5.c md5/md5hl.c)
     target_link_libraries(tjunittest turbojpeg)
+
+    add_executable(strtest strtest.c)
+    target_link_libraries(strtest turbojpeg jpeg)
 
     add_executable(tjbench tjbench.c tjutil.c)
     target_link_libraries(tjbench turbojpeg)
@@ -683,9 +686,11 @@ if(WITH_TURBOJPEG)
       set_target_properties(turbojpeg-static PROPERTIES OUTPUT_NAME turbojpeg)
     endif()
 
-    add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c
-      md5/md5hl.c)
+    add_executable(tjunittest-static tjunittest.c md5/md5.c md5/md5hl.c)
     target_link_libraries(tjunittest-static turbojpeg-static)
+
+    add_executable(strtest-static strtest.c)
+    target_link_libraries(strtest-static turbojpeg-static)
 
     add_executable(tjbench-static tjbench.c tjutil.c)
     target_link_libraries(tjbench-static turbojpeg-static)
@@ -734,8 +739,6 @@ add_executable(wrjpgcom wrjpgcom.c)
 if(WITH_FUZZ)
   add_subdirectory(fuzz)
 endif()
-
-add_executable(strtest strtest.c)
 
 add_subdirectory(md5)
 
@@ -977,6 +980,8 @@ foreach(libtype ${TEST_LIBTYPES})
     set(suffix -static)
   endif()
   if(WITH_TURBOJPEG)
+    add_test(strtest-${libtype}
+      ${CMAKE_CROSSCOMPILING_EMULATOR} strtest${suffix})
     add_test(tjunittest-${libtype}
       ${CMAKE_CROSSCOMPILING_EMULATOR} tjunittest${suffix})
     add_test(tjunittest-${libtype}-alloc
