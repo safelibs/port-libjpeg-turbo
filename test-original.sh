@@ -16,9 +16,9 @@ then exercises the direct dependent software listed in dependents.json.
 
 --checks defaults to all.
 runtime runs the runtime-dependent package smoke tests.
-compile runs the build-time matrix. Where a lightweight source rebuild is not
-practical in this harness, compile falls back to the closest public-API smoke
-test for that source package.
+compile runs the build-time matrix by building package-native targets from each
+source package in build_time_dependents[] and checking that the resulting
+artifacts resolve libjpeg/libturbojpeg from /usr/local.
 all runs compile checks first and runtime checks second.
 
 --only filters by exact runtime package name from runtime_dependents[].name or
@@ -85,6 +85,7 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       build-essential \
       ca-certificates \
       cmake \
+      curl \
       dbus-x11 \
       dcm2niix \
       eog \
@@ -101,7 +102,9 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
       libvips-dev \
       libvips-tools \
       libwebkit2gtk-4.1-dev \
+      meson \
       nasm \
+      ninja-build \
       openjdk-17-jdk-headless \
       pkg-config \
       python3 \
@@ -139,12 +142,12 @@ ORIGINAL_SRC_COPY=/tmp/libjpeg-original-src
 ORIGINAL_BUILD_DIR=/tmp/libjpeg-original-build
 DEPENDENT_SOURCE_ROOT=/tmp/libjpeg-dependent-sources
 APT_UPDATED=0
-SOURCE_BUILD_DEPS_READY=0
 
 mkdir -p "$HOME" "$TEST_ROOT" "$DEPENDENT_SOURCE_ROOT"
 
 declare -A COMPLETED_CHECKS=()
 declare -A SOURCE_CACHE=()
+declare -A BUILD_DEPS_READY=()
 
 log_step() {
   printf '\n==> %s\n' "$1"
@@ -231,6 +234,23 @@ find_first_file() {
   find "$root" -type f -name "$name_pattern" -print -quit 2>/dev/null
 }
 
+find_first_elf_shared_object() {
+  local root="$1"
+  shift
+  local name_pattern candidate
+
+  for name_pattern in "$@"; do
+    while IFS= read -r -d '' candidate; do
+      if file -b "$candidate" | grep -F 'ELF ' >/dev/null 2>&1; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done < <(find "$root" -type f -name "$name_pattern" -print0 2>/dev/null)
+  done
+
+  return 1
+}
+
 run_check() {
   local key="$1"
   local label="$2"
@@ -282,15 +302,20 @@ ensure_apt_updated() {
   fi
 }
 
-ensure_source_build_deps() {
-  if [[ "$SOURCE_BUILD_DEPS_READY" -eq 0 ]]; then
-    ensure_apt_updated
-    apt-get build-dep -y dcm2niix timg >/tmp/libjpeg-build-deps.log 2>&1 || {
-      cat /tmp/libjpeg-build-deps.log >&2
-      exit 1
-    }
-    SOURCE_BUILD_DEPS_READY=1
+ensure_package_build_deps() {
+  local source_package="$1"
+
+  if [[ -n "${BUILD_DEPS_READY[$source_package]:-}" ]]; then
+    return 0
   fi
+
+  ensure_apt_updated
+  apt-get build-dep -y "$source_package" >"/tmp/${source_package}-build-deps.log" 2>&1 || {
+    cat "/tmp/${source_package}-build-deps.log" >&2
+    exit 1
+  }
+
+  BUILD_DEPS_READY[$source_package]=1
 }
 
 fetch_ubuntu_source() {
@@ -464,7 +489,7 @@ EOF
 check_dcm2niix_source_build() {
   local source_dir build_dir binary dir nifti_file json_file
 
-  ensure_source_build_deps
+  ensure_package_build_deps dcm2niix
   source_dir="$(fetch_ubuntu_source dcm2niix)"
   build_dir="$TEST_ROOT/build-dcm2niix"
   rm -rf "$build_dir"
@@ -506,7 +531,7 @@ check_dcm2niix_source_build() {
 check_timg_source_build() {
   local source_dir build_dir binary dir
 
-  ensure_source_build_deps
+  ensure_package_build_deps timg
   source_dir="$(fetch_ubuntu_source timg)"
   build_dir="$TEST_ROOT/build-timg"
   rm -rf "$build_dir"
@@ -531,6 +556,371 @@ check_timg_source_build() {
     exit 1
   }
   require_nonempty_file "$dir/render.txt"
+}
+
+check_krita_source_build() {
+  local source_dir build_dir import_module export_module
+
+  ensure_package_build_deps krita
+  source_dir="$(fetch_ubuntu_source krita)"
+  build_dir="$TEST_ROOT/build-krita"
+  rm -rf "$build_dir"
+
+  cmake -S "$source_dir" -B "$build_dir" -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DFOUNDATION_BUILD=OFF \
+    -DBUILD_TESTING=OFF \
+    -DENABLE_UPDATERS=OFF \
+    -DKRITA_ENABLE_PCH=OFF \
+    >/tmp/krita-source-config.log 2>&1 || {
+      cat /tmp/krita-source-config.log >&2
+      exit 1
+    }
+
+  cmake --build "$build_dir" -j"$(nproc)" --target kritajpegimport kritajpegexport >/tmp/krita-source-build.log 2>&1 || {
+    cat /tmp/krita-source-build.log >&2
+    exit 1
+  }
+
+  import_module="$(find "$build_dir" -type f -name 'kritajpegimport.so' -print -quit)"
+  export_module="$(find "$build_dir" -type f -name 'kritajpegexport.so' -print -quit)"
+  [[ -n "$import_module" ]] || die "unable to locate source-built kritajpegimport module"
+  [[ -n "$export_module" ]] || die "unable to locate source-built kritajpegexport module"
+
+  assert_uses_local_soname "$import_module" libjpeg.so.8
+  assert_uses_local_soname "$export_module" libjpeg.so.8
+}
+
+check_libreoffice_source_build() {
+  local source_dir multiarch vcl_lib dir
+
+  ensure_package_build_deps libreoffice
+  source_dir="$(fetch_ubuntu_source libreoffice)"
+  multiarch="$(gcc -print-multiarch)"
+  dir="$(reset_test_dir libreoffice-source)"
+
+  (
+    cd "$source_dir"
+    rm -f autogen.lastrun config.status
+    export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:/usr/local/lib/$multiarch/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    export LD_LIBRARY_PATH="/usr/local/lib:/usr/local/lib/$multiarch${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export SAL_USE_VCLPLUGIN=headless
+
+    ./autogen.sh \
+      --disable-cups \
+      --disable-dbus \
+      --disable-dconf \
+      --disable-epm \
+      --disable-evolution2 \
+      --disable-ext-nlpsolver \
+      --disable-ext-wiki-publisher \
+      --disable-firebird-sdbc \
+      --disable-gio \
+      --disable-gstreamer-1-0 \
+      --disable-gtk3 \
+      --disable-gui \
+      --disable-kf5 \
+      --disable-libcmis \
+      --disable-lto \
+      --disable-odk \
+      --disable-online-update \
+      --disable-poppler \
+      --disable-postgresql-sdbc \
+      --disable-report-builder \
+      --disable-scripting-beanshell \
+      --disable-scripting-javascript \
+      --disable-sdremote \
+      --disable-sdremote-bluetooth \
+      --disable-skia \
+      --enable-cairo-rgba \
+      --enable-extension-integration \
+      --enable-mergelibs \
+      --enable-python=system \
+      --enable-release-build \
+      --with-external-dict-dir=/usr/share/hunspell \
+      --with-external-hyph-dir=/usr/share/hyphen \
+      --with-external-thes-dir=/usr/share/mythes \
+      --without-fonts \
+      --with-galleries=no \
+      --with-lang=en-US \
+      --with-linker-hash-style=both \
+      --with-system-dicts \
+      --with-system-jpeg \
+      --with-theme=colibre \
+      --without-branding \
+      --without-help \
+      --without-java \
+      --without-junit \
+      --without-package-format \
+      --without-system-cairo \
+      --without-system-jars \
+      --without-system-libpng \
+      --without-system-libxml \
+      --without-system-openssl \
+      --without-system-postgresql \
+      >/tmp/libreoffice-source-config.log 2>&1 || {
+        tail -n 200 /tmp/libreoffice-source-config.log >&2
+        exit 1
+      }
+
+    grep -F 'checking which libjpeg to use... external' /tmp/libreoffice-source-config.log >/dev/null || {
+      cat /tmp/libreoffice-source-config.log >&2
+      exit 1
+    }
+
+    make -j"$(nproc)" CppunitTest_vcl_jpeg_read_write_test >/tmp/libreoffice-source-build.log 2>&1 || {
+      tail -n 200 /tmp/libreoffice-source-build.log >&2
+      exit 1
+    }
+  )
+
+  vcl_lib="$(find_first_elf_shared_object "$source_dir" 'libvcllo.so.*' 'libmergedlo.so.*' 'libvcllo.so' 'libmergedlo.so')"
+  [[ -n "$vcl_lib" ]] || die "unable to locate source-built LibreOffice VCL library"
+  assert_uses_local_soname "$vcl_lib" libjpeg.so.8
+}
+
+check_opencv_source_build() {
+  local source_dir build_dir lib dir
+
+  ensure_package_build_deps opencv
+  source_dir="$(fetch_ubuntu_source opencv)"
+  build_dir="$TEST_ROOT/build-opencv"
+  rm -rf "$build_dir"
+
+  cmake -S "$source_dir" -B "$build_dir" -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_LIST=core,imgproc,imgcodecs \
+    -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_TESTS=OFF \
+    -DBUILD_PERF_TESTS=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_opencv_apps=OFF \
+    -DBUILD_opencv_java=OFF \
+    -DBUILD_opencv_python3=OFF \
+    -DBUILD_PROTOBUF=OFF \
+    -DWITH_PROTOBUF=OFF \
+    -DWITH_QUIRC=OFF \
+    -DWITH_1394=OFF \
+    -DWITH_VTK=OFF \
+    -DWITH_JPEG=ON \
+    -DBUILD_JPEG=OFF \
+    -DWITH_PNG=OFF \
+    -DWITH_TIFF=OFF \
+    -DWITH_WEBP=OFF \
+    -DWITH_OPENEXR=OFF \
+    -DWITH_OPENJPEG=OFF \
+    -DWITH_JASPER=OFF \
+    -DWITH_GDAL=OFF \
+    -DWITH_GTK=OFF \
+    -DWITH_QT=OFF \
+    -DWITH_OPENCL=OFF \
+    -DWITH_IPP=OFF \
+    -DWITH_TBB=OFF \
+    -DWITH_ITT=OFF \
+    -DWITH_ADE=OFF \
+    -DWITH_GSTREAMER=OFF \
+    -DWITH_V4L=OFF \
+    -DWITH_GPHOTO2=OFF \
+    -DWITH_FFMPEG=OFF \
+    >/tmp/opencv-source-config.log 2>&1 || {
+      cat /tmp/opencv-source-config.log >&2
+      exit 1
+    }
+
+  cmake --build "$build_dir" -j"$(nproc)" --target opencv_imgcodecs >/tmp/opencv-source-build.log 2>&1 || {
+    cat /tmp/opencv-source-build.log >&2
+    exit 1
+  }
+
+  lib="$(find "$build_dir/lib" -type f -name 'libopencv_imgcodecs.so*' -print -quit)"
+  [[ -n "$lib" ]] || die "unable to locate source-built libopencv_imgcodecs"
+  assert_uses_local_soname "$lib" libjpeg.so.8
+
+  dir="$(reset_test_dir opencv-source)"
+  cat >"$dir/opencv_smoke.cpp" <<'EOF'
+#include <opencv2/imgcodecs.hpp>
+#include <iostream>
+
+int main() {
+  cv::Mat input = cv::imread("INPUT_JPG", cv::IMREAD_COLOR);
+  if (input.empty()) {
+    std::cerr << "imread failed\n";
+    return 1;
+  }
+  if (!cv::imwrite("OUTPUT_JPG", input)) {
+    std::cerr << "imwrite failed\n";
+    return 1;
+  }
+  std::cout << input.cols << "x" << input.rows << "\n";
+  return 0;
+}
+EOF
+  sed -i "s|INPUT_JPG|$FIXTURE_DIR/input.jpg|g; s|OUTPUT_JPG|$dir/opencv-out.jpg|g" "$dir/opencv_smoke.cpp"
+
+  c++ -std=c++17 "$dir/opencv_smoke.cpp" \
+    -I"$source_dir/modules/core/include" \
+    -I"$source_dir/modules/imgproc/include" \
+    -I"$source_dir/modules/imgcodecs/include" \
+    -I"$build_dir" \
+    -L"$build_dir/lib" \
+    -Wl,-rpath,"$build_dir/lib" \
+    -lopencv_imgcodecs -lopencv_imgproc -lopencv_core \
+    -ldl -lm -lpthread -lrt \
+    -o "$dir/opencv-smoke" \
+    >/tmp/opencv-source-consumer.log 2>&1 || {
+      cat /tmp/opencv-source-consumer.log >&2
+      exit 1
+    }
+
+  "$dir/opencv-smoke" >"$dir/run.log" 2>&1 || {
+    cat "$dir/run.log" >&2
+    exit 1
+  }
+
+  require_nonempty_file "$dir/opencv-out.jpg"
+}
+
+check_vips_source_build() {
+  local source_dir build_dir lib dir
+
+  ensure_package_build_deps vips
+  source_dir="$(fetch_ubuntu_source vips)"
+  build_dir="$TEST_ROOT/build-vips"
+  rm -rf "$build_dir"
+
+  meson setup "$build_dir" "$source_dir" \
+    -Djpeg=enabled \
+    -Djpeg-xl=disabled \
+    -Dopenjpeg=disabled \
+    -Ddeprecated=false \
+    -Dexamples=false \
+    -Dgtk_doc=false \
+    -Ddoxygen=false \
+    -Dintrospection=disabled \
+    >/tmp/vips-source-config.log 2>&1 || {
+      cat /tmp/vips-source-config.log >&2
+      exit 1
+    }
+
+  ninja -C "$build_dir" tools/vips >/tmp/vips-source-build.log 2>&1 || {
+    cat /tmp/vips-source-build.log >&2
+    exit 1
+  }
+
+  lib="$(find "$build_dir/libvips" -maxdepth 1 -type f -name 'libvips.so*' ! -name '*.symbols' -print -quit)"
+  [[ -n "$lib" ]] || die "unable to locate source-built libvips shared library"
+  assert_uses_local_soname "$lib" libjpeg.so.8
+
+  dir="$(reset_test_dir vips-source)"
+  "$build_dir/tools/vips" copy "$FIXTURE_DIR/input.jpg" "$dir/roundtrip.jpg" >/tmp/vips-source-run.log 2>&1 || {
+    cat /tmp/vips-source-run.log >&2
+    exit 1
+  }
+
+  require_nonempty_file "$dir/roundtrip.jpg"
+}
+
+check_webkit_source_build() {
+  local source_dir build_dir webkit_lib
+  local -a cmake_args
+
+  ensure_package_build_deps webkit2gtk
+  source_dir="$(fetch_ubuntu_source webkit2gtk)"
+  build_dir="$TEST_ROOT/build-webkit2gtk"
+  rm -rf "$build_dir"
+
+  cmake_args=(
+    -GNinja
+    -DPORT=GTK
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
+    -DUSE_LIBBACKTRACE=OFF
+    -DENABLE_MINIBROWSER=ON
+    -DENABLE_DOCUMENTATION=OFF
+    -DENABLE_INTROSPECTION=OFF
+    -DENABLE_API_TESTS=OFF
+    -DENABLE_LAYOUT_TESTS=OFF
+    -DENABLE_BUBBLEWRAP_SANDBOX=OFF
+    -DENABLE_GAMEPAD=OFF
+    -DENABLE_MEMORY_SAMPLER=OFF
+    -DENABLE_RESOURCE_USAGE=OFF
+    -DENABLE_SPEECH_SYNTHESIS=OFF
+    -DENABLE_WEBDRIVER=OFF
+    -DUSE_GTK4=OFF
+    -DUSE_JPEGXL=OFF
+    -DUSE_GBM=OFF
+    -DUSE_LIBDRM=OFF
+    -DUSE_SOUP2=OFF
+    -DUSE_SYSTEM_SYSPROF_CAPTURE=OFF
+    -DUSE_SYSPROF_CAPTURE=OFF
+  )
+
+  if command -v clang >/dev/null 2>&1 && command -v clang++ >/dev/null 2>&1; then
+    cmake_args+=(-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++)
+  fi
+
+  cmake -S "$source_dir" -B "$build_dir" "${cmake_args[@]}" >/tmp/webkit-source-config.log 2>&1 || {
+    cat /tmp/webkit-source-config.log >&2
+    exit 1
+  }
+
+  cmake --build "$build_dir" -j"$(nproc)" --target WebKit >/tmp/webkit-source-build.log 2>&1 || {
+    cat /tmp/webkit-source-build.log >&2
+    exit 1
+  }
+
+  webkit_lib="$(find_first_elf_shared_object "$build_dir" 'libwebkit2gtk-4.1.so.*' 'libwebkit2gtk-4.1.so')"
+  [[ -n "$webkit_lib" ]] || die "unable to locate source-built libwebkit2gtk shared library"
+  assert_uses_local_soname "$webkit_lib" libjpeg.so.8
+}
+
+check_xpra_source_build() {
+  local source_dir encoder dir
+
+  ensure_package_build_deps xpra
+  source_dir="$(fetch_ubuntu_source xpra)"
+  dir="$(reset_test_dir xpra-source)"
+
+  (
+    cd "$source_dir"
+    python3 setup.py build_ext --inplace \
+      --with-verbose \
+      --with-Xdummy \
+      --without-Xdummy_wrapper \
+      --with-html5 \
+      --without-minify \
+      --without-html5_gzip \
+      --without-strict \
+      >/tmp/xpra-source-build.log 2>&1
+  ) || {
+    tail -n 200 /tmp/xpra-source-build.log >&2
+    exit 1
+  }
+
+  encoder="$(find "$source_dir/xpra/codecs/jpeg" -type f -name 'encoder*.so' -print -quit)"
+  [[ -n "$encoder" ]] || die "unable to locate source-built Xpra JPEG encoder extension"
+  assert_uses_local_soname "$encoder" libturbojpeg.so.0
+
+  FIXTURE_DIR="$FIXTURE_DIR" PYTHONPATH="$source_dir" python3 - <<'PY' >"$dir/run.log" 2>&1
+from PIL import Image
+from xpra.codecs.image_wrapper import ImageWrapper
+from xpra.codecs.jpeg import encoder, decoder
+import os
+
+fixture_dir = os.environ["FIXTURE_DIR"]
+image = Image.open(os.path.join(fixture_dir, "input.jpg")).convert("RGBA")
+raw = image.tobytes("raw", "RGBA")
+wrapper = ImageWrapper(0, 0, image.width, image.height, raw, "RGBX", 24, image.width * 4)
+encoding, compressed, options, width, height, _, _ = encoder.encode(wrapper, quality=80, speed=50, options={})
+decoded = decoder.decompress_to_rgb("RGBX", compressed.data, width, height, {})
+
+print(encoding)
+print(len(compressed.data))
+print(decoded.get_width(), decoded.get_height(), decoded.get_pixel_format())
+PY
+
+  require_contains "$dir/run.log" 'jpeg'
+  require_contains "$dir/run.log" 'RGBX'
 }
 
 check_dcm2niix_runtime() {
@@ -983,13 +1373,13 @@ PY
 
 run_compile_checks() {
   run_selected_compile dcm2niix dcm2niix-source 'dcm2niix source build' check_dcm2niix_source_build
-  run_selected_compile krita krita-runtime 'krita compile fallback (runtime smoke)' check_krita_runtime
-  run_selected_compile libreoffice libreoffice-runtime 'libreoffice compile fallback (runtime smoke)' check_libreoffice_runtime
-  run_selected_compile opencv opencv-consumer 'opencv public API consumer build' check_opencv_consumer
   run_selected_compile timg timg-source 'timg source build' check_timg_source_build
-  run_selected_compile vips vips-consumer 'vips public API consumer build' check_vips_consumer
-  run_selected_compile webkit2gtk webkit-consumer 'webkit2gtk public API consumer build' check_webkit_consumer
-  run_selected_compile xpra xpra-jpeg-codec 'xpra TurboJPEG codec smoke' check_xpra_jpeg_codec
+  run_selected_compile opencv opencv-source 'opencv source build' check_opencv_source_build
+  run_selected_compile vips vips-source 'vips source build' check_vips_source_build
+  run_selected_compile xpra xpra-source 'xpra source build' check_xpra_source_build
+  run_selected_compile krita krita-source 'krita source build' check_krita_source_build
+  run_selected_compile libreoffice libreoffice-source 'libreoffice source build' check_libreoffice_source_build
+  run_selected_compile webkit2gtk webkit-source 'webkit2gtk source build' check_webkit_source_build
 }
 
 run_runtime_checks() {
