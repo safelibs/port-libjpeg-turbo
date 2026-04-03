@@ -7,4 +7,9 @@ build = "build.rs"
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
 
+[dependencies]
+ffi-types = { path = "../ffi-types" }
+jpeg-core = { path = "../jpeg-core" }
+libjpeg-abi = { path = "../libjpeg-abi" }

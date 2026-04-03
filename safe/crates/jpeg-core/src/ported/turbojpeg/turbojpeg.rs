@@ -54,12 +54,33 @@ pub const TJ_ALPHA_OFFSET: [c_int; TJ_NUMPF as usize] =
     [-1, -1, -1, -1, -1, -1, -1, 3, 3, 0, 0, -1];
 pub const TJ_PIXEL_SIZE: [c_int; TJ_NUMPF as usize] = [3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4, 4];
 
+pub const NUM_SCALING_FACTORS: c_int = 16;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct tjscalingfactor {
     pub num: c_int,
     pub denom: c_int,
 }
+
+pub static SCALING_FACTORS: [tjscalingfactor; NUM_SCALING_FACTORS as usize] = [
+    tjscalingfactor { num: 2, denom: 1 },
+    tjscalingfactor { num: 15, denom: 8 },
+    tjscalingfactor { num: 7, denom: 4 },
+    tjscalingfactor { num: 13, denom: 8 },
+    tjscalingfactor { num: 3, denom: 2 },
+    tjscalingfactor { num: 11, denom: 8 },
+    tjscalingfactor { num: 5, denom: 4 },
+    tjscalingfactor { num: 9, denom: 8 },
+    tjscalingfactor { num: 1, denom: 1 },
+    tjscalingfactor { num: 7, denom: 8 },
+    tjscalingfactor { num: 3, denom: 4 },
+    tjscalingfactor { num: 5, denom: 8 },
+    tjscalingfactor { num: 1, denom: 2 },
+    tjscalingfactor { num: 3, denom: 8 },
+    tjscalingfactor { num: 1, denom: 4 },
+    tjscalingfactor { num: 1, denom: 8 },
+];
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -104,3 +125,179 @@ impl Default for tjtransform {
 }
 
 pub type TjBufSizeFn = unsafe extern "C" fn(width: c_int, height: c_int, subsamp: c_int) -> c_ulong;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TjMathError {
+    InvalidArgument,
+    WidthTooLarge,
+    HeightTooLarge,
+    ImageTooLarge,
+}
+
+const fn pad_u128(value: u128, align: u128) -> u128 {
+    (value + align - 1) & !(align - 1)
+}
+
+const fn plane_count_for_subsamp(subsamp: c_int) -> Option<c_int> {
+    if subsamp < 0 || subsamp >= TJ_NUMSAMP {
+        None
+    } else if subsamp == TJSAMP_GRAY {
+        Some(1)
+    } else {
+        Some(3)
+    }
+}
+
+pub fn legacy_buf_size_checked(width: c_int, height: c_int) -> Result<c_ulong, TjMathError> {
+    if width < 1 || height < 1 {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let retval = pad_u128(width as u128, 16) * pad_u128(height as u128, 16) * 6 + 2048;
+    if retval > c_ulong::MAX as u128 {
+        Err(TjMathError::ImageTooLarge)
+    } else {
+        Ok(retval as c_ulong)
+    }
+}
+
+pub fn buf_size_checked(
+    width: c_int,
+    height: c_int,
+    jpeg_subsamp: c_int,
+) -> Result<c_ulong, TjMathError> {
+    if width < 1 || height < 1 || plane_count_for_subsamp(jpeg_subsamp).is_none() {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let mcu_width = TJ_MCU_WIDTH[jpeg_subsamp as usize] as u128;
+    let mcu_height = TJ_MCU_HEIGHT[jpeg_subsamp as usize] as u128;
+    let chroma_sf = if jpeg_subsamp == TJSAMP_GRAY {
+        0
+    } else {
+        4 * 64 / (mcu_width * mcu_height)
+    };
+    let retval =
+        pad_u128(width as u128, mcu_width) * pad_u128(height as u128, mcu_height) * (2 + chroma_sf)
+            + 2048;
+
+    if retval > c_ulong::MAX as u128 {
+        Err(TjMathError::ImageTooLarge)
+    } else {
+        Ok(retval as c_ulong)
+    }
+}
+
+pub fn plane_width_checked(
+    component_id: c_int,
+    width: c_int,
+    subsamp: c_int,
+) -> Result<c_int, TjMathError> {
+    if width < 1 {
+        return Err(TjMathError::InvalidArgument);
+    }
+    let components = plane_count_for_subsamp(subsamp).ok_or(TjMathError::InvalidArgument)?;
+    if component_id < 0 || component_id >= components {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let mcu_width = TJ_MCU_WIDTH[subsamp as usize] as u128;
+    let padded = pad_u128(width as u128, mcu_width / 8);
+    let retval = if component_id == 0 {
+        padded
+    } else {
+        padded * 8 / mcu_width
+    };
+
+    if retval > i32::MAX as u128 {
+        Err(TjMathError::WidthTooLarge)
+    } else {
+        Ok(retval as c_int)
+    }
+}
+
+pub fn plane_height_checked(
+    component_id: c_int,
+    height: c_int,
+    subsamp: c_int,
+) -> Result<c_int, TjMathError> {
+    if height < 1 {
+        return Err(TjMathError::InvalidArgument);
+    }
+    let components = plane_count_for_subsamp(subsamp).ok_or(TjMathError::InvalidArgument)?;
+    if component_id < 0 || component_id >= components {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let mcu_height = TJ_MCU_HEIGHT[subsamp as usize] as u128;
+    let padded = pad_u128(height as u128, mcu_height / 8);
+    let retval = if component_id == 0 {
+        padded
+    } else {
+        padded * 8 / mcu_height
+    };
+
+    if retval > i32::MAX as u128 {
+        Err(TjMathError::HeightTooLarge)
+    } else {
+        Ok(retval as c_int)
+    }
+}
+
+pub fn plane_size_yuv_checked(
+    component_id: c_int,
+    width: c_int,
+    stride: c_int,
+    height: c_int,
+    subsamp: c_int,
+) -> Result<c_ulong, TjMathError> {
+    if width < 1 || height < 1 || plane_count_for_subsamp(subsamp).is_none() {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let plane_width = plane_width_checked(component_id, width, subsamp)? as u128;
+    let plane_height = plane_height_checked(component_id, height, subsamp)? as u128;
+    let abs_stride = if stride == 0 {
+        plane_width
+    } else {
+        stride.unsigned_abs() as u128
+    };
+    let retval = abs_stride * (plane_height - 1) + plane_width;
+
+    if retval > c_ulong::MAX as u128 {
+        Err(TjMathError::ImageTooLarge)
+    } else {
+        Ok(retval as c_ulong)
+    }
+}
+
+pub fn buf_size_yuv2_checked(
+    width: c_int,
+    align: c_int,
+    height: c_int,
+    subsamp: c_int,
+) -> Result<c_ulong, TjMathError> {
+    if align < 1 || (align & (align - 1)) != 0 {
+        return Err(TjMathError::InvalidArgument);
+    }
+
+    let components = plane_count_for_subsamp(subsamp).ok_or(TjMathError::InvalidArgument)?;
+    let mut retval = 0u128;
+    let align = align as u128;
+
+    for component_id in 0..components {
+        let plane_width = plane_width_checked(component_id, width, subsamp)? as u128;
+        let plane_height = plane_height_checked(component_id, height, subsamp)? as u128;
+        retval += pad_u128(plane_width, align) * plane_height;
+    }
+
+    if retval > c_ulong::MAX as u128 {
+        Err(TjMathError::ImageTooLarge)
+    } else {
+        Ok(retval as c_ulong)
+    }
+}
+
+pub fn buf_size_yuv_checked(width: c_int, height: c_int, subsamp: c_int) -> Result<c_ulong, TjMathError> {
+    buf_size_yuv2_checked(width, 4, height, subsamp)
+}

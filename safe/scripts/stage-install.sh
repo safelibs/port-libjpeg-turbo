@@ -354,6 +354,12 @@ ensure_rust_libjpeg_staticlib() {
   printf '%s\n' "$staticlib"
 }
 
+ensure_rust_libturbojpeg_staticlib() {
+  local staticlib="$SAFE_ROOT/target/release/liblibturbojpeg_abi.a"
+  cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libturbojpeg-abi --release >/dev/null
+  printf '%s\n' "$staticlib"
+}
+
 shared_library_target() {
   local symlink_path="$1"
   local target
@@ -402,19 +408,28 @@ relink_staged_libturbojpeg() {
   local version_script="$BUILD_DIR/libturbojpeg-bootstrap.map"
   local link_dir="$BUILD_DIR"
   local link_txt="$BUILD_DIR/CMakeFiles/turbojpeg.dir/link.txt"
-  local skip_args=()
+  local rust_staticlib
+  local skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o,jcapimin.c.o,jcapistd.c.o,jcarith.c.o,jccoefct.c.o,jccolor.c.o,jcdctmgr.c.o,jchuff.c.o,jcinit.c.o,jcmainct.c.o,jcmarker.c.o,jcmaster.c.o,jcparam.c.o,jcphuff.c.o,jcprepct.c.o,jcsample.c.o,jctrans.c.o,jdapimin.c.o,jdapistd.c.o,jdarith.c.o,jdcoefct.c.o,jdpostct.c.o,jdinput.c.o,jdmarker.c.o,jdhuff.c.o,jdphuff.c.o,jdmainct.c.o,jdmaster.c.o,jdmerge.c.o,jdsample.c.o,jdcolor.c.o,jddctmgr.c.o,jdtrans.c.o,jquant1.c.o,jquant2.c.o,jfdctint.c.o,jfdctfst.c.o,jfdctflt.c.o,jidctint.c.o,jidctfst.c.o,jidctflt.c.o,jidctred.c.o,turbojpeg.c.o,transupp.c.o,jdatadst-tj.c.o,jdatasrc-tj.c.o,rdbmp.c.o,rdppm.c.o,wrbmp.c.o,wrppm.c.o"
 
   if [[ "$WITH_JAVA" == "1" ]]; then
-    return
+    version_script="$ROOT/original/turbojpeg-mapfile.jni"
+  else
+    render_version_script "$ROOT/original/debian/libturbojpeg.symbols" \
+      "$version_script" --skip-regex '^Java_org_libjpegturbo_turbojpeg_'
   fi
 
-  skip_args=(--skip-regex '^Java_org_libjpegturbo_turbojpeg_')
-
-  render_version_script "$ROOT/original/debian/libturbojpeg.symbols" \
-    "$version_script" "${skip_args[@]}"
-
+  rust_staticlib="$(ensure_rust_libturbojpeg_staticlib)"
   output="$(shared_library_target "$libdir/libturbojpeg.so.0")"
-  run_relink_from_link_txt "$link_dir" "$link_txt" "$output" "$version_script"
+  run_relink_from_link_txt \
+    "$link_dir" \
+    "$link_txt" \
+    "$output" \
+    "$version_script" \
+    "$skip_basenames" \
+    -Wl,--whole-archive \
+    "$rust_staticlib" \
+    -Wl,--no-whole-archive \
+    -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
 }
 
 install_committed_headers() {
