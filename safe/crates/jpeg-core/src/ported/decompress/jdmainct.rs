@@ -1,26 +1,29 @@
-use ffi_types::{
-    boolean, j_decompress_ptr, jpeg_d_main_controller, jpeg_component_info, JSAMPARRAY,
-    JSAMPIMAGE, J_MESSAGE_CODE, JDIMENSION, MAX_COMPONENTS,
-};
+use ffi_types::{boolean, j_decompress_ptr, J_MESSAGE_CODE};
 
 use crate::common::error;
 
-pub const CTX_PREPARE_FOR_IMCU: i32 = 0;
+#[allow(
+    dead_code,
+    improper_ctypes,
+    improper_ctypes_definitions,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    unused_variables,
+    clippy::all
+)]
+mod translated {
+    include!("generated/jdmainct_translated.rs");
+}
+
+pub const CTX_PREPARE_FOR_IMCU: i32 = translated::CTX_PREPARE_FOR_IMCU;
 pub const CTX_PROCESS_IMCU: i32 = 1;
 pub const CTX_POSTPONED_ROW: i32 = 2;
 
-#[repr(C)]
-pub struct my_main_controller {
-    pub pub_: jpeg_d_main_controller,
-    pub buffer: [JSAMPARRAY; MAX_COMPONENTS],
-    pub buffer_full: boolean,
-    pub rowgroup_ctr: JDIMENSION,
-    pub xbuffer: [JSAMPIMAGE; 2],
-    pub whichptr: i32,
-    pub context_state: i32,
-    pub rowgroups_avail: JDIMENSION,
-    pub iMCU_row_ctr: JDIMENSION,
-}
+pub use translated::my_main_controller;
 
 pub unsafe fn set_wraparound_pointers(cinfo: j_decompress_ptr) {
     let main_ptr = (*cinfo).main as *mut my_main_controller;
@@ -41,11 +44,6 @@ pub unsafe fn set_wraparound_pointers(cinfo: j_decompress_ptr) {
     }
 }
 
-extern "C" {
-    #[link_name = "jinit_d_main_controller"]
-    fn c_jinit_d_main_controller(cinfo: j_decompress_ptr, need_full_buffer: boolean);
-}
-
 pub unsafe fn jinit_d_main_controller(cinfo: j_decompress_ptr, need_full_buffer: boolean) {
     if (*cinfo).min_DCT_v_scaled_size < 1 {
         error::errexit1(
@@ -54,5 +52,8 @@ pub unsafe fn jinit_d_main_controller(cinfo: j_decompress_ptr, need_full_buffer:
             (*cinfo).min_DCT_v_scaled_size,
         );
     }
-    c_jinit_d_main_controller(cinfo, need_full_buffer)
+    translated::jinit_d_main_controller(
+        cinfo.cast::<translated::jpeg_decompress_struct>(),
+        need_full_buffer,
+    )
 }

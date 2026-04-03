@@ -151,34 +151,6 @@ JPEG_DEFINE_FDCT_BRIDGE(15, 15)
 JPEG_DEFINE_FDCT_BRIDGE(16, 8)
 JPEG_DEFINE_FDCT_BRIDGE(16, 16)
 
-#define JPEG_DEFINE_IDCT_BRIDGE(width, height) \
-  void jpeg_idct_##width##x##height(j_decompress_ptr cinfo, \
-                                    jpeg_component_info *compptr, \
-                                    JCOEFPTR coef_block, \
-                                    JSAMPARRAY output_buf, \
-                                    JDIMENSION output_col) \
-  { \
-    jpeg_idct_rect_bridge(cinfo, compptr, coef_block, output_buf, output_col, \
-                          width, height); \
-  }
-
-JPEG_DEFINE_IDCT_BRIDGE(1, 2)
-JPEG_DEFINE_IDCT_BRIDGE(2, 1)
-JPEG_DEFINE_IDCT_BRIDGE(2, 4)
-JPEG_DEFINE_IDCT_BRIDGE(3, 6)
-JPEG_DEFINE_IDCT_BRIDGE(4, 2)
-JPEG_DEFINE_IDCT_BRIDGE(4, 8)
-JPEG_DEFINE_IDCT_BRIDGE(5, 10)
-JPEG_DEFINE_IDCT_BRIDGE(6, 3)
-JPEG_DEFINE_IDCT_BRIDGE(6, 12)
-JPEG_DEFINE_IDCT_BRIDGE(7, 14)
-JPEG_DEFINE_IDCT_BRIDGE(8, 4)
-JPEG_DEFINE_IDCT_BRIDGE(8, 16)
-JPEG_DEFINE_IDCT_BRIDGE(10, 5)
-JPEG_DEFINE_IDCT_BRIDGE(12, 6)
-JPEG_DEFINE_IDCT_BRIDGE(14, 7)
-JPEG_DEFINE_IDCT_BRIDGE(16, 8)
-
 int
 libjpeg_general_init(void)
 {

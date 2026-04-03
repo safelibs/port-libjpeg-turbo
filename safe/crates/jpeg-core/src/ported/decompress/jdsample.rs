@@ -1,34 +1,24 @@
-use ffi_types::{
-    j_decompress_ptr, jpeg_component_info, jpeg_upsampler, JSAMPARRAY, JSAMPIMAGE, JDIMENSION,
-    MAX_COMPONENTS, UINT8,
-};
+use ffi_types::j_decompress_ptr;
 
-pub type upsample1_ptr = Option<
-    unsafe extern "C" fn(
-        cinfo: j_decompress_ptr,
-        compptr: *mut jpeg_component_info,
-        input_data: JSAMPARRAY,
-        output_data_ptr: *mut JSAMPARRAY,
-    ),
->;
-
-#[repr(C)]
-pub struct my_upsampler {
-    pub pub_: jpeg_upsampler,
-    pub color_buf: [JSAMPARRAY; MAX_COMPONENTS],
-    pub methods: [upsample1_ptr; MAX_COMPONENTS],
-    pub next_row_out: i32,
-    pub rows_to_go: JDIMENSION,
-    pub rowgroup_height: [i32; MAX_COMPONENTS],
-    pub h_expand: [UINT8; MAX_COMPONENTS],
-    pub v_expand: [UINT8; MAX_COMPONENTS],
+#[allow(
+    dead_code,
+    improper_ctypes,
+    improper_ctypes_definitions,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    unused_variables,
+    clippy::all
+)]
+mod translated {
+    include!("generated/jdsample_translated.rs");
 }
 
-extern "C" {
-    #[link_name = "jinit_upsampler"]
-    fn c_jinit_upsampler(cinfo: j_decompress_ptr);
-}
+pub use translated::{my_upsampler, upsample1_ptr};
 
 pub unsafe fn jinit_upsampler(cinfo: j_decompress_ptr) {
-    c_jinit_upsampler(cinfo)
+    translated::jinit_upsampler(cinfo.cast::<translated::jpeg_decompress_struct>())
 }

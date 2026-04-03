@@ -1,18 +1,24 @@
 use ffi_types::{j_decompress_ptr, jpeg_component_info, JCOEFPTR, JSAMPARRAY, JDIMENSION};
 
-macro_rules! idct_wrapper {
-    ($alias:ident, $rust_name:ident, $link_name:literal) => {
-        extern "C" {
-            #[link_name = $link_name]
-            fn $alias(
-                cinfo: j_decompress_ptr,
-                compptr: *mut jpeg_component_info,
-                coef_block: JCOEFPTR,
-                output_buf: JSAMPARRAY,
-                output_col: JDIMENSION,
-            );
-        }
+#[allow(
+    dead_code,
+    improper_ctypes,
+    improper_ctypes_definitions,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    unused_variables,
+    clippy::all
+)]
+mod translated {
+    include!("generated/jidctred_translated.rs");
+}
 
+macro_rules! idct_wrapper {
+    ($rust_name:ident) => {
         pub unsafe extern "C" fn $rust_name(
             cinfo: j_decompress_ptr,
             compptr: *mut jpeg_component_info,
@@ -20,11 +26,17 @@ macro_rules! idct_wrapper {
             output_buf: JSAMPARRAY,
             output_col: JDIMENSION,
         ) {
-            $alias(cinfo, compptr, coef_block, output_buf, output_col)
+            translated::$rust_name(
+                cinfo.cast::<translated::jpeg_decompress_struct>(),
+                compptr.cast::<translated::jpeg_component_info>(),
+                coef_block.cast::<translated::JCOEF>(),
+                output_buf.cast::<translated::JSAMPROW>(),
+                output_col,
+            )
         }
     };
 }
 
-idct_wrapper!(c_jpeg_idct_1x1, jpeg_idct_1x1, "jpeg_idct_1x1");
-idct_wrapper!(c_jpeg_idct_2x2, jpeg_idct_2x2, "jpeg_idct_2x2");
-idct_wrapper!(c_jpeg_idct_4x4, jpeg_idct_4x4, "jpeg_idct_4x4");
+idct_wrapper!(jpeg_idct_1x1);
+idct_wrapper!(jpeg_idct_2x2);
+idct_wrapper!(jpeg_idct_4x4);

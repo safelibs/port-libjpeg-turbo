@@ -15,6 +15,23 @@ use crate::{
     },
 };
 
+#[allow(
+    dead_code,
+    improper_ctypes,
+    improper_ctypes_definitions,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    unused_variables,
+    clippy::all
+)]
+mod translated {
+    include!("generated/jdmaster_translated.rs");
+}
+
 #[repr(C)]
 pub struct my_decomp_master {
     pub pub_: jpeg_decomp_master,
@@ -25,8 +42,6 @@ pub struct my_decomp_master {
 }
 
 extern "C" {
-    #[link_name = "jpeg_calc_output_dimensions"]
-    fn c_jpeg_calc_output_dimensions(cinfo: j_decompress_ptr);
     #[link_name = "jinit_1pass_quantizer"]
     fn c_jinit_1pass_quantizer(cinfo: j_decompress_ptr);
     #[link_name = "jinit_2pass_quantizer"]
@@ -37,6 +52,14 @@ extern "C" {
     fn c_jinit_arith_decoder(cinfo: j_decompress_ptr);
     #[link_name = "jinit_phuff_decoder"]
     fn c_jinit_phuff_decoder(cinfo: j_decompress_ptr);
+}
+
+pub unsafe extern "C" fn jpeg_calc_output_dimensions(cinfo: j_decompress_ptr) {
+    translated::jpeg_calc_output_dimensions(cinfo.cast::<translated::jpeg_decompress_struct>())
+}
+
+pub unsafe extern "C" fn jpeg_new_colormap(cinfo: j_decompress_ptr) {
+    translated::jpeg_new_colormap(cinfo.cast::<translated::jpeg_decompress_struct>())
 }
 
 unsafe fn use_merged_upsample(cinfo: j_decompress_ptr) -> boolean {
@@ -130,7 +153,7 @@ unsafe fn prepare_range_limit_table(cinfo: j_decompress_ptr) {
 unsafe fn master_selection(cinfo: j_decompress_ptr) {
     let master = (*cinfo).master as *mut my_decomp_master;
 
-    c_jpeg_calc_output_dimensions(cinfo);
+    jpeg_calc_output_dimensions(cinfo);
     prepare_range_limit_table(cinfo);
 
     let samplesperrow = (*cinfo).output_width as ffi_types::long

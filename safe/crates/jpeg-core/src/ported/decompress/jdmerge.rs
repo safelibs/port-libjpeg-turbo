@@ -1,33 +1,24 @@
-use ffi_types::{boolean, j_decompress_ptr, jpeg_upsampler, JLONG, JSAMPARRAY, JSAMPROW, JSAMPIMAGE, JDIMENSION};
+use ffi_types::j_decompress_ptr;
 
-pub type merged_upsample_ptr = Option<
-    unsafe extern "C" fn(
-        cinfo: j_decompress_ptr,
-        input_buf: JSAMPIMAGE,
-        in_row_group_ctr: JDIMENSION,
-        output_buf: JSAMPARRAY,
-    ),
->;
-
-#[repr(C)]
-pub struct my_merged_upsampler {
-    pub pub_: jpeg_upsampler,
-    pub upmethod: merged_upsample_ptr,
-    pub Cr_r_tab: *mut i32,
-    pub Cb_b_tab: *mut i32,
-    pub Cr_g_tab: *mut JLONG,
-    pub Cb_g_tab: *mut JLONG,
-    pub spare_row: JSAMPROW,
-    pub spare_full: boolean,
-    pub out_row_width: JDIMENSION,
-    pub rows_to_go: JDIMENSION,
+#[allow(
+    dead_code,
+    improper_ctypes,
+    improper_ctypes_definitions,
+    non_camel_case_types,
+    non_snake_case,
+    non_upper_case_globals,
+    unused_assignments,
+    unused_mut,
+    unused_parens,
+    unused_variables,
+    clippy::all
+)]
+mod translated {
+    include!("generated/jdmerge_translated.rs");
 }
 
-extern "C" {
-    #[link_name = "jinit_merged_upsampler"]
-    fn c_jinit_merged_upsampler(cinfo: j_decompress_ptr);
-}
+pub use translated::my_merged_upsampler;
 
 pub unsafe fn jinit_merged_upsampler(cinfo: j_decompress_ptr) {
-    c_jinit_merged_upsampler(cinfo)
+    translated::jinit_merged_upsampler(cinfo.cast::<translated::jpeg_decompress_struct>())
 }

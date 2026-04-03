@@ -244,7 +244,7 @@ unsafe fn read_and_discard_scanlines(cinfo: j_decompress_ptr, num_lines: JDIMENS
     }
     if (*master).using_merged_upsample != FALSE && (*cinfo).max_v_samp_factor == 2 {
         let upsample = (*cinfo).upsample as *mut my_merged_upsampler;
-        scanlines = &mut (*upsample).spare_row;
+        scanlines = (&mut (*upsample).spare_row as *mut _) as JSAMPARRAY;
     }
 
     for _ in 0..num_lines {
