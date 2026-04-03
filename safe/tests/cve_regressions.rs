@@ -74,7 +74,11 @@ fn skip_scanlines_handles_merged_upsampling_regression_path() {
     )
     .expect("spawn djpeg");
 
-    assert!(output.status.success(), "{}", command_failure("djpeg", &output));
+    assert!(
+        output.status.success(),
+        "{}",
+        command_failure("djpeg", &output)
+    );
     assert_eq!(
         md5_file(&output_path).expect("md5"),
         "087c6b123db16ac00cb88c5b590bb74a"
@@ -200,7 +204,10 @@ fn command_failure(tool: &str, output: &Output) -> String {
 
 fn new_temp_dir(name: &str) -> Result<PathBuf, String> {
     let mut path = std::env::temp_dir();
-    path.push(format!("libjpeg-cve-regressions-{}-{name}", std::process::id()));
+    path.push(format!(
+        "libjpeg-cve-regressions-{}-{name}",
+        std::process::id()
+    ));
     if path.exists() {
         fs::remove_dir_all(&path)
             .map_err(|error| format!("remove_dir_all {}: {error}", path.display()))?;
@@ -215,7 +222,10 @@ fn md5_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", md5::compute(bytes)))
 }
 
-fn build_oversized_progressive_fixture(stage: &StagePaths, temp_dir: &Path) -> Result<PathBuf, String> {
+fn build_oversized_progressive_fixture(
+    stage: &StagePaths,
+    temp_dir: &Path,
+) -> Result<PathBuf, String> {
     let base = temp_dir.join("base_progressive.jpg");
     let output = run_stage_command(
         stage,

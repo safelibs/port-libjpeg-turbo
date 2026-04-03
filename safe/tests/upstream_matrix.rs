@@ -9,10 +9,9 @@ use std::{
 };
 
 use ffi_types::{
-    boolean, int, j_decompress_ptr, jpeg_decompress_struct, jpeg_error_mgr, JSAMPARRAY,
-    DSTATE_BUFIMAGE, DSTATE_SCANNING, JDIMENSION, JPEG_HEADER_OK, JPEG_LIB_VERSION,
-    JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED, JDCT_IFAST,
-    TRUE, ulong,
+    boolean, int, j_decompress_ptr, jpeg_decompress_struct, jpeg_error_mgr, ulong, DSTATE_BUFIMAGE,
+    DSTATE_SCANNING, JDCT_IFAST, JDIMENSION, JPEG_HEADER_OK, JPEG_LIB_VERSION, JPEG_REACHED_EOI,
+    JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED, JSAMPARRAY, TRUE,
 };
 use libtest_mimic::{Arguments, Failed, Trial};
 
@@ -124,8 +123,8 @@ impl Drop for LoadedLibjpeg {
 }
 
 unsafe fn load_symbol<T>(handle: *mut c_void, symbol: &'static [u8]) -> Result<T, String> {
-    let symbol_name = CStr::from_bytes_with_nul(symbol)
-        .expect("symbol names are static and NUL-terminated");
+    let symbol_name =
+        CStr::from_bytes_with_nul(symbol).expect("symbol names are static and NUL-terminated");
     let ptr = dlsym(handle, symbol_name.as_ptr());
     if ptr.is_null() {
         return Err(format!(
@@ -816,7 +815,10 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
                         "@TMP:testout_3x2_ifast.ppm",
                         "@TMP:testout_3x2_ifast_prog.jpg",
                     ],
-                    Some(("@TMP:testout_3x2_ifast.ppm", "fd283664b3b49127984af0a7f118fccd")),
+                    Some((
+                        "@TMP:testout_3x2_ifast.ppm",
+                        "fd283664b3b49127984af0a7f118fccd",
+                    )),
                 ),
             ],
             runner: None,
@@ -839,7 +841,10 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420m_ifast_ari.ppm",
                     "@ORIG:testimgari.jpg",
                 ],
-                Some(("@TMP:testout_420m_ifast_ari.ppm", "57251da28a35b46eecb7177d82d10e0e")),
+                Some((
+                    "@TMP:testout_420m_ifast_ari.ppm",
+                    "57251da28a35b46eecb7177d82d10e0e",
+                )),
             )],
             runner: None,
         },
@@ -852,7 +857,10 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420_islow.jpg",
                     "@ORIG:testimgari.jpg",
                 ],
-                Some(("@TMP:testout_420_islow.jpg", "9a68f56bc76e466aa7e52f415d0f4a5f")),
+                Some((
+                    "@TMP:testout_420_islow.jpg",
+                    "9a68f56bc76e466aa7e52f415d0f4a5f",
+                )),
             )],
             runner: None,
         },
@@ -1083,7 +1091,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_rgb_islow.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_rgb_islow.jpg", "1d44a406f61da743b5fd31c0a9abdca3")),
+                Some((
+                    "@TMP:testout_rgb_islow.jpg",
+                    "1d44a406f61da743b5fd31c0a9abdca3",
+                )),
             )],
             runner: None,
         },
@@ -1102,7 +1113,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                         "@TMP:testout_rgb_islow2.jpg",
                         "@TMP:testout_rgb_islow.jpg",
                     ],
-                    Some(("@TMP:testout_rgb_islow2.jpg", "31d121e57b6c2934c890a7fc7763bcd4")),
+                    Some((
+                        "@TMP:testout_rgb_islow2.jpg",
+                        "31d121e57b6c2934c890a7fc7763bcd4",
+                    )),
                 ),
             ],
             runner: None,
@@ -1121,7 +1135,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_422_ifast_opt.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_422_ifast_opt.jpg", "2540287b79d913f91665e660303ab2c8")),
+                Some((
+                    "@TMP:testout_422_ifast_opt.jpg",
+                    "2540287b79d913f91665e660303ab2c8",
+                )),
             )],
             runner: None,
         },
@@ -1138,7 +1155,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_440_islow.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_440_islow.jpg", "538bc02bd4b4658fd85de6ece6cbeda6")),
+                Some((
+                    "@TMP:testout_440_islow.jpg",
+                    "538bc02bd4b4658fd85de6ece6cbeda6",
+                )),
             )],
             runner: None,
         },
@@ -1159,7 +1179,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420_q100_ifast_prog.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_420_q100_ifast_prog.jpg", "0ba15f9dab81a703505f835f9dbbac6d")),
+                Some((
+                    "@TMP:testout_420_q100_ifast_prog.jpg",
+                    "0ba15f9dab81a703505f835f9dbbac6d",
+                )),
             )],
             runner: None,
         },
@@ -1175,7 +1198,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_gray_islow.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_gray_islow.jpg", "72b51f894b8f4a10b3ee3066770aa38d")),
+                Some((
+                    "@TMP:testout_gray_islow.jpg",
+                    "72b51f894b8f4a10b3ee3066770aa38d",
+                )),
             )],
             runner: None,
         },
@@ -1195,7 +1221,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420s_ifast_opt.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_420s_ifast_opt.jpg", "388708217ac46273ca33086b22827ed8")),
+                Some((
+                    "@TMP:testout_420s_ifast_opt.jpg",
+                    "388708217ac46273ca33086b22827ed8",
+                )),
             )],
             runner: None,
         },
@@ -1213,7 +1242,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_3x2_ifast_prog.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_3x2_ifast_prog.jpg", "1ee5d2c1a77f2da495f993c8c7cceca5")),
+                Some((
+                    "@TMP:testout_3x2_ifast_prog.jpg",
+                    "1ee5d2c1a77f2da495f993c8c7cceca5",
+                )),
             )],
             runner: None,
         },
@@ -1229,7 +1261,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420_islow_ari.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_420_islow_ari.jpg", "e986fb0a637a8d833d96e8a6d6d84ea1")),
+                Some((
+                    "@TMP:testout_420_islow_ari.jpg",
+                    "e986fb0a637a8d833d96e8a6d6d84ea1",
+                )),
             )],
             runner: None,
         },
@@ -1243,7 +1278,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420_islow_ari2.jpg",
                     "@ORIG:testimgint.jpg",
                 ],
-                Some(("@TMP:testout_420_islow_ari2.jpg", "e986fb0a637a8d833d96e8a6d6d84ea1")),
+                Some((
+                    "@TMP:testout_420_islow_ari2.jpg",
+                    "e986fb0a637a8d833d96e8a6d6d84ea1",
+                )),
             )],
             runner: None,
         },
@@ -1262,7 +1300,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_444_islow_progari.jpg",
                     "@ORIG:testorig.ppm",
                 ],
-                Some(("@TMP:testout_444_islow_progari.jpg", "0a8f1c8f66e113c3cf635df0a475a617")),
+                Some((
+                    "@TMP:testout_444_islow_progari.jpg",
+                    "0a8f1c8f66e113c3cf635df0a475a617",
+                )),
             )],
             runner: None,
         },
@@ -1275,7 +1316,10 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
                     "@TMP:testout_420_islow.jpg",
                     "@ORIG:testimgari.jpg",
                 ],
-                Some(("@TMP:testout_420_islow.jpg", "9a68f56bc76e466aa7e52f415d0f4a5f")),
+                Some((
+                    "@TMP:testout_420_islow.jpg",
+                    "9a68f56bc76e466aa7e52f415d0f4a5f",
+                )),
             )],
             runner: None,
         },
@@ -1463,7 +1507,11 @@ fn md5_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", md5::compute(bytes)))
 }
 
-fn run_matrix_command(stage: &StagePaths, temp_dir: &Path, command: &MatrixCommand) -> Result<(), String> {
+fn run_matrix_command(
+    stage: &StagePaths,
+    temp_dir: &Path,
+    command: &MatrixCommand,
+) -> Result<(), String> {
     let output = run_stage_command(
         stage,
         temp_dir,
@@ -1515,7 +1563,11 @@ fn command_failure(tool: &str, output: &Output) -> String {
     format!(
         "{tool} exited with status {}{}\n{}{}",
         output.status,
-        if stdout.is_empty() { "" } else { " (stdout follows)" },
+        if stdout.is_empty() {
+            ""
+        } else {
+            " (stdout follows)"
+        },
         stdout,
         if stderr.is_empty() {
             String::new()
@@ -1550,7 +1602,10 @@ fn run_buffered_image_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), St
             stage.original_testimages.join("test.scan").into_os_string(),
             OsString::from("-outfile"),
             jpeg_path.clone().into_os_string(),
-            stage.original_testimages.join("testorig.ppm").into_os_string(),
+            stage
+                .original_testimages
+                .join("testorig.ppm")
+                .into_os_string(),
         ],
     )?;
     if !output.status.success() {
@@ -1610,11 +1665,7 @@ fn decode_buffered_image_passes(
         );
 
         let result = (|| -> Result<(PpmImage, PpmImage, usize), String> {
-            (libjpeg.jpeg_mem_src)(
-                &mut cinfo,
-                jpeg_bytes.as_ptr(),
-                jpeg_bytes.len() as _,
-            );
+            (libjpeg.jpeg_mem_src)(&mut cinfo, jpeg_bytes.as_ptr(), jpeg_bytes.len() as _);
             let header_status = (libjpeg.jpeg_read_header)(&mut cinfo, TRUE);
             if header_status != JPEG_HEADER_OK {
                 return Err(format!(
@@ -1622,7 +1673,9 @@ fn decode_buffered_image_passes(
                 ));
             }
             if (libjpeg.jpeg_has_multiple_scans)(&mut cinfo) == 0 {
-                return Err("progressive buffered-image input did not report multiple scans".into());
+                return Err(
+                    "progressive buffered-image input did not report multiple scans".into(),
+                );
             }
 
             cinfo.buffered_image = TRUE;
@@ -1784,7 +1837,11 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
             }
             args.extend(sample_args.iter().map(|arg| OsString::from(*arg)));
             args.push(OsString::from("-outfile"));
-            args.push(temp_dir.join(format!("{basename}_{prog_tag}_{sample_name}.jpg")).into_os_string());
+            args.push(
+                temp_dir
+                    .join(format!("{basename}_{prog_tag}_{sample_name}.jpg"))
+                    .into_os_string(),
+            );
             args.push(source.clone().into_os_string());
 
             let output = run_stage_command(stage, temp_dir, "cjpeg", args)?;
@@ -1794,14 +1851,24 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
         }
 
         for nosmooth in NOSMOOTH {
-            let ns_tag = if nosmooth.is_some() { "nosmooth" } else { "smooth" };
+            let ns_tag = if nosmooth.is_some() {
+                "nosmooth"
+            } else {
+                "smooth"
+            };
             for quant_args in QUANT_ARGS {
-                let quant_tag = if quant_args.is_empty() { "full" } else { "quant256" };
+                let quant_tag = if quant_args.is_empty() {
+                    "full"
+                } else {
+                    "quant256"
+                };
 
                 for (sample_name, _) in SAMPLES {
-                    let jpeg_path = temp_dir.join(format!("{basename}_{prog_tag}_{sample_name}.jpg"));
-                    let full_path =
-                        temp_dir.join(format!("{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_full.ppm"));
+                    let jpeg_path =
+                        temp_dir.join(format!("{basename}_{prog_tag}_{sample_name}.jpg"));
+                    let full_path = temp_dir.join(format!(
+                        "{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_full.ppm"
+                    ));
                     let mut args = Vec::new();
                     if let Some(flag) = nosmooth {
                         args.push(OsString::from(flag));
@@ -1886,7 +1953,10 @@ fn read_ppm(path: &Path) -> Result<PpmImage, String> {
         .parse::<usize>()
         .map_err(|error| format!("invalid PPM maxval in {}: {error}", path.display()))?;
     if maxval > 255 {
-        return Err(format!("{} uses unsupported PPM maxval {maxval}", path.display()));
+        return Err(format!(
+            "{} uses unsupported PPM maxval {maxval}",
+            path.display()
+        ));
     }
     skip_ppm_separators(&bytes, &mut offset);
     let expected_len = width
@@ -1913,12 +1983,17 @@ fn read_ppm(path: &Path) -> Result<PpmImage, String> {
     })
 }
 
-fn crop_ppm(image: &PpmImage, x: usize, y: usize, width: usize, height: usize) -> Result<PpmImage, String> {
+fn crop_ppm(
+    image: &PpmImage,
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+) -> Result<PpmImage, String> {
     if x + width > image.width || y + height > image.height {
         return Err(format!(
             "crop {x},{y} {width}x{height} falls outside {}x{} image",
-            image.width,
-            image.height
+            image.width, image.height
         ));
     }
 
@@ -1942,10 +2017,7 @@ fn crop_ppm(image: &PpmImage, x: usize, y: usize, width: usize, height: usize) -
 fn next_ppm_token(bytes: &[u8], offset: &mut usize) -> Result<String, String> {
     skip_ppm_separators(bytes, offset);
     let start = *offset;
-    while *offset < bytes.len()
-        && !bytes[*offset].is_ascii_whitespace()
-        && bytes[*offset] != b'#'
-    {
+    while *offset < bytes.len() && !bytes[*offset].is_ascii_whitespace() && bytes[*offset] != b'#' {
         *offset += 1;
     }
     if start == *offset {

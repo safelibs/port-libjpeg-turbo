@@ -9,9 +9,7 @@ use std::{
 
 use jpeg_core::ported::turbojpeg::{
     tjutil,
-    turbojpeg::{
-        tjscalingfactor, TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY, TJPF_RGB,
-    },
+    turbojpeg::{tjscalingfactor, TJPF_RGB, TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY},
 };
 use libturbojpeg_abi::EXPECTED_NON_JNI_SYMBOLS;
 
@@ -54,8 +52,7 @@ type TjCompress2Fn = unsafe extern "C" fn(
 type TjGetScalingFactorsFn = unsafe extern "C" fn(num: *mut c_int) -> *mut tjscalingfactor;
 type TjBufSizeYUV2Fn =
     unsafe extern "C" fn(width: c_int, align: c_int, height: c_int, subsamp: c_int) -> c_ulong;
-type TjPlaneWidthFn =
-    unsafe extern "C" fn(component: c_int, width: c_int, subsamp: c_int) -> c_int;
+type TjPlaneWidthFn = unsafe extern "C" fn(component: c_int, width: c_int, subsamp: c_int) -> c_int;
 type TjPlaneHeightFn =
     unsafe extern "C" fn(component: c_int, height: c_int, subsamp: c_int) -> c_int;
 type TjPlaneSizeYUVFn = unsafe extern "C" fn(
@@ -90,8 +87,8 @@ impl LoadedTurbojpeg {
     }
 
     unsafe fn symbol<T>(&self, symbol: &'static [u8]) -> Result<T, String> {
-        let symbol_name = CStr::from_bytes_with_nul(symbol)
-            .expect("static symbol names must be NUL-terminated");
+        let symbol_name =
+            CStr::from_bytes_with_nul(symbol).expect("static symbol names must be NUL-terminated");
         let ptr = dlsym(self.handle, symbol_name.as_ptr());
         if ptr.is_null() {
             return Err(format!(
@@ -139,7 +136,9 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
                 .status()
                 .map_err(|error| format!("failed to run stage-install.sh: {error}"))?;
             if !stage_status.success() {
-                return Err(format!("stage-install.sh exited with status {stage_status}"));
+                return Err(format!(
+                    "stage-install.sh exited with status {stage_status}"
+                ));
             }
 
             let relink_status = Command::new("bash")
@@ -188,11 +187,10 @@ fn find_stage_libdir() -> Result<PathBuf, String> {
 
 fn find_relink_dir() -> Result<PathBuf, String> {
     let root = safe::safe_root().join("target/original-relinked");
-    for entry in fs::read_dir(&root)
-        .map_err(|error| format!("read_dir {}: {error}", root.display()))?
+    for entry in
+        fs::read_dir(&root).map_err(|error| format!("read_dir {}: {error}", root.display()))?
     {
-        let entry =
-            entry.map_err(|error| format!("read_dir entry {}: {error}", root.display()))?;
+        let entry = entry.map_err(|error| format!("read_dir entry {}: {error}", root.display()))?;
         let path = entry.path();
         if path.is_dir() && path.join("tjunittest").exists() {
             return Ok(path);
@@ -243,7 +241,10 @@ fn command_failure(tool: &str, output: &Output) -> String {
 
 fn new_temp_dir(name: &str) -> Result<PathBuf, String> {
     let mut path = std::env::temp_dir();
-    path.push(format!("libjpeg-turbo-phase6-{}-{name}", std::process::id()));
+    path.push(format!(
+        "libjpeg-turbo-phase6-{}-{name}",
+        std::process::id()
+    ));
     if path.exists() {
         fs::remove_dir_all(&path)
             .map_err(|error| format!("remove_dir_all {}: {error}", path.display()))?;
@@ -273,11 +274,7 @@ fn assert_files_identical(left: &Path, right: &Path) -> Result<(), String> {
     if left_bytes == right_bytes {
         Ok(())
     } else {
-        Err(format!(
-            "{} and {} differ",
-            left.display(),
-            right.display()
-        ))
+        Err(format!("{} and {} differ", left.display(), right.display()))
     }
 }
 
@@ -306,8 +303,8 @@ fn turbojpeg_exports_and_geometry_match_reference_tables() {
     let _guard = main_lock();
     let stage = stage_paths().expect("stage paths");
 
-    let library =
-        LoadedTurbojpeg::open(&stage.stage_lib.join("libturbojpeg.so.0")).expect("load libturbojpeg");
+    let library = LoadedTurbojpeg::open(&stage.stage_lib.join("libturbojpeg.so.0"))
+        .expect("load libturbojpeg");
 
     unsafe {
         for symbol in EXPECTED_NON_JNI_SYMBOLS {
@@ -323,8 +320,9 @@ fn turbojpeg_exports_and_geometry_match_reference_tables() {
             );
         }
 
-        let tj_get_scaling_factors: TjGetScalingFactorsFn =
-            library.symbol(b"tjGetScalingFactors\0").expect("tjGetScalingFactors");
+        let tj_get_scaling_factors: TjGetScalingFactorsFn = library
+            .symbol(b"tjGetScalingFactors\0")
+            .expect("tjGetScalingFactors");
         let tj_buf_size_yuv2: TjBufSizeYUV2Fn =
             library.symbol(b"tjBufSizeYUV2\0").expect("tjBufSizeYUV2");
         let tj_plane_width: TjPlaneWidthFn =
@@ -349,7 +347,9 @@ fn turbojpeg_exports_and_geometry_match_reference_tables() {
         assert!(num_scaling_factors > 0);
         let scaling_slice =
             std::slice::from_raw_parts(scaling_factors, num_scaling_factors as usize);
-        assert!(scaling_slice.iter().any(|factor| factor.num == 1 && factor.denom == 1));
+        assert!(scaling_slice
+            .iter()
+            .any(|factor| factor.num == 1 && factor.denom == 1));
 
         for &(width, height, align, subsamp) in &[
             (35, 39, 1, TJSAMP_444),
@@ -371,9 +371,14 @@ fn turbojpeg_exports_and_geometry_match_reference_tables() {
                     tjutil::plane_width(component, width, subsamp).expect("reference plane width");
                 let expected_height = tjutil::plane_height(component, height, subsamp)
                     .expect("reference plane height");
-                let stride = if component == 0 { 0 } else { expected_width + component };
-                let expected_plane_size = tjutil::plane_size(component, width, stride, height, subsamp)
-                    .expect("reference plane size");
+                let stride = if component == 0 {
+                    0
+                } else {
+                    expected_width + component
+                };
+                let expected_plane_size =
+                    tjutil::plane_size(component, width, stride, height, subsamp)
+                        .expect("reference plane size");
 
                 assert_eq!(tj_plane_width(component, width, subsamp), expected_width);
                 assert_eq!(tj_plane_height(component, height, subsamp), expected_height);
@@ -435,8 +440,8 @@ fn relinked_tjunittest_variants_pass() {
         vec!["-yuv".into(), "-noyuvpad".into()],
         vec!["-bmp".into()],
     ] {
-        let output = run_relinked_command(&stage, &temp_dir, "tjunittest", &args)
-            .expect("spawn tjunittest");
+        let output =
+            run_relinked_command(&stage, &temp_dir, "tjunittest", &args).expect("spawn tjunittest");
         assert_success("tjunittest", output).expect("tjunittest variant");
     }
 }
@@ -498,36 +503,126 @@ fn tjbench_tile_regressions_match_upstream_md5s() {
     assert_success("tjbench", output).expect("tjbench tilem");
 
     for (file, expected_md5) in [
-        ("testout_tile_GRAY_Q95_8x8.ppm", "89d3ca21213d9d864b50b4e4e7de4ca6"),
-        ("testout_tile_GRAY_Q95_16x16.ppm", "89d3ca21213d9d864b50b4e4e7de4ca6"),
-        ("testout_tile_GRAY_Q95_32x32.ppm", "89d3ca21213d9d864b50b4e4e7de4ca6"),
-        ("testout_tile_GRAY_Q95_64x64.ppm", "89d3ca21213d9d864b50b4e4e7de4ca6"),
-        ("testout_tile_GRAY_Q95_128x128.ppm", "89d3ca21213d9d864b50b4e4e7de4ca6"),
-        ("testout_tile_420_Q95_8x8.ppm", "847fceab15c5b7b911cb986cf0f71de3"),
-        ("testout_tile_420_Q95_16x16.ppm", "ca45552a93687e078f7137cc4126a7b0"),
-        ("testout_tile_420_Q95_32x32.ppm", "d8676f1d6b68df358353bba9844f4a00"),
-        ("testout_tile_420_Q95_64x64.ppm", "4e4c1a3d7ea4bace4f868bcbe83b7050"),
-        ("testout_tile_420_Q95_128x128.ppm", "f24c3429c52265832beab9df72a0ceae"),
-        ("testout_tile_422_Q95_8x8.ppm", "d83dacd9fc73b0a6f10c09acad64eb1e"),
-        ("testout_tile_422_Q95_16x16.ppm", "35077fb610d72dd743b1eb0cbcfe10fb"),
-        ("testout_tile_422_Q95_32x32.ppm", "e6902ed8a449ecc0f0d6f2bf945f65f7"),
-        ("testout_tile_422_Q95_64x64.ppm", "2b4502a8f316cedbde1da7bce3d2231e"),
-        ("testout_tile_422_Q95_128x128.ppm", "f0b5617d578f5e13c8eee215d64d4877"),
-        ("testout_tile_444_Q95_8x8.ppm", "7964e41e67cfb8d0a587c0aa4798f9c3"),
-        ("testout_tile_444_Q95_16x16.ppm", "7964e41e67cfb8d0a587c0aa4798f9c3"),
-        ("testout_tile_444_Q95_32x32.ppm", "7964e41e67cfb8d0a587c0aa4798f9c3"),
-        ("testout_tile_444_Q95_64x64.ppm", "7964e41e67cfb8d0a587c0aa4798f9c3"),
-        ("testout_tile_444_Q95_128x128.ppm", "7964e41e67cfb8d0a587c0aa4798f9c3"),
-        ("testout_tilem_420_Q95_8x8.ppm", "bc25320e1f4c31ce2e610e43e9fd173c"),
-        ("testout_tilem_420_Q95_16x16.ppm", "75ffdf14602258c5c189522af57fa605"),
-        ("testout_tilem_420_Q95_32x32.ppm", "75ffdf14602258c5c189522af57fa605"),
-        ("testout_tilem_420_Q95_64x64.ppm", "75ffdf14602258c5c189522af57fa605"),
-        ("testout_tilem_420_Q95_128x128.ppm", "75ffdf14602258c5c189522af57fa605"),
-        ("testout_tilem_422_Q95_8x8.ppm", "828941d7f41cd6283abd6beffb7fd51d"),
-        ("testout_tilem_422_Q95_16x16.ppm", "e877ae1324c4a280b95376f7f018172f"),
-        ("testout_tilem_422_Q95_32x32.ppm", "e877ae1324c4a280b95376f7f018172f"),
-        ("testout_tilem_422_Q95_64x64.ppm", "e877ae1324c4a280b95376f7f018172f"),
-        ("testout_tilem_422_Q95_128x128.ppm", "e877ae1324c4a280b95376f7f018172f"),
+        (
+            "testout_tile_GRAY_Q95_8x8.ppm",
+            "89d3ca21213d9d864b50b4e4e7de4ca6",
+        ),
+        (
+            "testout_tile_GRAY_Q95_16x16.ppm",
+            "89d3ca21213d9d864b50b4e4e7de4ca6",
+        ),
+        (
+            "testout_tile_GRAY_Q95_32x32.ppm",
+            "89d3ca21213d9d864b50b4e4e7de4ca6",
+        ),
+        (
+            "testout_tile_GRAY_Q95_64x64.ppm",
+            "89d3ca21213d9d864b50b4e4e7de4ca6",
+        ),
+        (
+            "testout_tile_GRAY_Q95_128x128.ppm",
+            "89d3ca21213d9d864b50b4e4e7de4ca6",
+        ),
+        (
+            "testout_tile_420_Q95_8x8.ppm",
+            "847fceab15c5b7b911cb986cf0f71de3",
+        ),
+        (
+            "testout_tile_420_Q95_16x16.ppm",
+            "ca45552a93687e078f7137cc4126a7b0",
+        ),
+        (
+            "testout_tile_420_Q95_32x32.ppm",
+            "d8676f1d6b68df358353bba9844f4a00",
+        ),
+        (
+            "testout_tile_420_Q95_64x64.ppm",
+            "4e4c1a3d7ea4bace4f868bcbe83b7050",
+        ),
+        (
+            "testout_tile_420_Q95_128x128.ppm",
+            "f24c3429c52265832beab9df72a0ceae",
+        ),
+        (
+            "testout_tile_422_Q95_8x8.ppm",
+            "d83dacd9fc73b0a6f10c09acad64eb1e",
+        ),
+        (
+            "testout_tile_422_Q95_16x16.ppm",
+            "35077fb610d72dd743b1eb0cbcfe10fb",
+        ),
+        (
+            "testout_tile_422_Q95_32x32.ppm",
+            "e6902ed8a449ecc0f0d6f2bf945f65f7",
+        ),
+        (
+            "testout_tile_422_Q95_64x64.ppm",
+            "2b4502a8f316cedbde1da7bce3d2231e",
+        ),
+        (
+            "testout_tile_422_Q95_128x128.ppm",
+            "f0b5617d578f5e13c8eee215d64d4877",
+        ),
+        (
+            "testout_tile_444_Q95_8x8.ppm",
+            "7964e41e67cfb8d0a587c0aa4798f9c3",
+        ),
+        (
+            "testout_tile_444_Q95_16x16.ppm",
+            "7964e41e67cfb8d0a587c0aa4798f9c3",
+        ),
+        (
+            "testout_tile_444_Q95_32x32.ppm",
+            "7964e41e67cfb8d0a587c0aa4798f9c3",
+        ),
+        (
+            "testout_tile_444_Q95_64x64.ppm",
+            "7964e41e67cfb8d0a587c0aa4798f9c3",
+        ),
+        (
+            "testout_tile_444_Q95_128x128.ppm",
+            "7964e41e67cfb8d0a587c0aa4798f9c3",
+        ),
+        (
+            "testout_tilem_420_Q95_8x8.ppm",
+            "bc25320e1f4c31ce2e610e43e9fd173c",
+        ),
+        (
+            "testout_tilem_420_Q95_16x16.ppm",
+            "75ffdf14602258c5c189522af57fa605",
+        ),
+        (
+            "testout_tilem_420_Q95_32x32.ppm",
+            "75ffdf14602258c5c189522af57fa605",
+        ),
+        (
+            "testout_tilem_420_Q95_64x64.ppm",
+            "75ffdf14602258c5c189522af57fa605",
+        ),
+        (
+            "testout_tilem_420_Q95_128x128.ppm",
+            "75ffdf14602258c5c189522af57fa605",
+        ),
+        (
+            "testout_tilem_422_Q95_8x8.ppm",
+            "828941d7f41cd6283abd6beffb7fd51d",
+        ),
+        (
+            "testout_tilem_422_Q95_16x16.ppm",
+            "e877ae1324c4a280b95376f7f018172f",
+        ),
+        (
+            "testout_tilem_422_Q95_32x32.ppm",
+            "e877ae1324c4a280b95376f7f018172f",
+        ),
+        (
+            "testout_tilem_422_Q95_64x64.ppm",
+            "e877ae1324c4a280b95376f7f018172f",
+        ),
+        (
+            "testout_tilem_422_Q95_128x128.ppm",
+            "e877ae1324c4a280b95376f7f018172f",
+        ),
     ] {
         let actual = md5_file(&temp_dir.join(file)).expect("md5");
         assert_eq!(actual, expected_md5, "{file}");

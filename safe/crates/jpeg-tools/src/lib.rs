@@ -1,9 +1,9 @@
 use std::{
-    ffi::CString,
-    os::{
-        raw::{c_char, c_int},
-        unix::ffi::OsStringExt,
-    },
+    ffi::OsString,
+    io,
+    os::unix::process::CommandExt,
+    path::{Path, PathBuf},
+    process::Command,
 };
 
 pub mod cdjpeg;
@@ -33,27 +33,92 @@ pub const MANPAGE_NAMES: &[&str] = &[
     "exifautotran.1",
 ];
 
-pub type EmbeddedToolMain = unsafe extern "C" fn(argc: c_int, argv: *mut *mut c_char) -> c_int;
+fn find_safe_root_from(path: &Path) -> Result<PathBuf, String> {
+    for ancestor in path.ancestors() {
+        if ancestor.join("Cargo.toml").is_file() && ancestor.join("scripts/stage-install.sh").is_file() {
+            return Ok(ancestor.to_path_buf());
+        }
+    }
+    Err(format!(
+        "could not locate safe/ root from {}",
+        path.display()
+    ))
+}
 
-pub fn run_embedded_tool(tool: &str, entry: EmbeddedToolMain) -> ! {
-    let args = match std::env::args_os()
-        .map(|arg| CString::new(arg.into_vec()))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(args) => args,
-        Err(_) => {
-            eprintln!("{tool}: arguments contain an unexpected NUL byte");
+fn find_stage_libdir(safe_root: &Path) -> Result<PathBuf, String> {
+    let lib_root = safe_root.join("stage/usr/lib");
+    let entries = std::fs::read_dir(&lib_root)
+        .map_err(|error| format!("read_dir {}: {error}", lib_root.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("read_dir {}: {error}", lib_root.display()))?;
+        let path = entry.path();
+        if path.is_dir()
+            && (path.join("libjpeg.so.8").exists() || path.join("libturbojpeg.so.0").exists())
+        {
+            return Ok(path);
+        }
+    }
+    Err(format!(
+        "could not find staged library directory under {}",
+        lib_root.display()
+    ))
+}
+
+fn join_library_path(paths: &[PathBuf]) -> Result<OsString, String> {
+    std::env::join_paths(paths).map_err(|error| format!("join LD_LIBRARY_PATH entries: {error}"))
+}
+
+pub fn exec_upstream_tool(tool: &str) -> ! {
+    let exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("{tool}: current_exe failed: {error}");
+            std::process::exit(1);
+        }
+    };
+    let safe_root = match find_safe_root_from(&exe) {
+        Ok(path) => path,
+        Err(message) => {
+            eprintln!("{tool}: {message}");
+            std::process::exit(1);
+        }
+    };
+    let build_dir = std::env::var_os("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| safe_root.join("target/upstream-bootstrap"));
+    let backend = build_dir.join(tool);
+    if !backend.is_file() {
+        eprintln!("{tool}: missing upstream backend tool {}", backend.display());
+        std::process::exit(1);
+    }
+
+    let mut library_paths = Vec::new();
+    if let Ok(stage_libdir) = find_stage_libdir(&safe_root) {
+        library_paths.push(stage_libdir);
+    }
+    library_paths.push(build_dir.clone());
+    if let Some(existing) = std::env::var_os("LD_LIBRARY_PATH") {
+        library_paths.extend(std::env::split_paths(&existing));
+    }
+    let ld_library_path = match join_library_path(&library_paths) {
+        Ok(value) => value,
+        Err(message) => {
+            eprintln!("{tool}: {message}");
             std::process::exit(1);
         }
     };
 
-    let mut argv = args
-        .iter()
-        .map(|arg| arg.as_ptr() as *mut c_char)
-        .collect::<Vec<_>>();
-    argv.push(std::ptr::null_mut());
+    let args = std::env::args_os().skip(1);
+    let error = Command::new(&backend)
+        .arg0(tool)
+        .args(args)
+        .env("LD_LIBRARY_PATH", ld_library_path)
+        .exec();
 
-    let argc = c_int::try_from(args.len()).unwrap_or(c_int::MAX);
-    let code = unsafe { entry(argc, argv.as_mut_ptr()) };
-    std::process::exit(code);
+    report_exec_error(tool, &backend, error)
+}
+
+fn report_exec_error(tool: &str, backend: &Path, error: io::Error) -> ! {
+    eprintln!("{tool}: exec {} failed: {error}", backend.display());
+    std::process::exit(1);
 }

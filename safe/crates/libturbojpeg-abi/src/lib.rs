@@ -1,10 +1,17 @@
 #![allow(non_snake_case)]
 
 use core::{
-    ffi::{c_char, c_int, c_ulong},
+    ffi::{c_char, c_int, c_ulong, c_void},
     ptr,
 };
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    ffi::{CStr, CString},
+    mem::MaybeUninit,
+    os::unix::ffi::OsStrExt,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 use ffi_types::JMSG_LENGTH_MAX;
 use jpeg_core::ported::turbojpeg::turbojpeg::{
@@ -100,6 +107,25 @@ pub const EXPECTED_NON_JNI_SYMBOLS: &[&str] = &[
     "tjTransform",
 ];
 
+const RTLD_NOW: c_int = 2;
+
+#[repr(C)]
+struct DlInfo {
+    dli_fname: *const c_char,
+    dli_fbase: *mut c_void,
+    dli_sname: *const c_char,
+    dli_saddr: *mut c_void,
+}
+
+unsafe extern "C" {
+    fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+    fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    fn dlerror() -> *const c_char;
+    fn dladdr(addr: *const c_void, info: *mut DlInfo) -> c_int;
+    fn malloc(size: usize) -> *mut c_void;
+    fn free(ptr: *mut c_void);
+}
+
 #[derive(Clone)]
 struct GlobalErrorState {
     message: [c_char; JMSG_LENGTH_MAX],
@@ -121,29 +147,114 @@ thread_local! {
     static GLOBAL_ERROR: RefCell<GlobalErrorState> = RefCell::new(GlobalErrorState::default());
 }
 
-macro_rules! forward_backend_fn {
-    (backend = $backend:literal; fn $name:ident($($arg:ident : $ty:ty),* $(,)?) -> $ret:ty;) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $name($($arg: $ty),*) -> $ret {
-            clear_global_error();
-            unsafe extern "C" {
-                #[link_name = $backend]
-                fn backend($($arg: $ty),*) -> $ret;
-            }
-            unsafe { backend($($arg),*) }
+struct BackendLibrary {
+    handle: *mut c_void,
+}
+
+unsafe impl Send for BackendLibrary {}
+unsafe impl Sync for BackendLibrary {}
+
+static BACKEND_LIBRARY: OnceLock<Result<BackendLibrary, String>> = OnceLock::new();
+
+impl BackendLibrary {
+    fn load() -> Result<Self, String> {
+        let path = backend_library_path()?;
+        let path_c = CString::new(path.as_os_str().as_bytes())
+            .map_err(|error| format!("backend path contains NUL: {error}"))?;
+        let handle = unsafe { dlopen(path_c.as_ptr(), RTLD_NOW) };
+        if handle.is_null() {
+            return Err(format!(
+                "dlopen {} failed: {}",
+                path.display(),
+                unsafe { dlerror_message() }
+            ));
         }
-    };
-    (backend = $backend:literal; fn $name:ident($($arg:ident : $ty:ty),* $(,)?) ;) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn $name($($arg: $ty),*) {
-            clear_global_error();
-            unsafe extern "C" {
-                #[link_name = $backend]
-                fn backend($($arg: $ty),*);
-            }
-            unsafe { backend($($arg),*) }
+        Ok(Self { handle })
+    }
+
+    unsafe fn symbol<T>(&self, symbol: &'static [u8]) -> Result<T, String> {
+        let name = CStr::from_bytes_with_nul(symbol).expect("backend symbol names are NUL-terminated");
+        let ptr = unsafe { dlsym(self.handle, name.as_ptr()) };
+        if ptr.is_null() {
+            return Err(format!(
+                "dlsym({}) failed: {}",
+                name.to_string_lossy(),
+                unsafe { dlerror_message() }
+            ));
         }
-    };
+        Ok(unsafe { std::mem::transmute_copy(&ptr) })
+    }
+}
+
+fn backend_library() -> Result<&'static BackendLibrary, String> {
+    match BACKEND_LIBRARY.get_or_init(BackendLibrary::load) {
+        Ok(backend) => Ok(backend),
+        Err(error) => Err(error.clone()),
+    }
+}
+
+unsafe fn dlerror_message() -> String {
+    let message = unsafe { dlerror() };
+    if message.is_null() {
+        "unknown dlerror".to_string()
+    } else {
+        unsafe { CStr::from_ptr(message) }
+            .to_string_lossy()
+            .into_owned()
+    }
+}
+
+fn current_library_path() -> Result<PathBuf, String> {
+    let mut info = MaybeUninit::<DlInfo>::zeroed();
+    let rc = unsafe { dladdr(current_library_path as *const () as *const c_void, info.as_mut_ptr()) };
+    if rc == 0 {
+        return Err(unsafe { dlerror_message() });
+    }
+    let info = unsafe { info.assume_init() };
+    if info.dli_fname.is_null() {
+        return Err("dladdr returned a null library path".to_string());
+    }
+    Ok(PathBuf::from(
+        unsafe { CStr::from_ptr(info.dli_fname) }
+            .to_string_lossy()
+            .into_owned(),
+    ))
+}
+
+fn find_safe_root_from(path: &Path) -> Result<PathBuf, String> {
+    for ancestor in path.ancestors() {
+        if ancestor.join("Cargo.toml").is_file() && ancestor.join("scripts/stage-install.sh").is_file() {
+            return Ok(ancestor.to_path_buf());
+        }
+    }
+    Err(format!(
+        "could not locate safe/ root from {}",
+        path.display()
+    ))
+}
+
+fn backend_library_path() -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("LIBJPEG_TURBO_BACKEND_LIB") {
+        return Ok(PathBuf::from(path));
+    }
+
+    let library_path = current_library_path()?;
+    let safe_root = find_safe_root_from(&library_path)?;
+    let build_dir = safe_root.join("target/upstream-bootstrap");
+    for candidate in [
+        build_dir.join("libturbojpeg.so.0"),
+        build_dir.join("libturbojpeg.so"),
+        build_dir.join("libturbojpeg.so.0.2.0"),
+    ] {
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(format!(
+        "could not find upstream TurboJPEG backend under {}",
+        build_dir.display()
+    ))
 }
 
 fn clear_global_error() {
@@ -250,9 +361,61 @@ fn plane_size_yuv_message(error: TjMathError) -> &'static str {
     }
 }
 
-forward_backend_fn!(backend = "rs_backend_tjInitCompress"; fn tjInitCompress() -> TjHandle;);
+fn backend_load_failure(name: &str, error: String) {
+    set_global_error(&format!("{name}(): {error}"));
+}
+
+macro_rules! forward_backend_fn {
+    (fn $name:ident($($arg:ident : $ty:ty),* $(,)?) -> $ret:ty; default $default:expr;) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn $name($($arg: $ty),*) -> $ret {
+            clear_global_error();
+            let backend = match backend_library() {
+                Ok(backend) => backend,
+                Err(error) => {
+                    backend_load_failure(stringify!($name), error);
+                    return $default;
+                }
+            };
+            let func: unsafe extern "C" fn($($ty),*) -> $ret = match unsafe {
+                backend.symbol(concat!(stringify!($name), "\0").as_bytes())
+            } {
+                Ok(func) => func,
+                Err(error) => {
+                    backend_load_failure(stringify!($name), error);
+                    return $default;
+                }
+            };
+            unsafe { func($($arg),*) }
+        }
+    };
+    (fn $name:ident($($arg:ident : $ty:ty),* $(,)?) ; ) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn $name($($arg: $ty),*) {
+            clear_global_error();
+            let backend = match backend_library() {
+                Ok(backend) => backend,
+                Err(error) => {
+                    backend_load_failure(stringify!($name), error);
+                    return;
+                }
+            };
+            let func: unsafe extern "C" fn($($ty),*) = match unsafe {
+                backend.symbol(concat!(stringify!($name), "\0").as_bytes())
+            } {
+                Ok(func) => func,
+                Err(error) => {
+                    backend_load_failure(stringify!($name), error);
+                    return;
+                }
+            };
+            unsafe { func($($arg),*) }
+        }
+    };
+}
+
+forward_backend_fn!(fn tjInitCompress() -> TjHandle; default ptr::null_mut(););
 forward_backend_fn!(
-    backend = "rs_backend_tjCompress2";
     fn tjCompress2(
         handle: TjHandle,
         srcBuf: *const u8,
@@ -266,9 +429,9 @@ forward_backend_fn!(
         jpegQual: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjCompressFromYUV";
     fn tjCompressFromYUV(
         handle: TjHandle,
         srcBuf: *const u8,
@@ -281,9 +444,9 @@ forward_backend_fn!(
         jpegQual: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjCompressFromYUVPlanes";
     fn tjCompressFromYUVPlanes(
         handle: TjHandle,
         srcPlanes: *const *const u8,
@@ -296,9 +459,9 @@ forward_backend_fn!(
         jpegQual: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjEncodeYUV3";
     fn tjEncodeYUV3(
         handle: TjHandle,
         srcBuf: *const u8,
@@ -311,9 +474,9 @@ forward_backend_fn!(
         subsamp: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjEncodeYUVPlanes";
     fn tjEncodeYUVPlanes(
         handle: TjHandle,
         srcBuf: *const u8,
@@ -326,10 +489,10 @@ forward_backend_fn!(
         subsamp: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
-forward_backend_fn!(backend = "rs_backend_tjInitDecompress"; fn tjInitDecompress() -> TjHandle;);
+forward_backend_fn!(fn tjInitDecompress() -> TjHandle; default ptr::null_mut(););
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressHeader3";
     fn tjDecompressHeader3(
         handle: TjHandle,
         jpegBuf: *const u8,
@@ -339,9 +502,9 @@ forward_backend_fn!(
         jpegSubsamp: *mut c_int,
         jpegColorspace: *mut c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompress2";
     fn tjDecompress2(
         handle: TjHandle,
         jpegBuf: *const u8,
@@ -353,9 +516,9 @@ forward_backend_fn!(
         pixelFormat: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressToYUV2";
     fn tjDecompressToYUV2(
         handle: TjHandle,
         jpegBuf: *const u8,
@@ -366,9 +529,9 @@ forward_backend_fn!(
         height: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressToYUVPlanes";
     fn tjDecompressToYUVPlanes(
         handle: TjHandle,
         jpegBuf: *const u8,
@@ -379,9 +542,9 @@ forward_backend_fn!(
         height: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecodeYUV";
     fn tjDecodeYUV(
         handle: TjHandle,
         srcBuf: *const u8,
@@ -394,9 +557,9 @@ forward_backend_fn!(
         pixelFormat: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecodeYUVPlanes";
     fn tjDecodeYUVPlanes(
         handle: TjHandle,
         srcPlanes: *const *const u8,
@@ -409,10 +572,10 @@ forward_backend_fn!(
         pixelFormat: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
-forward_backend_fn!(backend = "rs_backend_tjInitTransform"; fn tjInitTransform() -> TjHandle;);
+forward_backend_fn!(fn tjInitTransform() -> TjHandle; default ptr::null_mut(););
 forward_backend_fn!(
-    backend = "rs_backend_tjTransform";
     fn tjTransform(
         handle: TjHandle,
         jpegBuf: *const u8,
@@ -423,11 +586,9 @@ forward_backend_fn!(
         transforms: *mut tjtransform,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
-forward_backend_fn!(backend = "rs_backend_tjDestroy"; fn tjDestroy(handle: TjHandle) -> c_int;);
-forward_backend_fn!(backend = "rs_backend_tjAlloc"; fn tjAlloc(bytes: c_int) -> *mut u8;);
 forward_backend_fn!(
-    backend = "rs_backend_tjLoadImage";
     fn tjLoadImage(
         filename: *const c_char,
         width: *mut c_int,
@@ -436,9 +597,9 @@ forward_backend_fn!(
         pixelFormat: *mut c_int,
         flags: c_int,
     ) -> *mut u8;
+    default ptr::null_mut();
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjSaveImage";
     fn tjSaveImage(
         filename: *const c_char,
         buffer: *mut u8,
@@ -448,10 +609,9 @@ forward_backend_fn!(
         pixelFormat: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
-forward_backend_fn!(backend = "rs_backend_tjFree"; fn tjFree(buffer: *mut u8););
 forward_backend_fn!(
-    backend = "rs_backend_tjCompress";
     fn tjCompress(
         handle: TjHandle,
         srcBuf: *mut u8,
@@ -465,9 +625,9 @@ forward_backend_fn!(
         jpegQual: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompress";
     fn tjDecompress(
         handle: TjHandle,
         jpegBuf: *mut u8,
@@ -479,9 +639,9 @@ forward_backend_fn!(
         pixelSize: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressHeader";
     fn tjDecompressHeader(
         handle: TjHandle,
         jpegBuf: *mut u8,
@@ -489,9 +649,9 @@ forward_backend_fn!(
         width: *mut c_int,
         height: *mut c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressHeader2";
     fn tjDecompressHeader2(
         handle: TjHandle,
         jpegBuf: *mut u8,
@@ -500,9 +660,9 @@ forward_backend_fn!(
         height: *mut c_int,
         jpegSubsamp: *mut c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjDecompressToYUV";
     fn tjDecompressToYUV(
         handle: TjHandle,
         jpegBuf: *mut u8,
@@ -510,9 +670,9 @@ forward_backend_fn!(
         dstBuf: *mut u8,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjEncodeYUV";
     fn tjEncodeYUV(
         handle: TjHandle,
         srcBuf: *mut u8,
@@ -524,9 +684,9 @@ forward_backend_fn!(
         subsamp: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 forward_backend_fn!(
-    backend = "rs_backend_tjEncodeYUV2";
     fn tjEncodeYUV2(
         handle: TjHandle,
         srcBuf: *mut u8,
@@ -538,6 +698,7 @@ forward_backend_fn!(
         subsamp: c_int,
         flags: c_int,
     ) -> c_int;
+    default -1;
 );
 
 #[no_mangle]
@@ -658,6 +819,49 @@ pub unsafe extern "C" fn tjGetScalingFactors(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn tjDestroy(handle: TjHandle) -> c_int {
+    if handle.is_null() {
+        return 0;
+    }
+    clear_global_error();
+    let backend = match backend_library() {
+        Ok(backend) => backend,
+        Err(error) => {
+            backend_load_failure("tjDestroy", error);
+            return -1;
+        }
+    };
+    let func: unsafe extern "C" fn(TjHandle) -> c_int = match unsafe {
+        backend.symbol(b"tjDestroy\0")
+    } {
+        Ok(func) => func,
+        Err(error) => {
+            backend_load_failure("tjDestroy", error);
+            return -1;
+        }
+    };
+    unsafe { func(handle) }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tjAlloc(bytes: c_int) -> *mut u8 {
+    clear_global_error();
+    if bytes < 0 {
+        set_global_error("tjAlloc(): Invalid argument");
+        return ptr::null_mut();
+    }
+    unsafe { malloc(bytes as usize) as *mut u8 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn tjFree(buffer: *mut u8) {
+    if buffer.is_null() {
+        return;
+    }
+    unsafe { free(buffer.cast::<c_void>()) }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn tjGetErrorStr2(handle: TjHandle) -> *mut c_char {
     if handle.is_null() {
         if let Some(error) = global_error_ptr() {
@@ -665,11 +869,23 @@ pub unsafe extern "C" fn tjGetErrorStr2(handle: TjHandle) -> *mut c_char {
         }
     }
 
-    unsafe extern "C" {
-        #[link_name = "rs_backend_tjGetErrorStr2"]
-        fn backend(handle: TjHandle) -> *mut c_char;
-    }
-    unsafe { backend(handle) }
+    let backend = match backend_library() {
+        Ok(backend) => backend,
+        Err(error) => {
+            backend_load_failure("tjGetErrorStr2", error);
+            return global_error_ptr().unwrap_or(ptr::null_mut());
+        }
+    };
+    let func: unsafe extern "C" fn(TjHandle) -> *mut c_char = match unsafe {
+        backend.symbol(b"tjGetErrorStr2\0")
+    } {
+        Ok(func) => func,
+        Err(error) => {
+            backend_load_failure("tjGetErrorStr2", error);
+            return global_error_ptr().unwrap_or(ptr::null_mut());
+        }
+    };
+    unsafe { func(handle) }
 }
 
 #[no_mangle]
@@ -680,11 +896,23 @@ pub unsafe extern "C" fn tjGetErrorCode(handle: TjHandle) -> c_int {
         }
     }
 
-    unsafe extern "C" {
-        #[link_name = "rs_backend_tjGetErrorCode"]
-        fn backend(handle: TjHandle) -> c_int;
-    }
-    unsafe { backend(handle) }
+    let backend = match backend_library() {
+        Ok(backend) => backend,
+        Err(error) => {
+            backend_load_failure("tjGetErrorCode", error);
+            return TJERR_FATAL;
+        }
+    };
+    let func: unsafe extern "C" fn(TjHandle) -> c_int = match unsafe {
+        backend.symbol(b"tjGetErrorCode\0")
+    } {
+        Ok(func) => func,
+        Err(error) => {
+            backend_load_failure("tjGetErrorCode", error);
+            return TJERR_FATAL;
+        }
+    };
+    unsafe { func(handle) }
 }
 
 #[no_mangle]
@@ -693,9 +921,19 @@ pub unsafe extern "C" fn tjGetErrorStr() -> *mut c_char {
         return error;
     }
 
-    unsafe extern "C" {
-        #[link_name = "rs_backend_tjGetErrorStr"]
-        fn backend() -> *mut c_char;
-    }
-    unsafe { backend() }
+    let backend = match backend_library() {
+        Ok(backend) => backend,
+        Err(error) => {
+            backend_load_failure("tjGetErrorStr", error);
+            return global_error_ptr().unwrap_or(ptr::null_mut());
+        }
+    };
+    let func: unsafe extern "C" fn() -> *mut c_char = match unsafe { backend.symbol(b"tjGetErrorStr\0") } {
+        Ok(func) => func,
+        Err(error) => {
+            backend_load_failure("tjGetErrorStr", error);
+            return global_error_ptr().unwrap_or(ptr::null_mut());
+        }
+    };
+    unsafe { func() }
 }
