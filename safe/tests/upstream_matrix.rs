@@ -1185,7 +1185,6 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
     ];
     const NOSMOOTH: [Option<&str>; 2] = [None, Some("-nosmooth")];
     const QUANT_ARGS: [&[&str]; 2] = [&[], &["-colors", "256", "-dither", "none", "-onepass"]];
-    const CROPS: [(usize, usize); 8] = [(0, 1), (0, 16), (1, 7), (5, 9), (15, 1), (15, 16), (16, 1), (16, 16)];
 
     let source = stage.original_testimages.join(IMAGE);
     let basename = "vgl_6548_0026a";
@@ -1234,45 +1233,47 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
                     }
                     let full = read_ppm(&full_path)?;
 
-                    for (y, h) in CROPS {
-                        let x = (y * 16) % WIDTH;
-                        let w = WIDTH - x - 7;
-                        let y0 = if y <= 15 { y } else { HEIGHT - h };
-                        let cropspec = format!("{w}x{h}+{x}+{y0}");
-                        let cropped_path = temp_dir.join(format!(
-                            "{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_{x}_{y0}_{w}_{h}.ppm"
-                        ));
-
-                        let mut args = Vec::new();
-                        if let Some(flag) = nosmooth {
-                            args.push(OsString::from(flag));
-                        }
-                        args.extend(quant_args.iter().map(|arg| OsString::from(*arg)));
-                        args.push(OsString::from("-crop"));
-                        args.push(OsString::from(cropspec));
-                        args.push(OsString::from("-rgb"));
-                        args.push(OsString::from("-outfile"));
-                        args.push(cropped_path.clone().into_os_string());
-                        args.push(jpeg_path.clone().into_os_string());
-
-                        let output = run_stage_command(stage, temp_dir, "djpeg", args)?;
-                        if !output.status.success() {
-                            return Err(command_failure("djpeg", &output));
-                        }
-
-                        let expected = crop_ppm(&full, x, y0, w, h)?;
-                        let actual = read_ppm(&cropped_path)?;
-                        if expected.width != actual.width
-                            || expected.height != actual.height
-                            || expected.maxval != actual.maxval
-                            || expected.data != actual.data
-                        {
-                            return Err(format!(
-                                "croptest mismatch for progressive={progressive} nosmooth={:?} quant={} sample={} crop={x},{y0} {w}x{h}",
-                                nosmooth,
-                                quant_tag,
-                                sample_name
+                    for y in 0..=16 {
+                        for h in 1..=16 {
+                            let x = (y * 16) % WIDTH;
+                            let w = WIDTH - x - 7;
+                            let y0 = if y <= 15 { y } else { HEIGHT - h };
+                            let cropspec = format!("{w}x{h}+{x}+{y0}");
+                            let cropped_path = temp_dir.join(format!(
+                                "{basename}_{prog_tag}_{ns_tag}_{quant_tag}_{sample_name}_{x}_{y0}_{w}_{h}.ppm"
                             ));
+
+                            let mut args = Vec::new();
+                            if let Some(flag) = nosmooth {
+                                args.push(OsString::from(flag));
+                            }
+                            args.extend(quant_args.iter().map(|arg| OsString::from(*arg)));
+                            args.push(OsString::from("-crop"));
+                            args.push(OsString::from(cropspec.clone()));
+                            args.push(OsString::from("-rgb"));
+                            args.push(OsString::from("-outfile"));
+                            args.push(cropped_path.clone().into_os_string());
+                            args.push(jpeg_path.clone().into_os_string());
+
+                            let output = run_stage_command(stage, temp_dir, "djpeg", args)?;
+                            if !output.status.success() {
+                                return Err(command_failure("djpeg", &output));
+                            }
+
+                            let expected = crop_ppm(&full, x, y0, w, h)?;
+                            let actual = read_ppm(&cropped_path)?;
+                            if expected.width != actual.width
+                                || expected.height != actual.height
+                                || expected.maxval != actual.maxval
+                                || expected.data != actual.data
+                            {
+                                return Err(format!(
+                                    "croptest mismatch for progressive={progressive} nosmooth={:?} quant={} sample={} crop={cropspec}",
+                                    nosmooth,
+                                    quant_tag,
+                                    sample_name
+                                ));
+                            }
                         }
                     }
                 }
