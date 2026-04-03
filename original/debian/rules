@@ -1,0 +1,113 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+NULL =
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+include /usr/share/dpkg/default.mk
+
+ifneq (,$(filter $(DEB_HOST_ARCH), m68k))
+  FLOAT_STORE=-ffloat-store
+endif
+ifneq (,$(filter $(DEB_HOST_ARCH), ia64 riscv64 s390x))
+  FLOATTEST=-DFLOATTEST=fp-contract
+endif
+
+# To enable all, uncomment following line
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_LDFLAGS_MAINT_STRIP=-Wl,-Bsymbolic-functions
+export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic $(FLOAT_STORE)
+
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+CFLAGS ?= $(shell dpkg-buildflags --get CFLAGS)
+CPPFLAGS ?= $(shell dpkg-buildflags --get CPPFLAGS)
+LDFLAGS ?= $(shell dpkg-buildflags --get LDFLAGS)
+ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -Wall
+endif
+
+ifeq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+CC = gcc
+else
+CC = $(DEB_HOST_GNU_TYPE)-gcc
+endif
+
+SIMD_BROKEN_ARCHS = x32
+
+ifeq (,$(filter $(DEB_HOST_ARCH), $(SIMD_BROKEN_ARCHS)))
+  DISABLE_SIMD=-DWITH_SIMD=1
+else
+  DISABLE_SIMD=-DWITH_SIMD=0
+endif
+
+%:
+	dh $@ --with javahelper
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(DISABLE_SIMD) $(FLOATTEST) \
+	                     -DWITH_JAVA=1 \
+	                     -DWITH_JPEG8=1 \
+	                     -DCMAKE_INSTALL_LIBDIR=/usr/lib/$(DEB_HOST_MULTIARCH) \
+	                     -DCMAKE_INSTALL_MANDIR=/usr/share/man/
+	                     $(NULL)
+
+override_dh_auto_build:
+	dh_auto_build -- V=1
+	$(MAKE) -C debian/extra CC=$(CC) CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)" CPPFLAGS="$(CPPFLAGS)" V=1
+
+override_dh_auto_clean:
+	$(MAKE) -C debian/extra clean
+	if [ -e Makefile ]; then $(MAKE) testclean; fi
+	dh_auto_clean
+	rm -f simd/jsimdcfg.inc
+
+override_dh_auto_install: debian/tjbench.1
+	dh_auto_install
+	# drop documentation files (installed via dh_installdocs)
+	rm -Rfv debian/tmp/usr/share/doc/
+	# Install extra utilities
+	$(MAKE) -C debian/extra install prefix=/usr DESTDIR=$(CURDIR)/debian/tmp
+	# Install manual page for tjbench.1
+	install -m 644 debian/tjbench.1 $(CURDIR)/debian/tmp/usr/share/man/man1/
+	# Fix jconfig.h for MultiArch
+	rm -f debian/tmp/usr/include/jconfig.h
+	mkdir -p debian/tmp/usr/include/$(DEB_HOST_MULTIARCH)
+	sed -e "s/#\(undef\|define\) HAVE_\(LOCALE\|\(STD\(DEF\|LIB\)\)\)_H 1//g" \
+		obj-$(DEB_HOST_GNU_TYPE)/jconfig.h > debian/tmp/usr/include/$(DEB_HOST_MULTIARCH)/jconfig.h
+
+override_dh_install:
+	dh_install -X.la -X/usr/share/doc
+
+override_dh_missing:
+	dh_missing --fail-missing
+
+execute_after_dh_gencontrol:
+	dh_gencontrol -p libturbojpeg0-dev -- -v1:$(DEB_VERSION)
+	dh_gencontrol -p libturbojpeg -- -v1:$(DEB_VERSION)
+
+override_dh_makeshlibs:
+	: # keep the original libjpeg symbol version
+	dh_makeshlibs -- -v8c
+	: # ... and mark libjpeg-turbo only symbols with a different version
+	sed -i "$$(for i in $$(cat debian/libjpeg-turbo-only.symbols); do echo "/^ $$i/s/8c$$/8c-2ubuntu5~/;"; done)" debian/libjpeg-turbo8/DEBIAN/symbols
+
+override_dh_installchangelogs:
+	dh_installchangelogs -plibjpeg-turbo8-dev change.log
+	dh_installchangelogs -Nlibjpeg-turbo8-dev
+
+# See debhelper:
+DEFAULT_BUILD_DIRECTORY = obj-$(DEB_HOST_GNU_TYPE)
+
+debian/tjbench.1: debian/tjbench.1.in
+	PATH=$(CURDIR)/$(DEFAULT_BUILD_DIRECTORY) \
+		/usr/bin/help2man --no-info --include=$< --output=$@ \
+		--name="benchmark the performance of libjpeg-turbo" \
+		--version-string=$(DEB_VERSION_UPSTREAM) `basename $@ .1`
+	# next line may break in the future, but tidy output a bit:
+	sed -z -i -e 's/USAGE: tjbench\n.IP/.SH USAGE\n.IP\ntjbench/g' $@
+
+get-orig-source:
+	uscan --noconf --force-download --rename --download-current-version --destdir=..

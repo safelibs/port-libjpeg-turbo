@@ -1,0 +1,3 @@
+Tests: libjpeg-turbo8-dev libjpeg-turbo8-dev-static
+Depends: build-essential, libjpeg-turbo8-dev, pkg-config
+Restrictions: superficial, allow-stderr

@@ -1,0 +1,41 @@
+# libjpeg-turbo ships a pre-build API documentation, leave it as it is
+source: source-is-missing [doc/html/group___turbo_j_p_e_g.html]
+source: source-is-missing [doc/html/structtjtransform.html]
+source: source-is-missing [java/doc/org/libjpegturbo/turbojpeg/TJCompressor.html]
+source: source-is-missing [java/doc/org/libjpegturbo/turbojpeg/TJTransformer.html]
+
+# manually checked the menu.js Javascript file, it is not minified/pre-built
+source: source-is-missing [doc/html/menu.js]
+source: source-contains-prebuilt-javascript-object [doc/html/menu.js]
+
+# we don't use this file in the bin:pkg (FIXME, this file should not be in the src:pkg, at all!)
+source: source-contains-prebuilt-javascript-object [doc/html/jquery.js]
+
+# yes, we know. This needs to be fixed after the Debian 11 release freeze
+source: source-contains-prebuilt-doxygen-documentation [*]
+
+# we temporarily switch to Github tag tarballs as the former download URL was offline when preparing 2.1.1-1
+source: debian-watch-could-verify-download debian/upstream/signing-key.asc [debian/watch]
+source: orig-tarball-missing-upstream-signature libjpeg-turbo_*.orig.tar.gz
+
+# too long lines in file we ignore for now
+source: very-long-line-length-in-source-file 101469 > 512 [testimages/testorig.ppm:4]
+source: very-long-line-length-in-source-file 13379 > 512 [testimages/vgl_5674_0098.bmp:195]
+source: very-long-line-length-in-source-file 14747 > 512 [testimages/vgl_6434_0018a.bmp:1]
+source: very-long-line-length-in-source-file 1608 > 512 [java/doc/org/libjpegturbo/turbojpeg/TJCompressor.html:411]
+source: very-long-line-length-in-source-file 1678 > 512 [doc/html/group___turbo_j_p_e_g.html:1662]
+source: very-long-line-length-in-source-file 17225 > 512 [testimages/nightshot_iso_100.bmp:590]
+source: very-long-line-length-in-source-file 1801 > 512 [java/doc/resources/titlebar.gif:11]
+source: very-long-line-length-in-source-file 24430 > 512 [debian/copyright.in:939]
+source: very-long-line-length-in-source-file 2802 > 512 [java/doc/org/libjpegturbo/turbojpeg/TJTransformer.html:210]
+source: very-long-line-length-in-source-file 36534 > 512 [testimages/vgl_6548_0026a.bmp:1]
+source: very-long-line-length-in-source-file 39449 > 512 [testimages/test2.icc:842]
+source: very-long-line-length-in-source-file 513 > 512 [simd/CMakeLists.txt:327]
+source: very-long-line-length-in-source-file 537 > 512 [doc/html/structtjtransform.html:92]
+source: very-long-line-length-in-source-file 581 > 512 [java/doc/resources/background.gif:1]
+source: very-long-line-length-in-source-file 590 > 512 [release/ReadMe.txt:1]
+source: very-long-line-length-in-source-file 702 > 512 [doc/html/menu.js:46]
+source: very-long-line-length-in-source-file 767 > 512 [release/License.rtf:19]
+source: very-long-line-length-in-source-file 88060 > 512 [doc/html/jquery.js:2]
+source: very-long-line-length-in-source-file 8820 > 512 [testimages/test1.icc:199]
+source: very-long-line-length-in-source-file 9184 > 512 [doc/html/tabs.css:1]

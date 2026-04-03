@@ -1,0 +1,5 @@
+#!/bin/sh
+# Copyright 2021 Simon McVittie
+# SPDX-License-Identifier: MIT
+set -eux
+exec debian/tests/libjpeg-turbo8-dev --static

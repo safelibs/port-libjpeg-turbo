@@ -1,0 +1,9 @@
+[DESCRIPTION]
+tjbench is a JPEG decompression/compression benchmark part of libjpeg-turbo.
+
+[COMMENT]
+This manual page was written by Mathieu Malaterre <malat@debian.org> for the
+Debian GNU/Linux system, but may be used by others.
+
+[COPYRIGHT]
+Copyright (C)2009-2019, 2021 D. R. Commander.  All Rights Reserved.
