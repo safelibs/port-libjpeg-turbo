@@ -37,9 +37,29 @@
 #include <math.h>
 #include <errno.h>
 #include <limits.h>
-#include <cdjpeg.h>
-#include "./tjutil.h"
+#include <jpeglib.h>
 #include "./turbojpeg.h"
+#ifndef _MSC_VER
+#include <strings.h>
+#endif
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/time.h>
+#endif
+
+
+#ifdef _MSC_VER
+#define SNPRINTF(str, n, format, ...) \
+  _snprintf_s(str, n, _TRUNCATE, format, ##__VA_ARGS__)
+#define strcasecmp  _stricmp
+#else
+#define SNPRINTF  snprintf
+#endif
+
+#ifndef min
+#define min(a, b)  ((a) < (b) ? (a) : (b))
+#endif
 
 
 #define THROW(op, err) { \
@@ -100,6 +120,38 @@ tjscalingfactor *scalingFactors = NULL, sf = { 1, 1 };
 int nsf = 0, xformOp = TJXOP_NONE, xformOpt = 0;
 int (*customFilter) (short *, tjregion, tjregion, int, int, tjtransform *);
 double benchTime = 5.0, warmup = 1.0;
+
+
+#ifdef _WIN32
+static double getFreq(void)
+{
+  LARGE_INTEGER freq;
+
+  if (!QueryPerformanceFrequency(&freq)) return 0.0;
+  return (double)freq.QuadPart;
+}
+
+static double timerFreq = -1.0;
+
+static double getTime(void)
+{
+  LARGE_INTEGER t;
+
+  if (timerFreq < 0.0) timerFreq = getFreq();
+  if (timerFreq == 0.0) return (double)GetTickCount() / 1000.;
+
+  QueryPerformanceCounter(&t);
+  return (double)t.QuadPart / timerFreq;
+}
+#else
+static double getTime(void)
+{
+  struct timeval tv;
+
+  if (gettimeofday(&tv, NULL) < 0) return 0.0;
+  return (double)tv.tv_sec + ((double)tv.tv_usec / 1000000.);
+}
+#endif
 
 
 static char *formatName(int subsamp, int cs, char *buf)
