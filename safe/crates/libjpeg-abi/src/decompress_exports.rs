@@ -126,6 +126,48 @@ pub unsafe extern "C" fn jinit_huff_decoder(cinfo: j_decompress_ptr) {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn jpeg_make_d_derived_tbl(
+    cinfo: j_decompress_ptr,
+    is_dc: boolean,
+    tblno: int,
+    pdtbl: *mut *mut jpeg_core::ported::decompress::jdhuff::d_derived_tbl,
+) {
+    jpeg_core::ported::decompress::jdhuff::jpeg_make_d_derived_tbl(cinfo, is_dc, tblno, pdtbl)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_fill_bit_buffer(
+    state: *mut jpeg_core::ported::decompress::jdhuff::bitread_working_state,
+    get_buffer: jpeg_core::ported::decompress::jdhuff::bit_buf_type,
+    bits_left: int,
+    nbits: int,
+) -> boolean {
+    jpeg_core::ported::decompress::jdhuff::jpeg_fill_bit_buffer(
+        state,
+        get_buffer,
+        bits_left,
+        nbits,
+    )
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_huff_decode(
+    state: *mut jpeg_core::ported::decompress::jdhuff::bitread_working_state,
+    get_buffer: jpeg_core::ported::decompress::jdhuff::bit_buf_type,
+    bits_left: int,
+    htbl: *mut jpeg_core::ported::decompress::jdhuff::d_derived_tbl,
+    min_bits: int,
+) -> int {
+    jpeg_core::ported::decompress::jdhuff::jpeg_huff_decode(
+        state,
+        get_buffer,
+        bits_left,
+        htbl,
+        min_bits,
+    )
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn jinit_input_controller(cinfo: j_decompress_ptr) {
     jpeg_core::ported::decompress::jdinput::jinit_input_controller(cinfo)
 }
@@ -171,6 +213,11 @@ pub unsafe extern "C" fn jinit_master_decompress(cinfo: j_decompress_ptr) {
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_calc_output_dimensions(cinfo: j_decompress_ptr) {
     jpeg_core::ported::decompress::jdmaster::jpeg_calc_output_dimensions(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_core_output_dimensions(cinfo: j_decompress_ptr) {
+    jpeg_core::ported::decompress::jdmaster::jpeg_core_output_dimensions(cinfo)
 }
 
 #[no_mangle]

@@ -58,6 +58,10 @@ pub unsafe extern "C" fn jpeg_calc_output_dimensions(cinfo: j_decompress_ptr) {
     translated::jpeg_calc_output_dimensions(cinfo.cast::<translated::jpeg_decompress_struct>())
 }
 
+pub unsafe extern "C" fn jpeg_core_output_dimensions(cinfo: j_decompress_ptr) {
+    translated::jpeg_core_output_dimensions(cinfo.cast::<translated::jpeg_decompress_struct>())
+}
+
 pub unsafe extern "C" fn jpeg_new_colormap(cinfo: j_decompress_ptr) {
     translated::jpeg_new_colormap(cinfo.cast::<translated::jpeg_decompress_struct>())
 }
