@@ -17,4 +17,3 @@ pub fn stage_root() -> PathBuf {
 pub fn stage_usr_root() -> PathBuf {
     stage_root().join("usr")
 }
-

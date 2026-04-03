@@ -27,3 +27,10 @@ jpeg-tools = { path = "crates/jpeg-tools" }
 libjpeg-abi = { path = "crates/libjpeg-abi" }
 libturbojpeg-abi = { path = "crates/libturbojpeg-abi" }
 
+[dev-dependencies]
+libtest-mimic = "0.8"
+md5 = "0.7"
+
+[[test]]
+name = "upstream_matrix"
+harness = false

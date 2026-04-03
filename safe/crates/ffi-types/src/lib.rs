@@ -105,6 +105,14 @@ pub const DSTATE_BUFPOST: int = 208;
 pub const DSTATE_RDCOEFS: int = 209;
 pub const DSTATE_STOPPING: int = 210;
 
+pub const JPEG_SUSPENDED: int = 0;
+pub const JPEG_HEADER_OK: int = 1;
+pub const JPEG_HEADER_TABLES_ONLY: int = 2;
+pub const JPEG_REACHED_SOS: int = 1;
+pub const JPEG_REACHED_EOI: int = 2;
+pub const JPEG_ROW_COMPLETED: int = 3;
+pub const JPEG_SCAN_COMPLETED: int = 4;
+
 pub type JSAMPROW = *mut JSAMPLE;
 pub type JSAMPARRAY = *mut JSAMPROW;
 pub type JSAMPIMAGE = *mut JSAMPARRAY;

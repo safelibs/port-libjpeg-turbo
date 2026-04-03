@@ -178,84 +178,261 @@ fn abi_layouts_match_headers() {
         assert_eq!(c[key], value, "{key}");
     };
 
-    check("size:struct jpeg_common_struct", size_of::<jpeg_common_struct>());
-    check("size:struct jpeg_compress_struct", size_of::<jpeg_compress_struct>());
-    check("size:struct jpeg_decompress_struct", size_of::<jpeg_decompress_struct>());
+    check(
+        "size:struct jpeg_common_struct",
+        size_of::<jpeg_common_struct>(),
+    );
+    check(
+        "size:struct jpeg_compress_struct",
+        size_of::<jpeg_compress_struct>(),
+    );
+    check(
+        "size:struct jpeg_decompress_struct",
+        size_of::<jpeg_decompress_struct>(),
+    );
     check("size:struct jpeg_error_mgr", size_of::<jpeg_error_mgr>());
-    check("size:struct jpeg_progress_mgr", size_of::<jpeg_progress_mgr>());
-    check("size:struct jpeg_destination_mgr", size_of::<jpeg_destination_mgr>());
+    check(
+        "size:struct jpeg_progress_mgr",
+        size_of::<jpeg_progress_mgr>(),
+    );
+    check(
+        "size:struct jpeg_destination_mgr",
+        size_of::<jpeg_destination_mgr>(),
+    );
     check("size:struct jpeg_source_mgr", size_of::<jpeg_source_mgr>());
     check("size:struct jpeg_memory_mgr", size_of::<jpeg_memory_mgr>());
     check("size:JQUANT_TBL", size_of::<JQUANT_TBL>());
     check("size:JHUFF_TBL", size_of::<JHUFF_TBL>());
     check("size:jpeg_component_info", size_of::<jpeg_component_info>());
     check("size:jpeg_scan_info", size_of::<jpeg_scan_info>());
-    check("size:struct jpeg_marker_struct", size_of::<jpeg_marker_struct>());
-    check("size:struct jpeg_comp_master", size_of::<jpeg_comp_master>());
-    check("size:struct jpeg_c_main_controller", size_of::<jpeg_c_main_controller>());
-    check("size:struct jpeg_c_prep_controller", size_of::<jpeg_c_prep_controller>());
-    check("size:struct jpeg_c_coef_controller", size_of::<jpeg_c_coef_controller>());
-    check("size:struct jpeg_color_converter", size_of::<jpeg_color_converter>());
-    check("size:struct jpeg_downsampler", size_of::<jpeg_downsampler>());
-    check("size:struct jpeg_forward_dct", size_of::<jpeg_forward_dct>());
-    check("size:struct jpeg_entropy_encoder", size_of::<jpeg_entropy_encoder>());
-    check("size:struct jpeg_marker_writer", size_of::<jpeg_marker_writer>());
-    check("size:struct jpeg_decomp_master", size_of::<jpeg_decomp_master>());
-    check("size:struct jpeg_input_controller", size_of::<jpeg_input_controller>());
-    check("size:struct jpeg_d_main_controller", size_of::<jpeg_d_main_controller>());
-    check("size:struct jpeg_d_coef_controller", size_of::<jpeg_d_coef_controller>());
-    check("size:struct jpeg_d_post_controller", size_of::<jpeg_d_post_controller>());
-    check("size:struct jpeg_marker_reader", size_of::<jpeg_marker_reader>());
-    check("size:struct jpeg_entropy_decoder", size_of::<jpeg_entropy_decoder>());
-    check("size:struct jpeg_inverse_dct", size_of::<jpeg_inverse_dct>());
+    check(
+        "size:struct jpeg_marker_struct",
+        size_of::<jpeg_marker_struct>(),
+    );
+    check(
+        "size:struct jpeg_comp_master",
+        size_of::<jpeg_comp_master>(),
+    );
+    check(
+        "size:struct jpeg_c_main_controller",
+        size_of::<jpeg_c_main_controller>(),
+    );
+    check(
+        "size:struct jpeg_c_prep_controller",
+        size_of::<jpeg_c_prep_controller>(),
+    );
+    check(
+        "size:struct jpeg_c_coef_controller",
+        size_of::<jpeg_c_coef_controller>(),
+    );
+    check(
+        "size:struct jpeg_color_converter",
+        size_of::<jpeg_color_converter>(),
+    );
+    check(
+        "size:struct jpeg_downsampler",
+        size_of::<jpeg_downsampler>(),
+    );
+    check(
+        "size:struct jpeg_forward_dct",
+        size_of::<jpeg_forward_dct>(),
+    );
+    check(
+        "size:struct jpeg_entropy_encoder",
+        size_of::<jpeg_entropy_encoder>(),
+    );
+    check(
+        "size:struct jpeg_marker_writer",
+        size_of::<jpeg_marker_writer>(),
+    );
+    check(
+        "size:struct jpeg_decomp_master",
+        size_of::<jpeg_decomp_master>(),
+    );
+    check(
+        "size:struct jpeg_input_controller",
+        size_of::<jpeg_input_controller>(),
+    );
+    check(
+        "size:struct jpeg_d_main_controller",
+        size_of::<jpeg_d_main_controller>(),
+    );
+    check(
+        "size:struct jpeg_d_coef_controller",
+        size_of::<jpeg_d_coef_controller>(),
+    );
+    check(
+        "size:struct jpeg_d_post_controller",
+        size_of::<jpeg_d_post_controller>(),
+    );
+    check(
+        "size:struct jpeg_marker_reader",
+        size_of::<jpeg_marker_reader>(),
+    );
+    check(
+        "size:struct jpeg_entropy_decoder",
+        size_of::<jpeg_entropy_decoder>(),
+    );
+    check(
+        "size:struct jpeg_inverse_dct",
+        size_of::<jpeg_inverse_dct>(),
+    );
     check("size:struct jpeg_upsampler", size_of::<jpeg_upsampler>());
-    check("size:struct jpeg_color_deconverter", size_of::<jpeg_color_deconverter>());
-    check("size:struct jpeg_color_quantizer", size_of::<jpeg_color_quantizer>());
+    check(
+        "size:struct jpeg_color_deconverter",
+        size_of::<jpeg_color_deconverter>(),
+    );
+    check(
+        "size:struct jpeg_color_quantizer",
+        size_of::<jpeg_color_quantizer>(),
+    );
 
-    check("align:struct jpeg_common_struct", align_of::<jpeg_common_struct>());
-    check("align:struct jpeg_compress_struct", align_of::<jpeg_compress_struct>());
-    check("align:struct jpeg_decompress_struct", align_of::<jpeg_decompress_struct>());
+    check(
+        "align:struct jpeg_common_struct",
+        align_of::<jpeg_common_struct>(),
+    );
+    check(
+        "align:struct jpeg_compress_struct",
+        align_of::<jpeg_compress_struct>(),
+    );
+    check(
+        "align:struct jpeg_decompress_struct",
+        align_of::<jpeg_decompress_struct>(),
+    );
     check("align:struct jpeg_error_mgr", align_of::<jpeg_error_mgr>());
-    check("align:struct jpeg_memory_mgr", align_of::<jpeg_memory_mgr>());
+    check(
+        "align:struct jpeg_memory_mgr",
+        align_of::<jpeg_memory_mgr>(),
+    );
 
-    check("off:struct jpeg_common_struct.err", offset_of!(jpeg_common_struct, err));
-    check("off:struct jpeg_common_struct.global_state", offset_of!(jpeg_common_struct, global_state));
-    check("off:struct jpeg_compress_struct.dest", offset_of!(jpeg_compress_struct, dest));
-    check("off:struct jpeg_compress_struct.input_gamma", offset_of!(jpeg_compress_struct, input_gamma));
-    check("off:struct jpeg_compress_struct.comp_info", offset_of!(jpeg_compress_struct, comp_info));
-    check("off:struct jpeg_compress_struct.quant_tbl_ptrs", offset_of!(jpeg_compress_struct, quant_tbl_ptrs));
-    check("off:struct jpeg_compress_struct.q_scale_factor", offset_of!(jpeg_compress_struct, q_scale_factor));
-    check("off:struct jpeg_compress_struct.arith_dc_L", offset_of!(jpeg_compress_struct, arith_dc_L));
-    check("off:struct jpeg_compress_struct.raw_data_in", offset_of!(jpeg_compress_struct, raw_data_in));
-    check("off:struct jpeg_compress_struct.restart_interval", offset_of!(jpeg_compress_struct, restart_interval));
-    check("off:struct jpeg_compress_struct.next_scanline", offset_of!(jpeg_compress_struct, next_scanline));
-    check("off:struct jpeg_compress_struct.total_iMCU_rows", offset_of!(jpeg_compress_struct, total_iMCU_rows));
-    check("off:struct jpeg_compress_struct.MCU_membership", offset_of!(jpeg_compress_struct, MCU_membership));
-    check("off:struct jpeg_compress_struct.block_size", offset_of!(jpeg_compress_struct, block_size));
-    check("off:struct jpeg_compress_struct.master", offset_of!(jpeg_compress_struct, master));
-    check("off:struct jpeg_compress_struct.script_space_size", offset_of!(jpeg_compress_struct, script_space_size));
-    check("off:struct jpeg_decompress_struct.src", offset_of!(jpeg_decompress_struct, src));
-    check("off:struct jpeg_decompress_struct.out_color_space", offset_of!(jpeg_decompress_struct, out_color_space));
-    check("off:struct jpeg_decompress_struct.output_gamma", offset_of!(jpeg_decompress_struct, output_gamma));
+    check(
+        "off:struct jpeg_common_struct.err",
+        offset_of!(jpeg_common_struct, err),
+    );
+    check(
+        "off:struct jpeg_common_struct.global_state",
+        offset_of!(jpeg_common_struct, global_state),
+    );
+    check(
+        "off:struct jpeg_compress_struct.dest",
+        offset_of!(jpeg_compress_struct, dest),
+    );
+    check(
+        "off:struct jpeg_compress_struct.input_gamma",
+        offset_of!(jpeg_compress_struct, input_gamma),
+    );
+    check(
+        "off:struct jpeg_compress_struct.comp_info",
+        offset_of!(jpeg_compress_struct, comp_info),
+    );
+    check(
+        "off:struct jpeg_compress_struct.quant_tbl_ptrs",
+        offset_of!(jpeg_compress_struct, quant_tbl_ptrs),
+    );
+    check(
+        "off:struct jpeg_compress_struct.q_scale_factor",
+        offset_of!(jpeg_compress_struct, q_scale_factor),
+    );
+    check(
+        "off:struct jpeg_compress_struct.arith_dc_L",
+        offset_of!(jpeg_compress_struct, arith_dc_L),
+    );
+    check(
+        "off:struct jpeg_compress_struct.raw_data_in",
+        offset_of!(jpeg_compress_struct, raw_data_in),
+    );
+    check(
+        "off:struct jpeg_compress_struct.restart_interval",
+        offset_of!(jpeg_compress_struct, restart_interval),
+    );
+    check(
+        "off:struct jpeg_compress_struct.next_scanline",
+        offset_of!(jpeg_compress_struct, next_scanline),
+    );
+    check(
+        "off:struct jpeg_compress_struct.total_iMCU_rows",
+        offset_of!(jpeg_compress_struct, total_iMCU_rows),
+    );
+    check(
+        "off:struct jpeg_compress_struct.MCU_membership",
+        offset_of!(jpeg_compress_struct, MCU_membership),
+    );
+    check(
+        "off:struct jpeg_compress_struct.block_size",
+        offset_of!(jpeg_compress_struct, block_size),
+    );
+    check(
+        "off:struct jpeg_compress_struct.master",
+        offset_of!(jpeg_compress_struct, master),
+    );
+    check(
+        "off:struct jpeg_compress_struct.script_space_size",
+        offset_of!(jpeg_compress_struct, script_space_size),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.src",
+        offset_of!(jpeg_decompress_struct, src),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.out_color_space",
+        offset_of!(jpeg_decompress_struct, out_color_space),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.output_gamma",
+        offset_of!(jpeg_decompress_struct, output_gamma),
+    );
     check(
         "off:struct jpeg_decompress_struct.desired_number_of_colors",
         offset_of!(jpeg_decompress_struct, desired_number_of_colors),
     );
-    check("off:struct jpeg_decompress_struct.output_width", offset_of!(jpeg_decompress_struct, output_width));
-    check("off:struct jpeg_decompress_struct.colormap", offset_of!(jpeg_decompress_struct, colormap));
-    check("off:struct jpeg_decompress_struct.coef_bits", offset_of!(jpeg_decompress_struct, coef_bits));
-    check("off:struct jpeg_decompress_struct.comp_info", offset_of!(jpeg_decompress_struct, comp_info));
-    check("off:struct jpeg_decompress_struct.arith_ac_K", offset_of!(jpeg_decompress_struct, arith_ac_K));
-    check("off:struct jpeg_decompress_struct.marker_list", offset_of!(jpeg_decompress_struct, marker_list));
+    check(
+        "off:struct jpeg_decompress_struct.output_width",
+        offset_of!(jpeg_decompress_struct, output_width),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.colormap",
+        offset_of!(jpeg_decompress_struct, colormap),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.coef_bits",
+        offset_of!(jpeg_decompress_struct, coef_bits),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.comp_info",
+        offset_of!(jpeg_decompress_struct, comp_info),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.arith_ac_K",
+        offset_of!(jpeg_decompress_struct, arith_ac_K),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.marker_list",
+        offset_of!(jpeg_decompress_struct, marker_list),
+    );
     check(
         "off:struct jpeg_decompress_struct.sample_range_limit",
         offset_of!(jpeg_decompress_struct, sample_range_limit),
     );
-    check("off:struct jpeg_decompress_struct.MCU_membership", offset_of!(jpeg_decompress_struct, MCU_membership));
-    check("off:struct jpeg_decompress_struct.unread_marker", offset_of!(jpeg_decompress_struct, unread_marker));
-    check("off:struct jpeg_decompress_struct.idct", offset_of!(jpeg_decompress_struct, idct));
-    check("off:struct jpeg_decompress_struct.cquantize", offset_of!(jpeg_decompress_struct, cquantize));
-    check("off:struct jpeg_error_mgr.msg_parm", offset_of!(jpeg_error_mgr, msg_parm));
+    check(
+        "off:struct jpeg_decompress_struct.MCU_membership",
+        offset_of!(jpeg_decompress_struct, MCU_membership),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.unread_marker",
+        offset_of!(jpeg_decompress_struct, unread_marker),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.idct",
+        offset_of!(jpeg_decompress_struct, idct),
+    );
+    check(
+        "off:struct jpeg_decompress_struct.cquantize",
+        offset_of!(jpeg_decompress_struct, cquantize),
+    );
+    check(
+        "off:struct jpeg_error_mgr.msg_parm",
+        offset_of!(jpeg_error_mgr, msg_parm),
+    );
     check(
         "off:struct jpeg_error_mgr.jpeg_message_table",
         offset_of!(jpeg_error_mgr, jpeg_message_table),
@@ -268,10 +445,22 @@ fn abi_layouts_match_headers() {
         "off:struct jpeg_memory_mgr.max_memory_to_use",
         offset_of!(jpeg_memory_mgr, max_memory_to_use),
     );
-    check("off:jpeg_component_info.quant_table", offset_of!(jpeg_component_info, quant_table));
-    check("off:struct jpeg_decomp_master.first_MCU_col", offset_of!(jpeg_decomp_master, first_MCU_col));
-    check("off:struct jpeg_marker_reader.discarded_bytes", offset_of!(jpeg_marker_reader, discarded_bytes));
-    check("off:struct jpeg_inverse_dct.inverse_DCT", offset_of!(jpeg_inverse_dct, inverse_DCT));
+    check(
+        "off:jpeg_component_info.quant_table",
+        offset_of!(jpeg_component_info, quant_table),
+    );
+    check(
+        "off:struct jpeg_decomp_master.first_MCU_col",
+        offset_of!(jpeg_decomp_master, first_MCU_col),
+    );
+    check(
+        "off:struct jpeg_marker_reader.discarded_bytes",
+        offset_of!(jpeg_marker_reader, discarded_bytes),
+    );
+    check(
+        "off:struct jpeg_inverse_dct.inverse_DCT",
+        offset_of!(jpeg_inverse_dct, inverse_DCT),
+    );
 
     check("const:JCS_EXT_RGB", JCS_EXT_RGB as usize);
     check("const:JCS_EXT_RGBA", JCS_EXT_RGBA as usize);

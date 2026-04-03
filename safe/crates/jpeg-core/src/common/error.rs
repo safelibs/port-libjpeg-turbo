@@ -147,7 +147,7 @@ pub static mut jpeg_std_message_table: [*const c_char; 129] = [
     core::ptr::null(),
 ];
 
-unsafe extern "C" {
+extern "C" {
     fn snprintf(dst: *mut c_char, size: usize, fmt: *const c_char, ...) -> int;
     fn fprintf(stream: *mut ffi_types::FILE, fmt: *const c_char, ...) -> int;
     fn exit(status: int) -> !;
@@ -182,6 +182,34 @@ pub unsafe fn warnms(cinfo: j_common_ptr, code: J_MESSAGE_CODE) {
     set_msg_code(cinfo, code);
     if let Some(emit) = (*err(cinfo)).emit_message {
         emit(cinfo, -1);
+    }
+}
+
+pub unsafe fn warnms1(cinfo: j_common_ptr, code: J_MESSAGE_CODE, p1: int) {
+    set_msg_code(cinfo, code);
+    set_i(cinfo, 0, p1);
+    if let Some(emit) = (*err(cinfo)).emit_message {
+        emit(cinfo, -1);
+    }
+}
+
+pub unsafe fn tracems3(
+    cinfo: j_common_ptr,
+    msg_level: int,
+    code: J_MESSAGE_CODE,
+    p1: int,
+    p2: int,
+    p3: int,
+) {
+    set_msg_code(cinfo, code);
+    set_i(cinfo, 0, p1);
+    set_i(cinfo, 1, p2);
+    set_i(cinfo, 2, p3);
+    let err = err(cinfo);
+    if (*err).trace_level >= msg_level {
+        if let Some(output_message) = (*err).output_message {
+            output_message(cinfo);
+        }
     }
 }
 

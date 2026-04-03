@@ -5,9 +5,9 @@ use std::sync::Mutex;
 
 use ffi_types::{
     boolean, j_compress_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_compress_struct,
-    jpeg_decompress_struct, jpeg_error_mgr, jpeg_marker_struct, jpeg_marker_writer, FILE,
-    J_MESSAGE_CODE, JMSG_LENGTH_MAX, CSTATE_SCANNING, DSTATE_READY, JCS_EXT_RGB, JCS_EXT_RGBA,
-    JPEG_LIB_VERSION, TRUE,
+    jpeg_decompress_struct, jpeg_error_mgr, jpeg_marker_struct, jpeg_marker_writer,
+    CSTATE_SCANNING, DSTATE_READY, FILE, JCS_EXT_RGB, JCS_EXT_RGBA, JMSG_LENGTH_MAX,
+    JPEG_LIB_VERSION, J_MESSAGE_CODE, TRUE,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -93,7 +93,11 @@ unsafe fn init_compress() -> (jpeg_compress_struct, jpeg_error_mgr) {
     let mut cinfo = MaybeUninit::<jpeg_compress_struct>::zeroed().assume_init();
     let mut err = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
     cinfo.err = jpeg_std_error(&mut err);
-    jpeg_CreateCompress(&mut cinfo, JPEG_LIB_VERSION, std::mem::size_of::<jpeg_compress_struct>());
+    jpeg_CreateCompress(
+        &mut cinfo,
+        JPEG_LIB_VERSION,
+        std::mem::size_of::<jpeg_compress_struct>(),
+    );
     (cinfo, err)
 }
 
@@ -137,12 +141,15 @@ fn jpeg_std_error_formats_messages() {
 #[test]
 fn jcstest_ported() {
     let mut message = [0 as c_char; JMSG_LENGTH_MAX];
-    let rgb = unsafe { jpeg_rs_probe_default_colorspace(JCS_EXT_RGB, message.as_mut_ptr(), message.len()) };
+    let rgb = unsafe {
+        jpeg_rs_probe_default_colorspace(JCS_EXT_RGB, message.as_mut_ptr(), message.len())
+    };
     assert_eq!(rgb, 1, "{}", c_message(&message));
 
     message.fill(0);
-    let rgba =
-        unsafe { jpeg_rs_probe_default_colorspace(JCS_EXT_RGBA, message.as_mut_ptr(), message.len()) };
+    let rgba = unsafe {
+        jpeg_rs_probe_default_colorspace(JCS_EXT_RGBA, message.as_mut_ptr(), message.len())
+    };
     assert_eq!(rgba, 1, "{}", c_message(&message));
 }
 
@@ -155,7 +162,7 @@ fn stdio_and_memory_managers_roundtrip() {
 
         jpeg_stdio_dest(&mut cinfo, file);
         let dest = cinfo.dest;
-        ( (*dest).init_destination.unwrap())(&mut cinfo);
+        ((*dest).init_destination.unwrap())(&mut cinfo);
         let bytes = [1u8, 2, 3, 4];
         ptr::copy_nonoverlapping(bytes.as_ptr(), (*dest).next_output_byte, bytes.len());
         (*dest).next_output_byte = (*dest).next_output_byte.add(bytes.len());
@@ -164,7 +171,15 @@ fn stdio_and_memory_managers_roundtrip() {
 
         rewind(file);
         let mut read_back = [0u8; 4];
-        assert_eq!(fread(read_back.as_mut_ptr() as *mut c_void, 1, read_back.len(), file), 4);
+        assert_eq!(
+            fread(
+                read_back.as_mut_ptr() as *mut c_void,
+                1,
+                read_back.len(),
+                file
+            ),
+            4
+        );
         assert_eq!(read_back, bytes);
         fclose(file);
         jpeg_destroy_compress(&mut cinfo);
@@ -174,7 +189,12 @@ fn stdio_and_memory_managers_roundtrip() {
         assert!(!src_file.is_null());
         let jpeg_bytes = [0xFFu8, 0xD8, 0xFF, 0xD9];
         assert_eq!(
-            fwrite(jpeg_bytes.as_ptr() as *const c_void, 1, jpeg_bytes.len(), src_file),
+            fwrite(
+                jpeg_bytes.as_ptr() as *const c_void,
+                1,
+                jpeg_bytes.len(),
+                src_file
+            ),
             jpeg_bytes.len()
         );
         rewind(src_file);
@@ -195,12 +215,19 @@ fn stdio_and_memory_managers_roundtrip() {
         jpeg_mem_dest(&mut mem_cinfo, &mut outbuffer, &mut outsize);
         let mem_dest = mem_cinfo.dest;
         let payload = [9u8, 8, 7];
-        ptr::copy_nonoverlapping(payload.as_ptr(), (*mem_dest).next_output_byte, payload.len());
+        ptr::copy_nonoverlapping(
+            payload.as_ptr(),
+            (*mem_dest).next_output_byte,
+            payload.len(),
+        );
         (*mem_dest).next_output_byte = (*mem_dest).next_output_byte.add(payload.len());
         (*mem_dest).free_in_buffer -= payload.len();
         ((*mem_dest).term_destination.unwrap())(&mut mem_cinfo);
         assert_eq!(outsize, payload.len() as u64);
-        assert_eq!(std::slice::from_raw_parts(outbuffer, outsize as usize), payload);
+        assert_eq!(
+            std::slice::from_raw_parts(outbuffer, outsize as usize),
+            payload
+        );
         free(outbuffer as *mut c_void);
         jpeg_destroy_compress(&mut mem_cinfo);
     }
@@ -278,9 +305,15 @@ fn icc_helpers_work() {
         dinfo.marker_list = &mut marker1;
         let mut out: *mut u8 = ptr::null_mut();
         let mut outlen = 0u32;
-        assert_eq!(jpeg_read_icc_profile(&mut dinfo, &mut out, &mut outlen), TRUE);
+        assert_eq!(
+            jpeg_read_icc_profile(&mut dinfo, &mut out, &mut outlen),
+            TRUE
+        );
         assert_eq!(outlen, (part1.len() + part2.len()) as u32);
-        assert_eq!(std::slice::from_raw_parts(out, outlen as usize), b"hello world");
+        assert_eq!(
+            std::slice::from_raw_parts(out, outlen as usize),
+            b"hello world"
+        );
         free(out as *mut c_void);
     }
 }
@@ -348,7 +381,9 @@ fn try_compress_test_jpeg() -> Result<Vec<u8>, String> {
             0,
         );
         let result = if rc == -1 {
-            Err(CStr::from_ptr(tjGetErrorStr2(handle)).to_string_lossy().into_owned())
+            Err(CStr::from_ptr(tjGetErrorStr2(handle))
+                .to_string_lossy()
+                .into_owned())
         } else {
             let bytes = std::slice::from_raw_parts(jpeg_buf, jpeg_size as usize).to_vec();
             tjFree(jpeg_buf);
@@ -449,7 +484,12 @@ fn strtest_ported() {
     std::env::remove_var("TJ_ARITHMETIC");
     std::env::remove_var("TJ_RESTART");
     std::env::set_var("TJ_PROGRESSIVE", "1");
-    verify_header(1, 0, 0, Some("Requested feature was omitted at compile time"));
+    verify_header(
+        1,
+        0,
+        0,
+        Some("Requested feature was omitted at compile time"),
+    );
 
     std::env::remove_var("TJ_OPTIMIZE");
     std::env::remove_var("TJ_PROGRESSIVE");

@@ -382,7 +382,7 @@ relink_staged_libjpeg() {
   gcc -O2 -fPIC -I"$BUILD_DIR" -I"$ROOT/original" -c \
     "$SAFE_ROOT/bridge/libjpeg_compat.c" -o "$bridge_object"
   rust_staticlib="$(ensure_rust_libjpeg_staticlib)"
-  skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o"
+  skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o,jdapimin.c.o,jdapistd.c.o"
 
   output="$(shared_library_target "$libdir/libjpeg.so.8")"
   run_relink_from_link_txt \

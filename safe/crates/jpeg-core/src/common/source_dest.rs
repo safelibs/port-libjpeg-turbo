@@ -11,7 +11,7 @@ use crate::common::{error, registry};
 const INPUT_BUF_SIZE: usize = 4096;
 const OUTPUT_BUF_SIZE: usize = 4096;
 
-unsafe extern "C" {
+extern "C" {
     fn fread(ptr: *mut c_void, size: usize, nmemb: usize, stream: *mut FILE) -> usize;
     fn fwrite(ptr: *const c_void, size: usize, nmemb: usize, stream: *mut FILE) -> usize;
     fn fflush(stream: *mut FILE) -> int;

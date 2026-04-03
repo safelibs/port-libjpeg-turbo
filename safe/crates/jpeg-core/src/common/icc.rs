@@ -13,7 +13,7 @@ const MAX_BYTES_IN_MARKER: usize = 65533;
 const MAX_DATA_BYTES_IN_MARKER: usize = MAX_BYTES_IN_MARKER - ICC_OVERHEAD_LEN;
 const MAX_SEQ_NO: usize = 255;
 
-unsafe extern "C" {
+extern "C" {
     fn malloc(size: usize) -> *mut c_void;
     fn jpeg_write_m_header(cinfo: j_compress_ptr, marker: int, datalen: ::core::ffi::c_uint);
     fn jpeg_write_m_byte(cinfo: j_compress_ptr, val: int);

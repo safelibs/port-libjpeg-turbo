@@ -13,7 +13,7 @@ const MIN_SLOP: usize = 50;
 const FIRST_POOL_SLOP: [usize; JPOOL_NUMPOOLS] = [1600, 16000];
 const EXTRA_POOL_SLOP: [usize; JPOOL_NUMPOOLS] = [0, 5000];
 
-unsafe extern "C" {
+extern "C" {
     fn malloc(size: usize) -> *mut c_void;
     fn free(ptr: *mut c_void);
     fn getenv(name: *const i8) -> *const i8;

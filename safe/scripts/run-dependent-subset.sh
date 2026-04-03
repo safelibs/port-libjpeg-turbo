@@ -108,7 +108,7 @@ cp -a "$ROOT/." "$WORK_ROOT/"
 
 cd "$WORK_ROOT/safe"
 cargo build --manifest-path Cargo.toml --workspace --release >/dev/null
-bash scripts/stage-install.sh --stage-dir "$STAGE_ROOT" >/dev/null
+bash scripts/stage-install.sh --clean --stage-dir "$STAGE_ROOT" >/dev/null
 
 select_runtime='.runtime_dependents[].name'
 select_compile='.build_time_dependents[].source_package'
@@ -128,8 +128,9 @@ case "$CHECKS" in
     jq -r --arg filters "$ONLY_FILTERS" '
       ($filters | split(":") | map(select(length > 0))) as $filter_values
       | .runtime_dependents[]
-      | select(($filter_values | length) == 0 or ($filter_values | index(.name)))
-      | "  " + .name + " - " + .summary
+      | . as $dep
+      | select(($filter_values | length) == 0 or ($filter_values | index($dep.name)))
+      | "  " + $dep.name + " - " + $dep.summary
     ' "$WORK_ROOT/dependents.json"
     ;;
 esac
@@ -140,10 +141,10 @@ case "$CHECKS" in
     jq -r --arg filters "$ONLY_FILTERS" '
       ($filters | split(":") | map(select(length > 0))) as $filter_values
       | .build_time_dependents[]
-      | select(($filter_values | length) == 0 or ($filter_values | index(.source_package)))
-      | "  " + .source_package + " - " + (.binary_examples | join(", "))
+      | . as $dep
+      | select(($filter_values | length) == 0 or ($filter_values | index($dep.source_package)))
+      | "  " + $dep.source_package + " - " + ($dep.binary_examples | join(", "))
     ' "$WORK_ROOT/dependents.json"
     ;;
 esac
 CONTAINER_SCRIPT
-
