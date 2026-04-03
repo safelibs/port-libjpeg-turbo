@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
 MANIFEST="$SAFE_ROOT/scripts/original-object-groups.json"
-STAGE_DIR="$SAFE_ROOT/stage"
+STAGE_DIR="$SAFE_ROOT/target/relink-stage"
 CACHE_DIR="$SAFE_ROOT/target/original-object-cache"
 OUT_DIR="$SAFE_ROOT/target/original-relinked"
 RUN_TARGETS=0

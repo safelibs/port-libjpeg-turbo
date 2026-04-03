@@ -1374,8 +1374,14 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
                 .parent()
                 .ok_or_else(|| "safe root has no parent".to_string())?
                 .to_path_buf();
+            let build_root = new_temp_dir("stage-build")?;
+            let stage_root = new_temp_dir("stage-install")?;
             let status = Command::new("bash")
                 .arg("scripts/stage-install.sh")
+                .arg("--build-dir")
+                .arg(&build_root)
+                .arg("--stage-dir")
+                .arg(&stage_root)
                 .current_dir(&safe_root)
                 .status()
                 .map_err(|error| format!("failed to run stage-install.sh: {error}"))?;
@@ -1383,8 +1389,9 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
                 return Err(format!("stage-install.sh exited with status {status}"));
             }
 
-            let stage_bin = safe::stage_usr_root().join("bin");
-            let stage_lib = find_stage_libdir()?;
+            let stage_usr_root = stage_root.join("usr");
+            let stage_bin = stage_usr_root.join("bin");
+            let stage_lib = find_stage_libdir(&stage_usr_root)?;
             Ok(StagePaths {
                 original_testimages: repo_root.join("original/testimages"),
                 stage_bin,
@@ -1395,8 +1402,8 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
         .map_err(Clone::clone)
 }
 
-fn find_stage_libdir() -> Result<PathBuf, String> {
-    let lib_root = safe::stage_usr_root().join("lib");
+fn find_stage_libdir(stage_usr_root: &Path) -> Result<PathBuf, String> {
+    let lib_root = stage_usr_root.join("lib");
     for entry in fs::read_dir(&lib_root)
         .map_err(|error| format!("read_dir {}: {error}", lib_root.display()))?
     {
