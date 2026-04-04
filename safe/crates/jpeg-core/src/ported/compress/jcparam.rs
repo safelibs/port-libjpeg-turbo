@@ -2118,3 +2118,5 @@ pub unsafe extern "C" fn jpeg_simple_progression(mut cinfo: j_compress_ptr) {
         );
     };
 }
+
+pub const JPEG_RS_JCPARAM_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jpeg_set_defaults;

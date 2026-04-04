@@ -4459,3 +4459,37 @@ pub unsafe extern "C" fn jcopy_markers_execute(
         marker = (*marker).next;
     }
 }
+
+pub const JPEG_RS_TRANSUPP_REQUEST_WORKSPACE_LINK_ANCHOR: unsafe extern "C" fn(
+    j_decompress_ptr,
+    *mut jpeg_transform_info,
+) -> boolean = jtransform_request_workspace;
+pub const JPEG_RS_TRANSUPP_ADJUST_PARAMETERS_LINK_ANCHOR:
+    unsafe extern "C" fn(
+        j_decompress_ptr,
+        j_compress_ptr,
+        *mut jvirt_barray_ptr,
+        *mut jpeg_transform_info,
+    ) -> *mut jvirt_barray_ptr = jtransform_adjust_parameters;
+pub const JPEG_RS_TRANSUPP_EXECUTE_LINK_ANCHOR: unsafe extern "C" fn(
+    j_decompress_ptr,
+    j_compress_ptr,
+    *mut jvirt_barray_ptr,
+    *mut jpeg_transform_info,
+) = jtransform_execute_transform;
+pub const JPEG_RS_TRANSUPP_PERFECT_LINK_ANCHOR: unsafe extern "C" fn(
+    JDIMENSION,
+    JDIMENSION,
+    ::core::ffi::c_int,
+    ::core::ffi::c_int,
+    JXFORM_CODE,
+) -> boolean = jtransform_perfect_transform;
+pub const JPEG_RS_TRANSUPP_COPY_SETUP_LINK_ANCHOR: unsafe extern "C" fn(
+    j_decompress_ptr,
+    JCOPY_OPTION,
+) = jcopy_markers_setup;
+pub const JPEG_RS_TRANSUPP_COPY_EXECUTE_LINK_ANCHOR: unsafe extern "C" fn(
+    j_decompress_ptr,
+    j_compress_ptr,
+    JCOPY_OPTION,
+) = jcopy_markers_execute;

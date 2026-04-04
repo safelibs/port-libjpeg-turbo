@@ -45,35 +45,123 @@ pub const EXPECTED_COMPRESS_SYMBOLS: &[&str] = &[
     "jpeg_copy_critical_parameters",
 ];
 
-// Keep one symbol per encoder/transcode object file anchored in libjpeg-abi so
-// downstream link modes continue to resolve the shared Rust codec core without
-// needing jpegtran's generated transupp copy.
+// Anchor the full Rust compression/transcode pipeline from the ported object
+// modules themselves so downstream links keep resolving the shared codec core.
 #[used]
 static JPEG_RS_JCAPIMIN_LINK_GUARD: unsafe extern "C" fn(
     compress::jcapimin::j_compress_ptr,
     ::core::ffi::c_int,
     usize,
-) = compress::jcapimin::jpeg_CreateCompress;
+) = compress::jcapimin::JPEG_RS_JCAPIMIN_LINK_ANCHOR;
 #[used]
 static JPEG_RS_JCAPISTD_LINK_GUARD: unsafe extern "C" fn(
     compress::jcapistd::j_compress_ptr,
     compress::jcapistd::boolean,
-) = compress::jcapistd::jpeg_start_compress;
+) = compress::jcapistd::JPEG_RS_JCAPISTD_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCINIT_LINK_GUARD: unsafe extern "C" fn(compress::jcinit::j_compress_ptr) =
+    compress::jcinit::JPEG_RS_JCINIT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCMASTER_LINK_GUARD: unsafe extern "C" fn(
+    compress::jcmaster::j_compress_ptr,
+    compress::jcmaster::boolean,
+) = compress::jcmaster::JPEG_RS_JCMASTER_LINK_ANCHOR;
 #[used]
 static JPEG_RS_JCPARAM_LINK_GUARD: unsafe extern "C" fn(compress::jcparam::j_compress_ptr) =
-    compress::jcparam::jpeg_set_defaults;
+    compress::jcparam::JPEG_RS_JCPARAM_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCMAINCT_LINK_GUARD: unsafe extern "C" fn(
+    compress::jcmainct::j_compress_ptr,
+    compress::jcmainct::boolean,
+) = compress::jcmainct::JPEG_RS_JCMAINCT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCPREPCT_LINK_GUARD: unsafe extern "C" fn(
+    compress::jcprepct::j_compress_ptr,
+    compress::jcprepct::boolean,
+) = compress::jcprepct::JPEG_RS_JCPREPCT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCCOLOR_LINK_GUARD: unsafe extern "C" fn(compress::jccolor::j_compress_ptr) =
+    compress::jccolor::JPEG_RS_JCCOLOR_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCCOLEXT_LINK_GUARD: unsafe extern "C" fn(compress::jccolext::j_compress_ptr) =
+    compress::jccolext::JPEG_RS_JCCOLEXT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCSAMPLE_LINK_GUARD: unsafe extern "C" fn(compress::jcsample::j_compress_ptr) =
+    compress::jcsample::JPEG_RS_JCSAMPLE_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCDCTMGR_LINK_GUARD: unsafe extern "C" fn(compress::jcdctmgr::j_compress_ptr) =
+    compress::jcdctmgr::JPEG_RS_JCDCTMGR_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JFDCTINT_LINK_GUARD: unsafe extern "C" fn(*mut compress::jfdctint::DCTELEM) =
+    compress::jfdctint::JPEG_RS_JFDCTINT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JFDCTFST_LINK_GUARD: unsafe extern "C" fn(*mut compress::jfdctfst::DCTELEM) =
+    compress::jfdctfst::JPEG_RS_JFDCTFST_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JFDCTFLT_LINK_GUARD: unsafe extern "C" fn(*mut ::core::ffi::c_float) =
+    compress::jfdctflt::JPEG_RS_JFDCTFLT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCHUFF_LINK_GUARD: unsafe extern "C" fn(compress::jchuff::j_compress_ptr) =
+    compress::jchuff::JPEG_RS_JCHUFF_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCPHUFF_LINK_GUARD: unsafe extern "C" fn(compress::jcphuff::j_compress_ptr) =
+    compress::jcphuff::JPEG_RS_JCPHUFF_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCARITH_LINK_GUARD: unsafe extern "C" fn(compress::jcarith::j_compress_ptr) =
+    compress::jcarith::JPEG_RS_JCARITH_LINK_ANCHOR;
+#[used]
+static JPEG_RS_JCMARKER_LINK_GUARD: unsafe extern "C" fn(compress::jcmarker::j_compress_ptr) =
+    compress::jcmarker::JPEG_RS_JCMARKER_LINK_ANCHOR;
 #[used]
 static JPEG_RS_JCTRANS_LINK_GUARD: unsafe extern "C" fn(
     compress::jctrans::j_compress_ptr,
     *mut compress::jctrans::jvirt_barray_ptr,
-) = compress::jctrans::jpeg_write_coefficients;
+) = compress::jctrans::JPEG_RS_JCTRANS_LINK_ANCHOR;
 #[used]
-static JPEG_RS_TRANSUPP_LINK_GUARD: unsafe extern "C" fn(
+static JPEG_RS_JCCOEFCT_LINK_GUARD: unsafe extern "C" fn(
+    compress::jccoefct::j_compress_ptr,
+    compress::jccoefct::boolean,
+) = compress::jccoefct::JPEG_RS_JCCOEFCT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_REQUEST_WORKSPACE_LINK_GUARD: unsafe extern "C" fn(
+    transform::transupp::j_decompress_ptr,
+    *mut transform::transupp::jpeg_transform_info,
+) -> ffi_types::boolean = transform::transupp::JPEG_RS_TRANSUPP_REQUEST_WORKSPACE_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_ADJUST_PARAMETERS_LINK_GUARD:
+    unsafe extern "C" fn(
+        transform::transupp::j_decompress_ptr,
+        transform::transupp::j_compress_ptr,
+        *mut transform::transupp::jvirt_barray_ptr,
+        *mut transform::transupp::jpeg_transform_info,
+    ) -> *mut transform::transupp::jvirt_barray_ptr =
+    transform::transupp::JPEG_RS_TRANSUPP_ADJUST_PARAMETERS_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_EXECUTE_LINK_GUARD: unsafe extern "C" fn(
     transform::transupp::j_decompress_ptr,
     transform::transupp::j_compress_ptr,
     *mut transform::transupp::jvirt_barray_ptr,
     *mut transform::transupp::jpeg_transform_info,
-) = transform::transupp::jtransform_execute_transform;
+) = transform::transupp::JPEG_RS_TRANSUPP_EXECUTE_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_PERFECT_LINK_GUARD: unsafe extern "C" fn(
+    ffi_types::JDIMENSION,
+    ffi_types::JDIMENSION,
+    ::core::ffi::c_int,
+    ::core::ffi::c_int,
+    transform::transupp::JXFORM_CODE,
+) -> ffi_types::boolean = transform::transupp::JPEG_RS_TRANSUPP_PERFECT_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_COPY_SETUP_LINK_GUARD: unsafe extern "C" fn(
+    transform::transupp::j_decompress_ptr,
+    transform::transupp::JCOPY_OPTION,
+) = transform::transupp::JPEG_RS_TRANSUPP_COPY_SETUP_LINK_ANCHOR;
+#[used]
+static JPEG_RS_TRANSUPP_COPY_EXECUTE_LINK_GUARD: unsafe extern "C" fn(
+    transform::transupp::j_decompress_ptr,
+    transform::transupp::j_compress_ptr,
+    transform::transupp::JCOPY_OPTION,
+) = transform::transupp::JPEG_RS_TRANSUPP_COPY_EXECUTE_LINK_ANCHOR;
 
 #[inline]
 pub unsafe fn configure_decompress_policy(

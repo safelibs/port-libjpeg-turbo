@@ -713,3 +713,6 @@ pub unsafe extern "C" fn jpeg_write_raw_data(
     (*cinfo).next_scanline = (*cinfo).next_scanline.wrapping_add(lines_per_iMCU_row);
     return lines_per_iMCU_row;
 }
+
+pub const JPEG_RS_JCAPISTD_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, boolean) =
+    jpeg_start_compress;

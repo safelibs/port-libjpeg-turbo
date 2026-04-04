@@ -945,3 +945,6 @@ pub unsafe extern "C" fn jinit_c_prep_controller(
         }
     };
 }
+
+pub const JPEG_RS_JCPREPCT_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, boolean) =
+    jinit_c_prep_controller;

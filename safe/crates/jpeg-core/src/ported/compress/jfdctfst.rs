@@ -163,3 +163,5 @@ pub unsafe extern "C" fn jpeg_fdct_ifast(mut data: *mut DCTELEM) {
         ctr -= 1;
     }
 }
+
+pub const JPEG_RS_JFDCTFST_LINK_ANCHOR: unsafe extern "C" fn(*mut DCTELEM) = jpeg_fdct_ifast;

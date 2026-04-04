@@ -111,3 +111,6 @@ pub unsafe extern "C" fn jpeg_fdct_float(mut data: *mut ::core::ffi::c_float) {
         ctr -= 1;
     }
 }
+
+pub const JPEG_RS_JFDCTFLT_LINK_ANCHOR: unsafe extern "C" fn(*mut ::core::ffi::c_float) =
+    jpeg_fdct_float;

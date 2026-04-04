@@ -220,3 +220,5 @@ pub unsafe extern "C" fn jpeg_fdct_islow(mut data: *mut DCTELEM) {
         ctr -= 1;
     }
 }
+
+pub const JPEG_RS_JFDCTINT_LINK_ANCHOR: unsafe extern "C" fn(*mut DCTELEM) = jpeg_fdct_islow;

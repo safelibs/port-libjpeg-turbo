@@ -1753,6 +1753,8 @@ unsafe extern "C" fn rgb_ycc_convert(
         }
     };
 }
+
+pub const JPEG_RS_JCCOLOR_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_color_converter;
 unsafe extern "C" fn rgb_gray_convert(
     mut cinfo: j_compress_ptr,
     mut input_buf: JSAMPARRAY,

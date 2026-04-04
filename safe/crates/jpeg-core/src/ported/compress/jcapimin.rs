@@ -853,3 +853,9 @@ pub unsafe extern "C" fn jpeg_write_tables(mut cinfo: j_compress_ptr) {
     )
     .expect("non-null function pointer")(cinfo);
 }
+
+pub const JPEG_RS_JCAPIMIN_LINK_ANCHOR: unsafe extern "C" fn(
+    j_compress_ptr,
+    ::core::ffi::c_int,
+    usize,
+) = jpeg_CreateCompress;

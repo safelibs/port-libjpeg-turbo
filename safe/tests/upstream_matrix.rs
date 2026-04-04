@@ -11,13 +11,18 @@ use std::{
 };
 
 use ffi_types::{
-    boolean, int, j_decompress_ptr, jpeg_decompress_struct, jpeg_error_mgr, ulong, DSTATE_BUFIMAGE,
-    DSTATE_READY, DSTATE_SCANNING, DSTATE_START, FALSE, JDCT_IFAST, JDIMENSION, JPEG_HEADER_OK,
-    JPEG_LIB_VERSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED,
-    JSAMPARRAY, TRUE,
+    boolean, int, j_decompress_ptr, jpeg_compress_struct, jpeg_decompress_struct, jpeg_error_mgr,
+    jvirt_barray_ptr, ulong, CSTATE_SCANNING, CSTATE_START, CSTATE_WRCOEFS, DSTATE_BUFIMAGE,
+    DSTATE_READY, DSTATE_SCANNING, DSTATE_START, FALSE, JCS_RGB, JDCT_IFAST, JDCT_ISLOW,
+    JDIMENSION, JPEG_HEADER_OK, JPEG_LIB_VERSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS,
+    JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED, JSAMPARRAY, TRUE,
 };
 use libjpeg_abi::{
-    common_exports::EXPECTED_COMMON_SYMBOLS, decompress_exports::EXPECTED_DECOMPRESS_SYMBOLS,
+    common_exports::EXPECTED_COMMON_SYMBOLS,
+    decompress_exports::EXPECTED_DECOMPRESS_SYMBOLS,
+    transform::transupp::{
+        self, jpeg_transform_info, JCOPYOPT_COMMENTS, JCROP_POS, JXFORM_ROT_90, JXFORM_TRANSPOSE,
+    },
     EXPECTED_COMPRESS_SYMBOLS,
 };
 use libtest_mimic::{Arguments, Failed, Trial};
@@ -49,6 +54,7 @@ unsafe extern "C" {
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     fn dlclose(handle: *mut c_void) -> c_int;
     fn dlerror() -> *const c_char;
+    fn free(ptr: *mut c_void);
 }
 
 const RTLD_NOW: c_int = 2;
@@ -67,6 +73,23 @@ type JpegReadScanlinesFn =
 type JpegFinishOutputFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
 type JpegInputCompleteFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
 type JpegFinishDecompressFn = unsafe extern "C" fn(j_decompress_ptr) -> boolean;
+type JpegCreateCompressFn = unsafe extern "C" fn(*mut jpeg_compress_struct, int, usize);
+type JpegDestroyCompressFn = unsafe extern "C" fn(*mut jpeg_compress_struct);
+type JpegMemDestFn = unsafe extern "C" fn(*mut jpeg_compress_struct, *mut *mut u8, *mut ulong);
+type JpegSetDefaultsFn = unsafe extern "C" fn(*mut jpeg_compress_struct);
+type JpegSetColorspaceFn =
+    unsafe extern "C" fn(*mut jpeg_compress_struct, ffi_types::J_COLOR_SPACE);
+type JpegStartCompressFn = unsafe extern "C" fn(*mut jpeg_compress_struct, boolean);
+type JpegWriteScanlinesFn =
+    unsafe extern "C" fn(*mut jpeg_compress_struct, JSAMPARRAY, JDIMENSION) -> JDIMENSION;
+type JpegFinishCompressFn = unsafe extern "C" fn(*mut jpeg_compress_struct);
+type JpegWriteIccProfileFn =
+    unsafe extern "C" fn(*mut jpeg_compress_struct, *const u8, ::core::ffi::c_uint);
+type JpegReadCoefficientsFn = unsafe extern "C" fn(j_decompress_ptr) -> *mut jvirt_barray_ptr;
+type JpegCopyCriticalParametersFn =
+    unsafe extern "C" fn(j_decompress_ptr, *mut jpeg_compress_struct);
+type JpegWriteCoefficientsFn =
+    unsafe extern "C" fn(*mut jpeg_compress_struct, *mut jvirt_barray_ptr);
 
 struct LoadedLibjpeg {
     handle: *mut c_void,
@@ -1133,6 +1156,16 @@ fn encode_transcode_cases() -> Vec<MatrixCase> {
             runner: Some(run_encode_transcode_symbol_surface_case),
         },
         MatrixCase {
+            name: "encode-transcode-libjpeg-api-rgb-islow",
+            commands: Vec::new(),
+            runner: Some(run_encode_transcode_api_rgb_islow_case),
+        },
+        MatrixCase {
+            name: "encode-transcode-libjpeg-api-transform-crop",
+            commands: Vec::new(),
+            runner: Some(run_encode_transcode_api_transform_crop_case),
+        },
+        MatrixCase {
             name: "encode-transcode-cjpeg-rgb-islow",
             commands: vec![cmd(
                 "cjpeg",
@@ -1645,6 +1678,19 @@ fn ppm_md5(image: &PpmImage) -> String {
     format!("{:x}", md5::compute(bytes))
 }
 
+fn md5_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", md5::compute(bytes))
+}
+
+unsafe fn take_output_buffer(outbuffer: *mut u8, outsize: ulong) -> Result<Vec<u8>, String> {
+    if outbuffer.is_null() {
+        return Err("jpeg_mem_dest returned a null output buffer".to_string());
+    }
+    let bytes = std::slice::from_raw_parts(outbuffer, outsize as usize).to_vec();
+    free(outbuffer.cast());
+    Ok(bytes)
+}
+
 fn run_sequential_api_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
     let jpeg_path = temp_dir.join("sequential_api_422_ifast.jpg");
 
@@ -2112,6 +2158,319 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
     }
 
     Ok(())
+}
+
+fn run_encode_transcode_api_rgb_islow_case(
+    stage: &StagePaths,
+    _temp_dir: &Path,
+) -> Result<(), String> {
+    let ppm = read_ppm(&stage.original_testimages.join("testorig.ppm"))?;
+    let icc = fs::read(stage.original_testimages.join("test1.icc")).map_err(|error| {
+        format!(
+            "read {}: {error}",
+            stage.original_testimages.join("test1.icc").display()
+        )
+    })?;
+    let jpeg = encode_rgb_islow_via_abi(stage, &ppm, &icc)?;
+    let digest = md5_bytes(&jpeg);
+    if digest != "1d44a406f61da743b5fd31c0a9abdca3" {
+        return Err(format!(
+            "libjpeg ABI rgb/islow md5 mismatch: expected 1d44a406f61da743b5fd31c0a9abdca3, got {digest}"
+        ));
+    }
+    Ok(())
+}
+
+fn encode_rgb_islow_via_abi(
+    stage: &StagePaths,
+    ppm: &PpmImage,
+    icc_profile: &[u8],
+) -> Result<Vec<u8>, String> {
+    unsafe {
+        if ppm.maxval != 255 {
+            return Err(format!("unsupported PPM maxval {}", ppm.maxval));
+        }
+
+        let libjpeg = LoadedLibjpeg::open(&stage.stage_lib.join("libjpeg.so.8"))?;
+        let jpeg_create_compress: JpegCreateCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_CreateCompress\0")?;
+        let jpeg_destroy_compress: JpegDestroyCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_destroy_compress\0")?;
+        let jpeg_mem_dest: JpegMemDestFn = load_symbol(libjpeg.handle, b"jpeg_mem_dest\0")?;
+        let jpeg_set_defaults: JpegSetDefaultsFn =
+            load_symbol(libjpeg.handle, b"jpeg_set_defaults\0")?;
+        let jpeg_set_colorspace: JpegSetColorspaceFn =
+            load_symbol(libjpeg.handle, b"jpeg_set_colorspace\0")?;
+        let jpeg_start_compress: JpegStartCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_start_compress\0")?;
+        let jpeg_write_scanlines: JpegWriteScanlinesFn =
+            load_symbol(libjpeg.handle, b"jpeg_write_scanlines\0")?;
+        let jpeg_finish_compress: JpegFinishCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_finish_compress\0")?;
+        let jpeg_write_icc_profile: JpegWriteIccProfileFn =
+            load_symbol(libjpeg.handle, b"jpeg_write_icc_profile\0")?;
+
+        let mut cinfo = MaybeUninit::<jpeg_compress_struct>::zeroed().assume_init();
+        let mut err = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
+        let mut outbuffer: *mut u8 = std::ptr::null_mut();
+        let mut outsize: ulong = 0;
+
+        cinfo.err = (libjpeg.jpeg_std_error)(&mut err);
+        jpeg_create_compress(
+            &mut cinfo,
+            JPEG_LIB_VERSION,
+            std::mem::size_of::<jpeg_compress_struct>(),
+        );
+
+        let result = (|| -> Result<Vec<u8>, String> {
+            let row_stride = ppm
+                .width
+                .checked_mul(3)
+                .ok_or_else(|| "encode row stride overflow".to_string())?;
+
+            jpeg_mem_dest(&mut cinfo, &mut outbuffer, &mut outsize);
+            if cinfo.global_state != CSTATE_START {
+                return Err(format!(
+                    "jpeg_CreateCompress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+
+            cinfo.image_width = ppm.width as JDIMENSION;
+            cinfo.image_height = ppm.height as JDIMENSION;
+            cinfo.input_components = 3;
+            cinfo.in_color_space = JCS_RGB;
+
+            jpeg_set_defaults(&mut cinfo);
+            jpeg_set_colorspace(&mut cinfo, JCS_RGB);
+            cinfo.dct_method = JDCT_ISLOW;
+
+            jpeg_start_compress(&mut cinfo, TRUE);
+            if cinfo.global_state != CSTATE_SCANNING {
+                return Err(format!(
+                    "jpeg_start_compress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+
+            jpeg_write_icc_profile(
+                &mut cinfo,
+                icc_profile.as_ptr(),
+                icc_profile.len() as ::core::ffi::c_uint,
+            );
+
+            while cinfo.next_scanline < cinfo.image_height {
+                let offset = row_stride
+                    .checked_mul(cinfo.next_scanline as usize)
+                    .ok_or_else(|| "encode output offset overflow".to_string())?;
+                let mut row = [ppm.data.as_ptr().add(offset) as *mut u8];
+                let written = jpeg_write_scanlines(&mut cinfo, row.as_mut_ptr(), 1);
+                if written != 1 {
+                    return Err(format!(
+                        "jpeg_write_scanlines wrote {written} row(s) at scanline {}",
+                        cinfo.next_scanline
+                    ));
+                }
+            }
+
+            jpeg_finish_compress(&mut cinfo);
+            if cinfo.global_state != CSTATE_START {
+                return Err(format!(
+                    "jpeg_finish_compress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+
+            let bytes = take_output_buffer(outbuffer, outsize)?;
+            outbuffer = std::ptr::null_mut();
+            Ok(bytes)
+        })();
+
+        if !outbuffer.is_null() {
+            free(outbuffer.cast());
+        }
+        jpeg_destroy_compress(&mut cinfo);
+        result
+    }
+}
+
+fn run_encode_transcode_api_transform_crop_case(
+    stage: &StagePaths,
+    _temp_dir: &Path,
+) -> Result<(), String> {
+    let jpeg_bytes = fs::read(stage.original_testimages.join("testorig.jpg")).map_err(|error| {
+        format!(
+            "read {}: {error}",
+            stage.original_testimages.join("testorig.jpg").display()
+        )
+    })?;
+    let jpeg = transcode_crop_transpose_via_abi(stage, &jpeg_bytes)?;
+    let digest = md5_bytes(&jpeg);
+    if digest != "b4197f377e621c4e9b1d20471432610d" {
+        return Err(format!(
+            "libjpeg ABI transform md5 mismatch: expected b4197f377e621c4e9b1d20471432610d, got {digest}"
+        ));
+    }
+    Ok(())
+}
+
+fn transcode_crop_transpose_via_abi(
+    stage: &StagePaths,
+    jpeg_bytes: &[u8],
+) -> Result<Vec<u8>, String> {
+    unsafe {
+        let libjpeg = LoadedLibjpeg::open(&stage.stage_lib.join("libjpeg.so.8"))?;
+        let jpeg_create_compress: JpegCreateCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_CreateCompress\0")?;
+        let jpeg_destroy_compress: JpegDestroyCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_destroy_compress\0")?;
+        let jpeg_mem_dest: JpegMemDestFn = load_symbol(libjpeg.handle, b"jpeg_mem_dest\0")?;
+        let jpeg_read_coefficients: JpegReadCoefficientsFn =
+            load_symbol(libjpeg.handle, b"jpeg_read_coefficients\0")?;
+        let jpeg_copy_critical_parameters: JpegCopyCriticalParametersFn =
+            load_symbol(libjpeg.handle, b"jpeg_copy_critical_parameters\0")?;
+        let jpeg_write_coefficients: JpegWriteCoefficientsFn =
+            load_symbol(libjpeg.handle, b"jpeg_write_coefficients\0")?;
+        let jpeg_finish_compress: JpegFinishCompressFn =
+            load_symbol(libjpeg.handle, b"jpeg_finish_compress\0")?;
+
+        let mut srcinfo = MaybeUninit::<jpeg_decompress_struct>::zeroed().assume_init();
+        let mut srcerr = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
+        let mut dstinfo = MaybeUninit::<jpeg_compress_struct>::zeroed().assume_init();
+        let mut dsterr = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
+        let mut outbuffer: *mut u8 = std::ptr::null_mut();
+        let mut outsize: ulong = 0;
+
+        srcinfo.err = (libjpeg.jpeg_std_error)(&mut srcerr);
+        (libjpeg.jpeg_create_decompress)(
+            &mut srcinfo,
+            JPEG_LIB_VERSION,
+            std::mem::size_of::<jpeg_decompress_struct>(),
+        );
+        dstinfo.err = (libjpeg.jpeg_std_error)(&mut dsterr);
+        jpeg_create_compress(
+            &mut dstinfo,
+            JPEG_LIB_VERSION,
+            std::mem::size_of::<jpeg_compress_struct>(),
+        );
+
+        let result = (|| -> Result<Vec<u8>, String> {
+            (libjpeg.jpeg_mem_src)(&mut srcinfo, jpeg_bytes.as_ptr(), jpeg_bytes.len() as _);
+            transupp::jcopy_markers_setup(
+                &mut srcinfo as *mut _ as transupp::j_decompress_ptr,
+                JCOPYOPT_COMMENTS,
+            );
+            let header_status = (libjpeg.jpeg_read_header)(&mut srcinfo, TRUE);
+            if header_status != JPEG_HEADER_OK {
+                return Err(format!(
+                    "jpeg_read_header returned unexpected status {header_status}"
+                ));
+            }
+
+            if transupp::jtransform_perfect_transform(17, 17, 16, 16, JXFORM_ROT_90) != FALSE {
+                return Err("jtransform_perfect_transform accepted an imperfect rotate".into());
+            }
+            if transupp::jtransform_perfect_transform(32, 32, 16, 16, JXFORM_ROT_90) == FALSE {
+                return Err("jtransform_perfect_transform rejected a perfect rotate".into());
+            }
+
+            let mut transform = MaybeUninit::<jpeg_transform_info>::zeroed().assume_init();
+            transform.transform = JXFORM_TRANSPOSE;
+            transform.perfect = TRUE;
+            transform.crop = TRUE;
+            transform.crop_width = 120;
+            transform.crop_width_set = JCROP_POS;
+            transform.crop_height = 90;
+            transform.crop_height_set = JCROP_POS;
+            transform.crop_xoffset = 20;
+            transform.crop_xoffset_set = JCROP_POS;
+            transform.crop_yoffset = 50;
+            transform.crop_yoffset_set = JCROP_POS;
+
+            if transupp::jtransform_request_workspace(
+                &mut srcinfo as *mut _ as transupp::j_decompress_ptr,
+                &mut transform,
+            ) == 0
+            {
+                return Err("jtransform_request_workspace rejected a valid transpose crop".into());
+            }
+
+            let src_coef_arrays = jpeg_read_coefficients(&mut srcinfo);
+            if src_coef_arrays.is_null() {
+                return Err("jpeg_read_coefficients returned null".into());
+            }
+
+            jpeg_copy_critical_parameters(&mut srcinfo, &mut dstinfo);
+            let dst_coef_arrays = transupp::jtransform_adjust_parameters(
+                &mut srcinfo as *mut _ as transupp::j_decompress_ptr,
+                &mut dstinfo as *mut _ as transupp::j_compress_ptr,
+                src_coef_arrays as *mut transupp::jvirt_barray_ptr,
+                &mut transform,
+            );
+            if dst_coef_arrays.is_null() {
+                return Err("jtransform_adjust_parameters returned null".into());
+            }
+            if transform.output_width != 124 || transform.output_height != 92 {
+                return Err(format!(
+                    "unexpected transform output dimensions {}x{}",
+                    transform.output_width, transform.output_height
+                ));
+            }
+
+            jpeg_mem_dest(&mut dstinfo, &mut outbuffer, &mut outsize);
+            if dstinfo.global_state != CSTATE_START {
+                return Err(format!(
+                    "jpeg_copy_critical_parameters left unexpected dst state {}",
+                    dstinfo.global_state
+                ));
+            }
+
+            jpeg_write_coefficients(
+                &mut dstinfo,
+                dst_coef_arrays as *mut ffi_types::jvirt_barray_ptr,
+            );
+            if dstinfo.global_state != CSTATE_WRCOEFS {
+                return Err(format!(
+                    "jpeg_write_coefficients left unexpected dst state {}",
+                    dstinfo.global_state
+                ));
+            }
+
+            transupp::jcopy_markers_execute(
+                &mut srcinfo as *mut _ as transupp::j_decompress_ptr,
+                &mut dstinfo as *mut _ as transupp::j_compress_ptr,
+                JCOPYOPT_COMMENTS,
+            );
+            transupp::jtransform_execute_transform(
+                &mut srcinfo as *mut _ as transupp::j_decompress_ptr,
+                &mut dstinfo as *mut _ as transupp::j_compress_ptr,
+                src_coef_arrays as *mut transupp::jvirt_barray_ptr,
+                &mut transform,
+            );
+
+            jpeg_finish_compress(&mut dstinfo);
+            if dstinfo.global_state != CSTATE_START {
+                return Err(format!(
+                    "jpeg_finish_compress left unexpected dst state {}",
+                    dstinfo.global_state
+                ));
+            }
+            if (libjpeg.jpeg_finish_decompress)(&mut srcinfo) == 0 {
+                return Err("jpeg_finish_decompress suspended unexpectedly".into());
+            }
+
+            let bytes = take_output_buffer(outbuffer, outsize)?;
+            outbuffer = std::ptr::null_mut();
+            Ok(bytes)
+        })();
+
+        if !outbuffer.is_null() {
+            free(outbuffer.cast());
+        }
+        jpeg_destroy_compress(&mut dstinfo);
+        (libjpeg.jpeg_destroy_decompress)(&mut srcinfo);
+        result
+    }
 }
 
 fn run_encode_transcode_symbol_surface_case(

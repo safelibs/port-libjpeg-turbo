@@ -1178,3 +1178,5 @@ pub unsafe extern "C" fn jinit_downsampler(mut cinfo: j_compress_ptr) {
         .expect("non-null function pointer")(cinfo as j_common_ptr, 0 as ::core::ffi::c_int);
     }
 }
+
+pub const JPEG_RS_JCSAMPLE_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_downsampler;

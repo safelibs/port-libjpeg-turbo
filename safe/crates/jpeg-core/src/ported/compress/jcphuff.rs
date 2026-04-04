@@ -67039,3 +67039,5 @@ pub unsafe extern "C" fn jinit_phuff_encoder(mut cinfo: j_compress_ptr) {
     (*entropy).bit_buffer = ::core::ptr::null_mut::<::core::ffi::c_char>();
 }
 pub const __CHAR_BIT__: ::core::ffi::c_int = 8 as ::core::ffi::c_int;
+
+pub const JPEG_RS_JCPHUFF_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_phuff_encoder;

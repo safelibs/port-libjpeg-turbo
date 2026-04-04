@@ -448,3 +448,5 @@ pub unsafe extern "C" fn jinit_compress_master(mut cinfo: j_compress_ptr) {
     )
     .expect("non-null function pointer")(cinfo);
 }
+
+pub const JPEG_RS_JCINIT_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_compress_master;

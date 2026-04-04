@@ -1388,3 +1388,5 @@ pub unsafe extern "C" fn jinit_forward_dct(mut cinfo: j_compress_ptr) {
         i += 1;
     }
 }
+
+pub const JPEG_RS_JCDCTMGR_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_forward_dct;

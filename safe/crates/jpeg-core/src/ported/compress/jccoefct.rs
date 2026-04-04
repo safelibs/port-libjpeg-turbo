@@ -1018,3 +1018,6 @@ pub unsafe extern "C" fn jinit_c_coef_controller(
             ::core::ptr::null_mut::<jvirt_barray_control>();
     };
 }
+
+pub const JPEG_RS_JCCOEFCT_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, boolean) =
+    jinit_c_coef_controller;

@@ -1607,3 +1607,5 @@ pub unsafe extern "C" fn jinit_arith_encoder(mut cinfo: j_compress_ptr) {
     }
     (*entropy).fixed_bin[0 as ::core::ffi::c_int as usize] = 113 as ::core::ffi::c_uchar;
 }
+
+pub const JPEG_RS_JCARITH_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_arith_encoder;

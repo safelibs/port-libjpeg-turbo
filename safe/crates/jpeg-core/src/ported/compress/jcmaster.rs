@@ -1354,3 +1354,6 @@ pub unsafe extern "C" fn jinit_c_master_control(
     (*master).jpeg_version = b"libjpeg-turbo version 2.1.5 (build 20260403)\0" as *const u8
         as *const ::core::ffi::c_char;
 }
+
+pub const JPEG_RS_JCMASTER_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, boolean) =
+    jinit_c_master_control;

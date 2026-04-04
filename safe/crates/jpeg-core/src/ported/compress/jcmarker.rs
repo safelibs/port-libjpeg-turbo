@@ -1127,3 +1127,5 @@ pub unsafe extern "C" fn jinit_marker_writer(mut cinfo: j_compress_ptr) {
             as Option<unsafe extern "C" fn(j_compress_ptr, ::core::ffi::c_int) -> ()>;
     (*marker).last_restart_interval = 0 as ::core::ffi::c_uint;
 }
+
+pub const JPEG_RS_JCMARKER_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr) = jinit_marker_writer;

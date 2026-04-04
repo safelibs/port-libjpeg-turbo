@@ -1194,3 +1194,6 @@ unsafe extern "C" fn transencode_coef_controller(
         i += 1;
     }
 }
+
+pub const JPEG_RS_JCTRANS_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, *mut jvirt_barray_ptr) =
+    jpeg_write_coefficients;

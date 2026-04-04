@@ -7,8 +7,7 @@ pub struct jvirt_sarray_control {
     _unused: [u8; 0],
 }
 
-extern "C" {
-}
+extern "C" {}
 pub type size_t = usize;
 pub type JSAMPLE = ::core::ffi::c_uchar;
 pub type JCOEF = ::core::ffi::c_short;
@@ -678,3 +677,6 @@ pub unsafe extern "C" fn jinit_c_main_controller(
         }
     };
 }
+
+pub const JPEG_RS_JCMAINCT_LINK_ANCHOR: unsafe extern "C" fn(j_compress_ptr, boolean) =
+    jinit_c_main_controller;
