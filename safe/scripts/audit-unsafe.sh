@@ -74,25 +74,139 @@ if [[ -n "$obsolete_c_frontend_refs" ]]; then
   die "obsolete C frontend references remain in the committed tree"
 fi
 
-unsafe_report="$(mktemp)"
-trap 'rm -f "$unsafe_report"' EXIT
+matches_any_pattern() {
+  local file="$1"
+  shift
+  local pattern
 
-rg -n -o '\bunsafe\b' "$SAFE_ROOT/crates" "$SAFE_ROOT/tests" \
-  | awk -F: '{ count[$1] += 1 } END { for (file in count) printf "%5d %s\n", count[file], file }' \
-  | sort -nr >"$unsafe_report"
+  for pattern in "$@"; do
+    if [[ "$file" =~ $pattern ]]; then
+      return 0
+    fi
+  done
 
-printf 'Unsafe footprint by file:\n'
-cat "$unsafe_report"
+  return 1
+}
 
-unexpected_files="$(
-  rg --files-with-matches '\bunsafe\b' "$SAFE_ROOT/crates" "$SAFE_ROOT/tests" \
-    | sort \
-    | grep -Ev '^'"$SAFE_ROOT"'/crates/(ffi-types|jpeg-core|libjpeg-abi|libturbojpeg-abi)/|^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/|^'"$SAFE_ROOT"'/tests/(compat_smoke|cve_regressions|turbojpeg_suite|upstream_matrix)\.rs$' \
-    || true
+collect_unexpected_files() {
+  local -a allowed_patterns=("$@")
+  local -a unexpected=()
+  local file
+
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    if ! matches_any_pattern "$file" "${allowed_patterns[@]}"; then
+      unexpected+=("$file")
+    fi
+  done
+
+  printf '%s\n' "${unexpected[@]}"
+}
+
+category_match_count() {
+  local pattern="$1"
+  local matches_file="$2"
+
+  awk -F: '{ print $1 }' "$matches_file" | grep -Ec "$pattern" || true
+}
+
+category_file_count() {
+  local pattern="$1"
+  local matches_file="$2"
+
+  (awk -F: '{ print $1 }' "$matches_file" | grep -E "$pattern" | sort -u | wc -l) || true
+}
+
+print_category_summary() {
+  local title="$1"
+  local matches_file="$2"
+  shift 2
+
+  printf '%s\n' "$title"
+
+  while (($#)); do
+    local label="$1"
+    local pattern="$2"
+    shift 2
+
+    local marker_count
+    local file_count
+    marker_count="$(category_match_count "$pattern" "$matches_file")"
+    file_count="$(category_file_count "$pattern" "$matches_file")"
+    printf '  - %s: %s markers across %s files\n' "$label" "$marker_count" "$file_count"
+  done
+}
+
+declare -a reviewed_unsafe_operation_patterns=(
+  '^'"$SAFE_ROOT"'/crates/ffi-types/src/lib\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/common/(error|icc|memory|registry|source_dest|utils)\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/compress/(jcapimin|jcapistd|jcarith|jccoefct|jccolor|jcdctmgr|jchuff|jcinit|jcmainct|jcmarker|jcmaster|jcparam|jcphuff|jcprepct|jcsample|jctrans|jfdctflt|jfdctfst|jfdctint)\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/decompress/(jdapimin|jdapistd|jdarith|jdcoefct|jdcolor|jddctmgr|jdhuff|jdinput|jdmainct|jdmarker|jdmaster|jdmerge|jdphuff|jdpostct|jdsample|jdtrans|jidctflt|jidctfst|jidctint|jidctred|jquant1|jquant2)\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/decompress/generated/[^/]+_translated\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/transform/transupp\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/turbojpeg/turbojpeg\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/[^/]+\.rs$'
+  '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none)\.rs$'
+  '^'"$SAFE_ROOT"'/crates/libturbojpeg-abi/src/generated/[^/]+\.rs$'
+  '^'"$SAFE_ROOT"'/tests/(compat_smoke|cve_regressions|turbojpeg_suite|upstream_matrix)\.rs$'
+)
+
+declare -a reviewed_unsafe_extern_block_patterns=(
+  '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/lib\.rs$'
+  '^'"$SAFE_ROOT"'/tests/(compat_smoke|turbojpeg_suite|upstream_matrix)\.rs$'
+)
+
+unsafe_operation_matches="$(mktemp)"
+unsafe_extern_block_matches="$(mktemp)"
+trap 'rm -f "$unsafe_operation_matches" "$unsafe_extern_block_matches"' EXIT
+
+rg -n -o \
+  -e 'unsafe\s*\{' \
+  -e '^\s*(pub\s+)?unsafe\s+(extern\s+"C"\s+)?fn' \
+  "$SAFE_ROOT/crates" "$SAFE_ROOT/tests" \
+  | sort >"$unsafe_operation_matches"
+
+rg -n -o \
+  -e '^\s*unsafe\s+extern\s+"C"\s*\{' \
+  "$SAFE_ROOT/crates" "$SAFE_ROOT/tests" \
+  | sort >"$unsafe_extern_block_matches"
+
+printf 'Executable unsafe excludes callback type signatures such as Option<unsafe extern "C" fn>.\n'
+
+print_category_summary \
+  'Unsafe function/block boundary summary:' \
+  "$unsafe_operation_matches" \
+  'ffi-types ABI declarations' '^'"$SAFE_ROOT"'/crates/ffi-types/src/lib\.rs$' \
+  'jpeg-core raw-pointer runtime support' '^'"$SAFE_ROOT"'/crates/jpeg-core/src/common/' \
+  'jpeg-core ported codec kernels' '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/' \
+  'libjpeg ABI exports and jsimd fallback hooks' '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none)\.rs$' \
+  'TurboJPEG/JNI frontend translations' '^'"$SAFE_ROOT"'/crates/libturbojpeg-abi/src/generated/' \
+  'CLI frontend translations' '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/' \
+  'integration-test harnesses' '^'"$SAFE_ROOT"'/tests/'
+
+print_category_summary \
+  'Unsafe extern block summary:' \
+  "$unsafe_extern_block_matches" \
+  'libjpeg native link declaration' '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/lib\.rs$' \
+  'integration-test extern bindings' '^'"$SAFE_ROOT"'/tests/'
+
+unsafe_operation_files="$(awk -F: '{ print $1 }' "$unsafe_operation_matches" | sort -u)"
+unexpected_operation_files="$(
+  collect_unexpected_files "${reviewed_unsafe_operation_patterns[@]}" <<< "$unsafe_operation_files"
 )"
 
-if [[ -n "$unexpected_files" ]]; then
-  printf '\nUnexpected unsafe outside the reviewed ABI/core boundary:\n%s\n' "$unexpected_files" >&2
+if [[ -n "$unexpected_operation_files" ]]; then
+  printf '\nUnexpected unsafe function/block files outside the reviewed boundary:\n%s\n' "$unexpected_operation_files" >&2
+  exit 1
+fi
+
+unsafe_extern_block_files="$(awk -F: '{ print $1 }' "$unsafe_extern_block_matches" | sort -u)"
+unexpected_extern_block_files="$(
+  collect_unexpected_files "${reviewed_unsafe_extern_block_patterns[@]}" <<< "$unsafe_extern_block_files"
+)"
+
+if [[ -n "$unexpected_extern_block_files" ]]; then
+  printf '\nUnexpected unsafe extern blocks outside the reviewed boundary:\n%s\n' "$unexpected_extern_block_files" >&2
   exit 1
 fi
 
