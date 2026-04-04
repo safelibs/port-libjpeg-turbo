@@ -60,6 +60,29 @@ clear_dir() {
   mkdir -p "$path"
 }
 
+fresh_writable_dir() {
+  local preferred="$1"
+  local label="$2"
+  local parent fallback
+
+  parent="$(dirname "$preferred")"
+  mkdir -p "$parent"
+
+  if rm -rf "$preferred" 2>/dev/null; then
+    mkdir -p "$preferred" || die "unable to create $label directory at $preferred"
+    if [[ -d "$preferred" && -w "$preferred" ]]; then
+      printf '%s\n' "$preferred"
+      return 0
+    fi
+  fi
+
+  fallback="$(mktemp -d "$parent/$(basename "$preferred").tmp.XXXXXX")" \
+    || die "unable to create fallback $label directory under $parent"
+  printf 'warning: using %s for %s because %s is not removable by uid %s\n' \
+    "$fallback" "$label" "$preferred" "$(id -u)" >&2
+  printf '%s\n' "$fallback"
+}
+
 while (($#)); do
   case "$1" in
     --build-dir)
@@ -138,7 +161,8 @@ prepare_java_tool_wrappers() {
   java_bin="$(java_bin_path)"
   [[ -n "$java_bin" ]] || return 0
 
-  rm -rf "$JAVA_TOOL_ROOT"
+  JAVA_TOOL_ROOT="$(fresh_writable_dir "$JAVA_TOOL_ROOT" "Java tool wrappers")"
+  JAVA_TOOL_BIN_DIR="$JAVA_TOOL_ROOT/bin"
   mkdir -p "$JAVA_TOOL_BIN_DIR"
 
   if ! command -v javac >/dev/null 2>&1 && java_module_tool_available jdk.compiler/com.sun.tools.javac.Main; then
@@ -199,7 +223,8 @@ reexec_stage_install_in_docker() {
 
   uid="$(id -u)"
   gid="$(id -g)"
-  mkdir -p "$docker_home" "$STAGE_DIR"
+  docker_home="$(fresh_writable_dir "$docker_home" "Docker home")"
+  mkdir -p "$STAGE_DIR"
   root_real="$(readlink -f "$ROOT")"
   stage_real="$(readlink -f "$STAGE_DIR")"
 
@@ -677,7 +702,7 @@ build_java_jar() {
 if ((CLEAN)); then
   clear_dir "$STAGE_DIR"
   clear_dir "$TMP_RENDER_ROOT"
-  rm -rf "$JAVA_TOOL_ROOT"
+  rm -rf "$JAVA_TOOL_ROOT" 2>/dev/null || true
 fi
 
 [[ -d "$ROOT/original" ]] || die "missing original source tree"
