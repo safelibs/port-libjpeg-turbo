@@ -14,7 +14,7 @@ if(NOT TARGET turbojpeg)
   set_target_properties(turbojpeg PROPERTIES
     IMPORTED_LOCATION "${_libjpeg_turbo_prefix}/lib/x86_64-linux-gnu/libturbojpeg.so"
     IMPORTED_SONAME "libturbojpeg.so.0"
+    INTERFACE_LINK_LIBRARIES "jpeg"
     INTERFACE_INCLUDE_DIRECTORIES "${_libjpeg_turbo_prefix}/include;${_libjpeg_turbo_prefix}/include/x86_64-linux-gnu"
   )
 endif()
-

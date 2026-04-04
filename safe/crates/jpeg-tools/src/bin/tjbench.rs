@@ -1,3 +1,11 @@
+#[allow(warnings, clippy::all)]
+mod generated {
+    #[path = "../../generated/tjbench.rs"]
+    pub mod tjbench;
+}
+
 fn main() {
-    jpeg_tools::staged_tool_only("tjbench");
+    let _ = libjpeg_abi::common_exports::jpeg_std_error as *const ();
+    let _ = libturbojpeg_abi::generated::turbojpeg::tjInitCompress as *const ();
+    generated::tjbench::main();
 }

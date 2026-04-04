@@ -1,3 +1,9 @@
+#[allow(warnings, clippy::all)]
+mod generated {
+    #[path = "../../generated/rdjpgcom.rs"]
+    pub mod rdjpgcom;
+}
+
 fn main() {
-    jpeg_tools::staged_tool_only("rdjpgcom");
+    generated::rdjpgcom::main();
 }

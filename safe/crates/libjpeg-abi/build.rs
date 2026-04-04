@@ -9,10 +9,7 @@ fn main() {
     let generated_multiarch = generated_include.join(&multiarch);
     std::fs::create_dir_all(&generated_multiarch).unwrap();
     write_generated_headers(&generated_include, &generated_multiarch);
-    let shim_sources = [
-        ("error_bridge.c", "error_bridge.o"),
-        ("jsimd_none.c", "jsimd_none.o"),
-    ];
+    let shim_sources = [("error_bridge.c", "error_bridge.o")];
     let shim_archive = out_dir.join("liberror_bridge.a");
 
     let mut objects = Vec::new();
@@ -48,7 +45,6 @@ fn main() {
         "../../scripts/stage-install.sh",
         "../../scripts/check-symbols.sh",
         "../../c_shim/error_bridge.c",
-        "../../c_shim/jsimd_none.c",
         "../../../original/debian/libjpeg-turbo8.symbols",
     ] {
         println!("cargo:rerun-if-changed={path}");

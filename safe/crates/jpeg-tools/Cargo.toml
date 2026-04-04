@@ -7,3 +7,7 @@ build = "build.rs"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+libjpeg-abi = { path = "../libjpeg-abi" }
+libturbojpeg-abi = { path = "../libturbojpeg-abi" }

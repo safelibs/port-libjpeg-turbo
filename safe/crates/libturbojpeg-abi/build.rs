@@ -2,7 +2,7 @@ fn main() {
     for path in [
         "Cargo.toml",
         "src/lib.rs",
-        "../jpeg-core/src/ported/turbojpeg/turbojpeg.rs",
+        "src/generated",
         "../../scripts/stage-install.sh",
         "../../link/turbojpeg-mapfile.jni",
         "../../debian/libturbojpeg.symbols",

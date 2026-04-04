@@ -7,4 +7,5 @@ Name: libturbojpeg
 Description: A SIMD-accelerated JPEG codec that provides the TurboJPEG API
 Version: @VERSION@
 Libs: -L${libdir} -lturbojpeg
+Libs.private: -ljpeg
 Cflags: -I${includedir}

@@ -37,12 +37,41 @@ if [[ -e "$SAFE_ROOT/bridge/libjpeg_compat.c" ]]; then
   die "temporary libjpeg compatibility bridge source still exists"
 fi
 
+for obsolete_dir in \
+  "$SAFE_ROOT/c_shim/tools" \
+  "$SAFE_ROOT/c_shim/turbojpeg"
+do
+  if find "$obsolete_dir" -type f -print -quit 2>/dev/null | grep -q .; then
+    die "obsolete staged C frontend sources still exist under $obsolete_dir"
+  fi
+done
+
+if [[ -e "$SAFE_ROOT/c_shim/jsimd_none.c" ]]; then
+  die "obsolete jsimd_none.c C shim still exists"
+fi
+
 if rg -n 'bridge/libjpeg_compat\.c|libjpeg_compat\.c' \
   "$SAFE_ROOT/build.rs" \
   "$SAFE_ROOT/crates" \
   "$SAFE_ROOT/scripts/stage-install.sh" \
   "$SAFE_ROOT/README.md"; then
   die "temporary libjpeg compatibility bridge is still referenced"
+fi
+
+obsolete_c_frontend_refs="$(
+  rg -n 'c_shim/(tools|turbojpeg)/|c_shim/jsimd_none\.c' \
+    "$SAFE_ROOT/build.rs" \
+    "$SAFE_ROOT/crates" \
+    "$SAFE_ROOT/scripts" \
+    "$SAFE_ROOT/tests" \
+    "$SAFE_ROOT/README.md" \
+    | grep -Fv "$SAFE_ROOT/scripts/audit-unsafe.sh:" \
+    || true
+)"
+
+if [[ -n "$obsolete_c_frontend_refs" ]]; then
+  printf '%s\n' "$obsolete_c_frontend_refs" >&2
+  die "obsolete C frontend references remain in the committed tree"
 fi
 
 unsafe_report="$(mktemp)"
@@ -58,7 +87,7 @@ cat "$unsafe_report"
 unexpected_files="$(
   rg --files-with-matches '\bunsafe\b' "$SAFE_ROOT/crates" "$SAFE_ROOT/tests" \
     | sort \
-    | grep -Ev '^'"$SAFE_ROOT"'/crates/(ffi-types|jpeg-core|libjpeg-abi|libturbojpeg-abi)/|^'"$SAFE_ROOT"'/tests/(compat_smoke|cve_regressions|turbojpeg_suite|upstream_matrix)\.rs$' \
+    | grep -Ev '^'"$SAFE_ROOT"'/crates/(ffi-types|jpeg-core|libjpeg-abi|libturbojpeg-abi)/|^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/|^'"$SAFE_ROOT"'/tests/(compat_smoke|cve_regressions|turbojpeg_suite|upstream_matrix)\.rs$' \
     || true
 )"
 

@@ -40,28 +40,26 @@ Two committed helper scripts are part of the final cleanup workflow:
 The remaining C boundary that still exists today is:
 
 - `safe/c_shim/error_bridge.c`, which preserves the libjpeg
-  error/`longjmp` contract at the ABI edge.
-- `safe/c_shim/jsimd_none.c`, which provides the no-SIMD fallback hooks that
-  the staged ABI still expects from the historical libjpeg surface.
-- `safe/c_shim/turbojpeg/*.c`, which preserves the TurboJPEG C/JNI frontend
-  layer while linking it directly against the Rust libjpeg core.
-- `safe/c_shim/tools/*.c`, which preserves the classic command-line frontend
-  programs while linking them against the staged Rust-built libraries.
+  error/`longjmp` contract at the ABI edge.  The integration tests also use
+  that same C frame to exercise the `setjmp`/`longjmp` error path without
+  unwinding through Rust stack frames.
 
 `safe/scripts/stage-install.sh` no longer bootstraps the old upstream CMake
-build tree, installs prebuilt compatibility artifacts, or redirects packaged
-binaries into a hidden backend tree. It links `libjpeg.so.8` from the Rust
-workspace, rebuilds `libturbojpeg.so.0` from the committed frontend sources
-against that Rust core, and recompiles the packaged tools from the committed
-frontend sources during staging.
+build tree, installs prebuilt compatibility artifacts, redirects packaged
+binaries into a hidden backend tree, or compiles staged C frontend sources.
+It links `libjpeg.so.8` from the Rust workspace, links `libturbojpeg.so.0`
+from the Rust `libturbojpeg-abi` staticlib plus the Rust `libjpeg` core, and
+installs the packaged CLI tools from the Rust `jpeg-tools` binaries.
 
 Today that means:
 
 - `libjpeg`, the staged development headers, and the pkg-config/CMake metadata
   come from the Rust workspace.
-- `libturbojpeg` and the packaged CLI tools are self-contained staged builds
-  from committed `safe/c_shim/` sources, with no staged dependency on legacy
-  compatibility artifact trees or `original/*.c`.
+- `libturbojpeg`, the Java JNI entry points, and the packaged CLI tools are
+  committed Rust translations under `safe/crates/libturbojpeg-abi/src/generated/`
+  and `safe/crates/jpeg-tools/src/generated/`, with no staged dependency on
+  legacy compatibility artifact trees, removed staged C frontend trees, or
+  `original/*.c`.
 
 
 License

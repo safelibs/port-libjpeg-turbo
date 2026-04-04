@@ -37,11 +37,29 @@ Two committed helper scripts are part of the final cleanup workflow:
 - `safe/scripts/run-bench-smoke.sh` runs a lightweight staged benchmark sweep
   across the packaged tools and TurboJPEG entry points.
 
-The narrow C boundary that still exists today is
-`safe/c_shim/error_bridge.c`, which is kept to preserve the libjpeg
-error/`longjmp` contract at the ABI edge.  TurboJPEG compatibility is still
-documented and audited separately while the remaining Rust cutover work is
-completed.
+The remaining C boundary that still exists today is:
+
+- `safe/c_shim/error_bridge.c`, which preserves the libjpeg
+  error/`longjmp` contract at the ABI edge.  The integration tests also use
+  that same C frame to exercise the `setjmp`/`longjmp` error path without
+  unwinding through Rust stack frames.
+
+`safe/scripts/stage-install.sh` no longer bootstraps the old upstream CMake
+build tree, installs prebuilt compatibility artifacts, redirects packaged
+binaries into a hidden backend tree, or compiles staged C frontend sources.
+It links `libjpeg.so.8` from the Rust workspace, links `libturbojpeg.so.0`
+from the Rust `libturbojpeg-abi` staticlib plus the Rust `libjpeg` core, and
+installs the packaged CLI tools from the Rust `jpeg-tools` binaries.
+
+Today that means:
+
+- `libjpeg`, the staged development headers, and the pkg-config/CMake metadata
+  come from the Rust workspace.
+- `libturbojpeg`, the Java JNI entry points, and the packaged CLI tools are
+  committed Rust translations under `safe/crates/libturbojpeg-abi/src/generated/`
+  and `safe/crates/jpeg-tools/src/generated/`, with no staged dependency on
+  legacy compatibility artifact trees, removed staged C frontend trees, or
+  `original/*.c`.
 
 
 License

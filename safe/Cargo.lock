@@ -130,6 +130,10 @@ dependencies = [
 [[package]]
 name = "jpeg-tools"
 version = "0.1.0"
+dependencies = [
+ "libjpeg-abi",
+ "libturbojpeg-abi",
+]
 
 [[package]]
 name = "libjpeg-abi"
