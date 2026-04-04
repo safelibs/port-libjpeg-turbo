@@ -21,6 +21,11 @@ mod translated {
 
 pub use translated::my_color_deconverter;
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jinit_color_deconverter(cinfo: j_decompress_ptr) {
-    translated::jinit_color_deconverter(cinfo.cast::<translated::jpeg_decompress_struct>())
+    translated::jinit_color_deconverter(translated_cinfo(cinfo))
 }

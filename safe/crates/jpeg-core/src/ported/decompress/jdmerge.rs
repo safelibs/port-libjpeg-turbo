@@ -19,6 +19,11 @@ mod translated {
 
 pub use translated::my_merged_upsampler;
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jinit_merged_upsampler(cinfo: j_decompress_ptr) {
-    translated::jinit_merged_upsampler(cinfo.cast::<translated::jpeg_decompress_struct>())
+    translated::jinit_merged_upsampler(translated_cinfo(cinfo))
 }

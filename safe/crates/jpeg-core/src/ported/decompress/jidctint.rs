@@ -23,6 +23,28 @@ mod translated {
     include!("generated/jidctint_translated.rs");
 }
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
+#[inline]
+unsafe fn translated_compptr(
+    compptr: *mut jpeg_component_info,
+) -> *mut translated::jpeg_component_info {
+    compptr.cast::<translated::jpeg_component_info>()
+}
+
+#[inline]
+unsafe fn translated_coef_block(coef_block: JCOEFPTR) -> *mut translated::JCOEF {
+    coef_block.cast::<translated::JCOEF>()
+}
+
+#[inline]
+unsafe fn translated_output_buf(output_buf: JSAMPARRAY) -> *mut translated::JSAMPROW {
+    output_buf.cast::<translated::JSAMPROW>()
+}
+
 macro_rules! square_idct_wrapper {
     ($rust_name:ident) => {
         pub unsafe extern "C" fn $rust_name(
@@ -33,10 +55,10 @@ macro_rules! square_idct_wrapper {
             output_col: JDIMENSION,
         ) {
             translated::$rust_name(
-                cinfo.cast::<translated::jpeg_decompress_struct>(),
-                compptr.cast::<translated::jpeg_component_info>(),
-                coef_block.cast::<translated::JCOEF>(),
-                output_buf.cast::<translated::JSAMPROW>(),
+                translated_cinfo(cinfo),
+                translated_compptr(compptr),
+                translated_coef_block(coef_block),
+                translated_output_buf(output_buf),
                 output_col,
             )
         }

@@ -19,18 +19,20 @@ mod translated {
     include!("generated/jdmarker_translated.rs");
 }
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jinit_marker_reader(cinfo: j_decompress_ptr) {
-    translated::jinit_marker_reader(cinfo.cast::<translated::jpeg_decompress_struct>())
+    translated::jinit_marker_reader(translated_cinfo(cinfo))
 }
 
 pub unsafe extern "C" fn jpeg_resync_to_restart(
     cinfo: j_decompress_ptr,
     desired: int,
 ) -> boolean {
-    translated::jpeg_resync_to_restart(
-        cinfo.cast::<translated::jpeg_decompress_struct>(),
-        desired,
-    )
+    translated::jpeg_resync_to_restart(translated_cinfo(cinfo), desired)
 }
 
 pub unsafe extern "C" fn jpeg_save_markers(
@@ -38,11 +40,7 @@ pub unsafe extern "C" fn jpeg_save_markers(
     marker_code: int,
     length_limit: c_uint,
 ) {
-    translated::jpeg_save_markers(
-        cinfo.cast::<translated::jpeg_decompress_struct>(),
-        marker_code,
-        length_limit,
-    )
+    translated::jpeg_save_markers(translated_cinfo(cinfo), marker_code, length_limit)
 }
 
 pub unsafe extern "C" fn jpeg_set_marker_processor(

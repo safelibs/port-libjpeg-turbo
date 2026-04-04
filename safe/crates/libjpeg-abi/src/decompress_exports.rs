@@ -5,53 +5,55 @@ use ffi_types::{
     JSAMPARRAY, JSAMPIMAGE, JDIMENSION, jvirt_barray_ptr,
 };
 
+use crate::decompress;
+
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_CreateDecompress(
     cinfo: j_decompress_ptr,
     version: int,
     structsize: usize,
 ) {
-    jpeg_core::ported::decompress::jdapimin::jpeg_CreateDecompress(cinfo, version, structsize)
+    decompress::jdapimin::jpeg_CreateDecompress(cinfo, version, structsize)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_destroy_decompress(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdapimin::jpeg_destroy_decompress(cinfo)
+    decompress::jdapimin::jpeg_destroy_decompress(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_abort_decompress(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdapimin::jpeg_abort_decompress(cinfo)
+    decompress::jdapimin::jpeg_abort_decompress(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_read_header(cinfo: j_decompress_ptr, require_image: boolean) -> int {
-    jpeg_core::ported::decompress::jdapimin::jpeg_read_header(cinfo, require_image)
+    decompress::jdapimin::jpeg_read_header(cinfo, require_image)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_consume_input(cinfo: j_decompress_ptr) -> int {
-    jpeg_core::ported::decompress::jdapimin::jpeg_consume_input(cinfo)
+    decompress::jdapimin::jpeg_consume_input(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_input_complete(cinfo: j_decompress_ptr) -> boolean {
-    jpeg_core::ported::decompress::jdapimin::jpeg_input_complete(cinfo)
+    decompress::jdapimin::jpeg_input_complete(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_has_multiple_scans(cinfo: j_decompress_ptr) -> boolean {
-    jpeg_core::ported::decompress::jdapimin::jpeg_has_multiple_scans(cinfo)
+    decompress::jdapimin::jpeg_has_multiple_scans(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_finish_decompress(cinfo: j_decompress_ptr) -> boolean {
-    jpeg_core::ported::decompress::jdapimin::jpeg_finish_decompress(cinfo)
+    decompress::jdapimin::jpeg_finish_decompress(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_start_decompress(cinfo: j_decompress_ptr) -> boolean {
-    jpeg_core::ported::decompress::jdapistd::jpeg_start_decompress(cinfo)
+    decompress::jdapistd::jpeg_start_decompress(cinfo)
 }
 
 #[no_mangle]
@@ -60,7 +62,7 @@ pub unsafe extern "C" fn jpeg_read_scanlines(
     scanlines: JSAMPARRAY,
     max_lines: JDIMENSION,
 ) -> JDIMENSION {
-    jpeg_core::ported::decompress::jdapistd::jpeg_read_scanlines(cinfo, scanlines, max_lines)
+    decompress::jdapistd::jpeg_read_scanlines(cinfo, scanlines, max_lines)
 }
 
 #[no_mangle]
@@ -69,7 +71,7 @@ pub unsafe extern "C" fn jpeg_crop_scanline(
     xoffset: *mut JDIMENSION,
     width: *mut JDIMENSION,
 ) {
-    jpeg_core::ported::decompress::jdapistd::jpeg_crop_scanline(cinfo, xoffset, width)
+    decompress::jdapistd::jpeg_crop_scanline(cinfo, xoffset, width)
 }
 
 #[no_mangle]
@@ -77,7 +79,7 @@ pub unsafe extern "C" fn jpeg_skip_scanlines(
     cinfo: j_decompress_ptr,
     num_lines: JDIMENSION,
 ) -> JDIMENSION {
-    jpeg_core::ported::decompress::jdapistd::jpeg_skip_scanlines(cinfo, num_lines)
+    decompress::jdapistd::jpeg_skip_scanlines(cinfo, num_lines)
 }
 
 #[no_mangle]
@@ -86,29 +88,29 @@ pub unsafe extern "C" fn jpeg_read_raw_data(
     data: JSAMPIMAGE,
     max_lines: JDIMENSION,
 ) -> JDIMENSION {
-    jpeg_core::ported::decompress::jdapistd::jpeg_read_raw_data(cinfo, data, max_lines)
+    decompress::jdapistd::jpeg_read_raw_data(cinfo, data, max_lines)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_start_output(cinfo: j_decompress_ptr, scan_number: int) -> boolean {
-    jpeg_core::ported::decompress::jdapistd::jpeg_start_output(cinfo, scan_number)
+    decompress::jdapistd::jpeg_start_output(cinfo, scan_number)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_finish_output(cinfo: j_decompress_ptr) -> boolean {
-    jpeg_core::ported::decompress::jdapistd::jpeg_finish_output(cinfo)
+    decompress::jdapistd::jpeg_finish_output(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_read_coefficients(
     cinfo: j_decompress_ptr,
 ) -> *mut jvirt_barray_ptr {
-    jpeg_core::ported::decompress::jdtrans::jpeg_read_coefficients(cinfo)
+    decompress::jdtrans::jpeg_read_coefficients(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_color_deconverter(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdcolor::jinit_color_deconverter(cinfo)
+    decompress::jdcolor::jinit_color_deconverter(cinfo)
 }
 
 #[no_mangle]
@@ -116,7 +118,7 @@ pub unsafe extern "C" fn jinit_d_coef_controller(
     cinfo: j_decompress_ptr,
     need_full_buffer: boolean,
 ) {
-    jpeg_core::ported::decompress::jdcoefct::jinit_d_coef_controller(cinfo, need_full_buffer)
+    decompress::jdcoefct::jinit_d_coef_controller(cinfo, need_full_buffer)
 }
 
 #[no_mangle]
@@ -124,22 +126,22 @@ pub unsafe extern "C" fn jinit_d_main_controller(
     cinfo: j_decompress_ptr,
     need_full_buffer: boolean,
 ) {
-    jpeg_core::ported::decompress::jdmainct::jinit_d_main_controller(cinfo, need_full_buffer)
+    decompress::jdmainct::jinit_d_main_controller(cinfo, need_full_buffer)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_huff_decoder(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdhuff::jinit_huff_decoder(cinfo)
+    decompress::jdhuff::jinit_huff_decoder(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_phuff_decoder(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdphuff::jinit_phuff_decoder(cinfo)
+    decompress::jdphuff::jinit_phuff_decoder(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_arith_decoder(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jdarith::jinit_arith_decoder(cinfo)
+    decompress::jdarith::jinit_arith_decoder(cinfo)
 }
 
 #[no_mangle]
@@ -147,17 +149,17 @@ pub unsafe extern "C" fn jinit_d_post_controller(
     cinfo: j_decompress_ptr,
     need_full_buffer: boolean,
 ) {
-    jpeg_core::ported::decompress::jdpostct::jinit_d_post_controller(cinfo, need_full_buffer)
+    decompress::jdpostct::jinit_d_post_controller(cinfo, need_full_buffer)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_1pass_quantizer(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jquant1::jinit_1pass_quantizer(cinfo)
+    decompress::jquant1::jinit_1pass_quantizer(cinfo)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jinit_2pass_quantizer(cinfo: j_decompress_ptr) {
-    jpeg_core::ported::decompress::jquant2::jinit_2pass_quantizer(cinfo)
+    decompress::jquant2::jinit_2pass_quantizer(cinfo)
 }
 
 #[no_mangle]

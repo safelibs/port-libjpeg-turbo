@@ -19,6 +19,12 @@ mod translated {
 
 pub use translated::my_coef_controller;
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
+#[inline]
 pub unsafe fn start_iMCU_row(cinfo: j_decompress_ptr) {
     let coef = (*cinfo).coef as *mut my_coef_controller;
     if (*cinfo).comps_in_scan > 1 {
@@ -34,8 +40,5 @@ pub unsafe fn start_iMCU_row(cinfo: j_decompress_ptr) {
 }
 
 pub unsafe fn jinit_d_coef_controller(cinfo: j_decompress_ptr, need_full_buffer: boolean) {
-    translated::jinit_d_coef_controller(
-        cinfo.cast::<translated::jpeg_decompress_struct>(),
-        need_full_buffer,
-    )
+    translated::jinit_d_coef_controller(translated_cinfo(cinfo), need_full_buffer)
 }

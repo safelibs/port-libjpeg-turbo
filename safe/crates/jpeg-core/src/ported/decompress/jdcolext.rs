@@ -20,3 +20,12 @@ pub const RGB_PIXELSIZE: [i32; JPEG_NUMCS] = {
     table[JCS_EXT_ARGB as usize] = 4;
     table
 };
+
+#[inline]
+pub const fn rgb_pixelsize_for(color_space: usize) -> i32 {
+    if color_space < JPEG_NUMCS {
+        RGB_PIXELSIZE[color_space]
+    } else {
+        -1
+    }
+}

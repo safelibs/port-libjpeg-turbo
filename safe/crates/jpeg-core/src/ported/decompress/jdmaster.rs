@@ -11,7 +11,7 @@ use ffi_types::{
 use crate::{
     common::error,
     ported::decompress::{
-        jdcoefct, jdcolor, jddctmgr, jdhuff, jdmainct, jdmerge, jdsample,
+        jdcoefct, jdcolext, jdcolor, jddctmgr, jdhuff, jdmainct, jdmerge, jdsample,
     },
 };
 
@@ -66,6 +66,15 @@ pub unsafe extern "C" fn jpeg_new_colormap(cinfo: j_decompress_ptr) {
     translated::jpeg_new_colormap(cinfo.cast::<translated::jpeg_decompress_struct>())
 }
 
+#[inline]
+unsafe fn need_full_image_buffer(cinfo: j_decompress_ptr) -> boolean {
+    if (*(*cinfo).inputctl).has_multiple_scans != FALSE || (*cinfo).buffered_image != FALSE {
+        TRUE
+    } else {
+        FALSE
+    }
+}
+
 unsafe fn use_merged_upsample(cinfo: j_decompress_ptr) -> boolean {
     if (*cinfo).do_fancy_upsampling != FALSE || (*cinfo).CCIR601_sampling != FALSE {
         return FALSE;
@@ -91,10 +100,10 @@ unsafe fn use_merged_upsample(cinfo: j_decompress_ptr) -> boolean {
     }
 
     let out_idx = (*cinfo).out_color_space as usize;
+    let rgb_pixel_size = jdcolext::rgb_pixelsize_for(out_idx);
     if ((*cinfo).out_color_space == JCS_RGB565 && (*cinfo).out_color_components != 3)
         || ((*cinfo).out_color_space != JCS_RGB565
-            && (out_idx >= jdcolor::rgb_pixelsize.len()
-                || (*cinfo).out_color_components != jdcolor::rgb_pixelsize[out_idx]))
+            && ((*cinfo).out_color_components != rgb_pixel_size))
     {
         return FALSE;
     }
@@ -225,14 +234,7 @@ unsafe fn master_selection(cinfo: j_decompress_ptr) {
         jdhuff::jinit_huff_decoder(cinfo);
     }
 
-    let use_c_buffer = if (*(*cinfo).inputctl).has_multiple_scans != FALSE
-        || (*cinfo).buffered_image != FALSE
-    {
-        TRUE
-    } else {
-        FALSE
-    };
-    jdcoefct::jinit_d_coef_controller(cinfo, use_c_buffer);
+    jdcoefct::jinit_d_coef_controller(cinfo, need_full_image_buffer(cinfo));
 
     if (*cinfo).raw_data_out == FALSE {
         jdmainct::jinit_d_main_controller(cinfo, FALSE);

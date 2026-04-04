@@ -22,6 +22,15 @@ extern "C" {
     static c_jpeg_natural_order: [int; DCTSIZE2 + 16];
 }
 
+#[inline]
+unsafe fn detect_multiple_scans(cinfo: j_decompress_ptr) -> boolean {
+    if (*cinfo).comps_in_scan < (*cinfo).num_components || (*cinfo).progressive_mode != FALSE {
+        TRUE
+    } else {
+        FALSE
+    }
+}
+
 unsafe fn initial_setup(cinfo: j_decompress_ptr) {
     if (*cinfo).image_height as ffi_types::long > JPEG_MAX_DIMENSION
         || (*cinfo).image_width as ffi_types::long > JPEG_MAX_DIMENSION
@@ -102,12 +111,7 @@ unsafe fn initial_setup(cinfo: j_decompress_ptr) {
         ((*cinfo).max_v_samp_factor as usize * DCTSIZE) as ffi_types::long,
     ) as _;
 
-    (*(*cinfo).inputctl).has_multiple_scans =
-        if (*cinfo).comps_in_scan < (*cinfo).num_components || (*cinfo).progressive_mode != FALSE {
-            TRUE
-        } else {
-            FALSE
-        };
+    (*(*cinfo).inputctl).has_multiple_scans = detect_multiple_scans(cinfo);
 }
 
 unsafe fn per_scan_setup(cinfo: j_decompress_ptr) {

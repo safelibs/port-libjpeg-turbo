@@ -25,6 +25,12 @@ pub const CTX_POSTPONED_ROW: i32 = 2;
 
 pub use translated::my_main_controller;
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
+#[inline]
 pub unsafe fn set_wraparound_pointers(cinfo: j_decompress_ptr) {
     let main_ptr = (*cinfo).main as *mut my_main_controller;
     let m = (*cinfo).min_DCT_v_scaled_size as isize;
@@ -52,8 +58,5 @@ pub unsafe fn jinit_d_main_controller(cinfo: j_decompress_ptr, need_full_buffer:
             (*cinfo).min_DCT_v_scaled_size,
         );
     }
-    translated::jinit_d_main_controller(
-        cinfo.cast::<translated::jpeg_decompress_struct>(),
-        need_full_buffer,
-    )
+    translated::jinit_d_main_controller(translated_cinfo(cinfo), need_full_buffer)
 }

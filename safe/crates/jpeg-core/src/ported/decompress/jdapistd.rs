@@ -18,6 +18,19 @@ use crate::{
     },
 };
 
+#[inline]
+unsafe fn update_output_progress(
+    cinfo: j_decompress_ptr,
+    pass_counter: JDIMENSION,
+    pass_limit: JDIMENSION,
+) {
+    if !(*cinfo).progress.is_null() {
+        (*(*cinfo).progress).pass_counter = pass_counter as long;
+        (*(*cinfo).progress).pass_limit = pass_limit as long;
+        (*(*cinfo).progress).progress_monitor.unwrap()(cinfo as j_common_ptr);
+    }
+}
+
 unsafe fn output_pass_setup(cinfo: j_decompress_ptr) -> boolean {
     if (*cinfo).global_state != DSTATE_PRESCAN {
         (*(*cinfo).master).prepare_for_output_pass.unwrap()(cinfo);
@@ -27,11 +40,7 @@ unsafe fn output_pass_setup(cinfo: j_decompress_ptr) -> boolean {
 
     while (*(*cinfo).master).is_dummy_pass != FALSE {
         while (*cinfo).output_scanline < (*cinfo).output_height {
-            if !(*cinfo).progress.is_null() {
-                (*(*cinfo).progress).pass_counter = (*cinfo).output_scanline as long;
-                (*(*cinfo).progress).pass_limit = (*cinfo).output_height as long;
-                (*(*cinfo).progress).progress_monitor.unwrap()(cinfo as j_common_ptr);
-            }
+            update_output_progress(cinfo, (*cinfo).output_scanline, (*cinfo).output_height);
 
             let last_scanline = (*cinfo).output_scanline;
             (*(*cinfo).main).process_data.unwrap()(cinfo, ptr::null_mut(), &mut (*cinfo).output_scanline, 0);
@@ -196,11 +205,7 @@ pub unsafe fn jpeg_read_scanlines(
         return 0;
     }
 
-    if !(*cinfo).progress.is_null() {
-        (*(*cinfo).progress).pass_counter = (*cinfo).output_scanline as long;
-        (*(*cinfo).progress).pass_limit = (*cinfo).output_height as long;
-        (*(*cinfo).progress).progress_monitor.unwrap()(cinfo as j_common_ptr);
-    }
+    update_output_progress(cinfo, (*cinfo).output_scanline, (*cinfo).output_height);
 
     let mut row_ctr = 0;
     (*(*cinfo).main).process_data.unwrap()(cinfo, scanlines, &mut row_ctr, max_lines);
@@ -424,11 +429,7 @@ pub unsafe fn jpeg_read_raw_data(
         return 0;
     }
 
-    if !(*cinfo).progress.is_null() {
-        (*(*cinfo).progress).pass_counter = (*cinfo).output_scanline as long;
-        (*(*cinfo).progress).pass_limit = (*cinfo).output_height as long;
-        (*(*cinfo).progress).progress_monitor.unwrap()(cinfo as j_common_ptr);
-    }
+    update_output_progress(cinfo, (*cinfo).output_scanline, (*cinfo).output_height);
 
     let lines_per_iMCU_row =
         ((*cinfo).max_v_samp_factor * (*cinfo).min_DCT_v_scaled_size) as JDIMENSION;

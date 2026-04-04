@@ -6,7 +6,7 @@ pub mod decompress_exports;
 mod jsimd_none;
 
 #[doc(hidden)]
-pub use jpeg_core::ported::{compress, transform};
+pub use jpeg_core::ported::{compress, decompress, transform};
 
 // Keep the minimal C longjmp/error bridge as a propagated native link
 // dependency for final binaries that pull in jpeg_core through libjpeg-abi.

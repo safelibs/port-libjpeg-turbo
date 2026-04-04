@@ -166,6 +166,16 @@ unsafe fn default_decompress_parms(cinfo: j_decompress_ptr) {
     (*cinfo).enable_2pass_quant = FALSE;
 }
 
+#[inline]
+unsafe fn consume_input_until_ready(cinfo: j_decompress_ptr) -> int {
+    let retcode = (*(*cinfo).inputctl).consume_input.unwrap()(cinfo);
+    if retcode == JPEG_REACHED_SOS {
+        default_decompress_parms(cinfo);
+        (*cinfo).global_state = DSTATE_READY;
+    }
+    retcode
+}
+
 pub unsafe fn jpeg_read_header(cinfo: j_decompress_ptr, require_image: boolean) -> int {
     if (*cinfo).global_state != DSTATE_START && (*cinfo).global_state != DSTATE_INHEADER {
         error::errexit1(
@@ -199,21 +209,9 @@ pub unsafe fn jpeg_consume_input(cinfo: j_decompress_ptr) -> int {
             (*(*cinfo).inputctl).reset_input_controller.unwrap()(cinfo);
             (*(*cinfo).src).init_source.unwrap()(cinfo);
             (*cinfo).global_state = DSTATE_INHEADER;
-            let retcode = (*(*cinfo).inputctl).consume_input.unwrap()(cinfo);
-            if retcode == JPEG_REACHED_SOS {
-                default_decompress_parms(cinfo);
-                (*cinfo).global_state = DSTATE_READY;
-            }
-            retcode
+            consume_input_until_ready(cinfo)
         }
-        DSTATE_INHEADER => {
-            let retcode = (*(*cinfo).inputctl).consume_input.unwrap()(cinfo);
-            if retcode == JPEG_REACHED_SOS {
-                default_decompress_parms(cinfo);
-                (*cinfo).global_state = DSTATE_READY;
-            }
-            retcode
-        }
+        DSTATE_INHEADER => consume_input_until_ready(cinfo),
         DSTATE_READY => JPEG_REACHED_SOS,
         ffi_types::DSTATE_PRELOAD
         | ffi_types::DSTATE_PRESCAN

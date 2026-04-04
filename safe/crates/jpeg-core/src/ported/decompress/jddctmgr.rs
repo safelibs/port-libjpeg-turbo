@@ -30,9 +30,48 @@ union multiplier_table {
     float_array: [FLOAT_MULT_TYPE; DCTSIZE2],
 }
 
+type InverseDctFn = unsafe extern "C" fn(
+    j_decompress_ptr,
+    *mut jpeg_component_info,
+    ffi_types::JCOEFPTR,
+    ffi_types::JSAMPARRAY,
+    ffi_types::JDIMENSION,
+);
+
 #[inline]
 fn descale(x: i64, n: i32) -> i64 {
     (x + (1_i64 << (n - 1))) >> n
+}
+
+#[inline]
+unsafe fn select_inverse_dct(cinfo: j_decompress_ptr, scaled_size: i32) -> (i32, InverseDctFn) {
+    match scaled_size {
+        1 => (JDCT_ISLOW, jidctred::jpeg_idct_1x1),
+        2 => (JDCT_ISLOW, jidctred::jpeg_idct_2x2),
+        3 => (JDCT_ISLOW, jidctint::jpeg_idct_3x3),
+        4 => (JDCT_ISLOW, jidctred::jpeg_idct_4x4),
+        5 => (JDCT_ISLOW, jidctint::jpeg_idct_5x5),
+        6 => (JDCT_ISLOW, jidctint::jpeg_idct_6x6),
+        7 => (JDCT_ISLOW, jidctint::jpeg_idct_7x7),
+        8 => match (*cinfo).dct_method {
+            JDCT_IFAST => (JDCT_IFAST, jidctfst::jpeg_idct_ifast),
+            JDCT_FLOAT => (JDCT_FLOAT, jidctflt::jpeg_idct_float),
+            _ => (JDCT_ISLOW, jidctint::jpeg_idct_islow),
+        },
+        9 => (JDCT_ISLOW, jidctint::jpeg_idct_9x9),
+        10 => (JDCT_ISLOW, jidctint::jpeg_idct_10x10),
+        11 => (JDCT_ISLOW, jidctint::jpeg_idct_11x11),
+        12 => (JDCT_ISLOW, jidctint::jpeg_idct_12x12),
+        13 => (JDCT_ISLOW, jidctint::jpeg_idct_13x13),
+        14 => (JDCT_ISLOW, jidctint::jpeg_idct_14x14),
+        15 => (JDCT_ISLOW, jidctint::jpeg_idct_15x15),
+        16 => (JDCT_ISLOW, jidctint::jpeg_idct_16x16),
+        _ => error::errexit1(
+            cinfo as j_common_ptr,
+            J_MESSAGE_CODE::JERR_BAD_DCTSIZE,
+            scaled_size,
+        ),
+    }
 }
 
 unsafe extern "C" fn start_pass(cinfo: j_decompress_ptr) {
@@ -62,33 +101,7 @@ unsafe extern "C" fn start_pass(cinfo: j_decompress_ptr) {
     for ci in 0..(*cinfo).num_components as usize {
         let compptr = (*cinfo).comp_info.add(ci);
         let scaled_size = (*compptr).DCT_h_scaled_size;
-        let (method, method_ptr) = match scaled_size {
-            1 => (JDCT_ISLOW, jidctred::jpeg_idct_1x1 as _),
-            2 => (JDCT_ISLOW, jidctred::jpeg_idct_2x2 as _),
-            3 => (JDCT_ISLOW, jidctint::jpeg_idct_3x3 as _),
-            4 => (JDCT_ISLOW, jidctred::jpeg_idct_4x4 as _),
-            5 => (JDCT_ISLOW, jidctint::jpeg_idct_5x5 as _),
-            6 => (JDCT_ISLOW, jidctint::jpeg_idct_6x6 as _),
-            7 => (JDCT_ISLOW, jidctint::jpeg_idct_7x7 as _),
-            8 => match (*cinfo).dct_method {
-                JDCT_IFAST => (JDCT_IFAST, jidctfst::jpeg_idct_ifast as _),
-                JDCT_FLOAT => (JDCT_FLOAT, jidctflt::jpeg_idct_float as _),
-                _ => (JDCT_ISLOW, jidctint::jpeg_idct_islow as _),
-            },
-            9 => (JDCT_ISLOW, jidctint::jpeg_idct_9x9 as _),
-            10 => (JDCT_ISLOW, jidctint::jpeg_idct_10x10 as _),
-            11 => (JDCT_ISLOW, jidctint::jpeg_idct_11x11 as _),
-            12 => (JDCT_ISLOW, jidctint::jpeg_idct_12x12 as _),
-            13 => (JDCT_ISLOW, jidctint::jpeg_idct_13x13 as _),
-            14 => (JDCT_ISLOW, jidctint::jpeg_idct_14x14 as _),
-            15 => (JDCT_ISLOW, jidctint::jpeg_idct_15x15 as _),
-            16 => (JDCT_ISLOW, jidctint::jpeg_idct_16x16 as _),
-            _ => error::errexit1(
-                cinfo as j_common_ptr,
-                J_MESSAGE_CODE::JERR_BAD_DCTSIZE,
-                scaled_size,
-            ),
-        };
+        let (method, method_ptr) = select_inverse_dct(cinfo, scaled_size);
         (*idct).pub_.inverse_DCT[ci] = Some(method_ptr);
 
         if (*compptr).component_needed == 0 || (*idct).cur_method[ci] == method {
