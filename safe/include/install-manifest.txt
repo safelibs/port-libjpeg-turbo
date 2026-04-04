@@ -1,3 +1,4 @@
+# Public libjpeg and TurboJPEG headers.
 usr/include/jchuff.h
 usr/include/jconfigint.h
 usr/include/jdcoefct.h
@@ -19,4 +20,6 @@ usr/include/jsimd.h
 usr/include/jsimddct.h
 usr/include/jversion.h
 usr/include/turbojpeg.h
+
+# Debian-compatible multiarch configuration header.
 usr/include/@multiarch@/jconfig.h

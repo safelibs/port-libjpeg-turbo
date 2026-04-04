@@ -1,3 +1,4 @@
+/* Canonical staged libjpeg version nodes. */
 LIBJPEGTURBO_8.0 {
   local:
     jsimd_*;
@@ -8,4 +9,3 @@ LIBJPEG_8.0 {
   global:
     *;
 };
-

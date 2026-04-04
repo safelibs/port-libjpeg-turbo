@@ -1,5 +1,5 @@
 prefix=@CMAKE_INSTALL_PREFIX@
-exec_prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
@@ -8,4 +8,5 @@ Description: A SIMD-accelerated JPEG codec that provides the TurboJPEG API
 Version: @VERSION@
 Libs: -L${libdir} -lturbojpeg
 Libs.private: -ljpeg
+# The staged Debian layout keeps the TurboJPEG public headers under /usr/include.
 Cflags: -I${includedir}

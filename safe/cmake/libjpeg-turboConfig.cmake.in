@@ -1,3 +1,9 @@
 get_filename_component(_libjpeg_turbo_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(libjpeg_turbo_VERSION "@PACKAGE_VERSION@")
+set(libjpeg_turbo_INCLUDE_DIRS
+  "${_libjpeg_turbo_prefix}/include"
+  "${_libjpeg_turbo_prefix}/include/@MULTIARCH@"
+)
+set(libjpeg_turbo_LIBRARY_DIR "${_libjpeg_turbo_prefix}/lib/@MULTIARCH@")
+set(libjpeg_turbo_LIBRARIES jpeg turbojpeg)
 include("${CMAKE_CURRENT_LIST_DIR}/libjpeg-turboTargets.cmake")
-

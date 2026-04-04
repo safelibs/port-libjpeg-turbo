@@ -1,5 +1,5 @@
 prefix=/usr
-exec_prefix=/usr
+exec_prefix=${prefix}
 libdir=/usr/lib/x86_64-linux-gnu
 includedir=/usr/include
 
@@ -8,4 +8,5 @@ Description: A SIMD-accelerated JPEG codec that provides the TurboJPEG API
 Version: 2.1.5
 Libs: -L${libdir} -lturbojpeg
 Libs.private: -ljpeg
+# The staged Debian layout keeps the TurboJPEG public headers under /usr/include.
 Cflags: -I${includedir}

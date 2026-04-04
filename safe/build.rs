@@ -1,5 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-env-changed=DEB_HOST_MULTIARCH");
+    println!("cargo:rerun-if-env-changed=LIBJPEG_TURBO_STAGE_ROOT");
     if let Some(libdir) = staged_libdir() {
         println!("cargo:rustc-link-search=native={}", libdir.display());
         println!("cargo:rustc-link-arg-tests=-Wl,-rpath,{}", libdir.display());
@@ -30,9 +31,11 @@ fn main() {
 }
 
 fn staged_libdir() -> Option<std::path::PathBuf> {
-    let safe_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let stage_root = std::env::var_os("LIBJPEG_TURBO_STAGE_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("stage"));
     let multiarch = multiarch()?;
-    let libdir = safe_root.join("stage/usr/lib").join(multiarch);
+    let libdir = stage_root.join("usr/lib").join(multiarch);
     if libdir.exists() {
         Some(libdir)
     } else {

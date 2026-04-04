@@ -1,3 +1,4 @@
+/* JNI-augmented TurboJPEG symbol surface used by staged Java packaging. */
 TURBOJPEG_1.0
 {
   global:

@@ -3,10 +3,20 @@
 #
 # Transforms Exif files so that Orientation becomes 1
 #
+set -eu
 
 bindir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 jpegtran_bin="$bindir/jpegtran"
 jpegexiforient_bin="$bindir/jpegexiforient"
+
+test -x "$jpegtran_bin" || {
+  echo "missing sibling jpegtran helper: $jpegtran_bin" >&2
+  exit 1
+}
+test -x "$jpegexiforient_bin" || {
+  echo "missing sibling jpegexiforient helper: $jpegexiforient_bin" >&2
+  exit 1
+}
 
 trap "if test -n \"\$tempfile\"; then rm -f \"\$tempfile\"; fi" INT QUIT TERM
 

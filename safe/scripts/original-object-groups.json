@@ -11,6 +11,18 @@
       "cjpeg",
       "jpegtran"
     ],
+    "compat": [
+      "jcstest",
+      "strtest",
+      "tjunittest"
+    ],
+    "cli": [
+      "cjpeg",
+      "djpeg",
+      "jpegtran",
+      "tjbench",
+      "tjexample"
+    ],
     "turbojpeg": [
       "tjunittest",
       "tjbench",
@@ -126,4 +138,3 @@
     }
   }
 }
-

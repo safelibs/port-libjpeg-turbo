@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
-STAGE_DIR="$SAFE_ROOT/stage"
+STAGE_DIR="${LIBJPEG_TURBO_STAGE_ROOT:-$SAFE_ROOT/stage}"
 TMP_RENDER_ROOT="$SAFE_ROOT/target/rendered"
 JAVA_TOOL_ROOT="$SAFE_ROOT/target/java-tools"
 JAVA_TOOL_BIN_DIR="$JAVA_TOOL_ROOT/bin"

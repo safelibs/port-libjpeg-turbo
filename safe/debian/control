@@ -7,9 +7,11 @@ Uploaders: Mike Gabriel <sunweaver@debian.org>
 Build-Depends: cargo,
                cmake (>= 2.8.12),
                debhelper-compat (= 13),
+               default-jdk,
                help2man,
 	       nasm,
                pkg-config,
+               python3,
                rustc
 Rules-Requires-Root: no
 Standards-Version: 4.6.2

@@ -2,4 +2,4 @@ usr/include/turbojpeg.h
 usr/lib/*/libturbojpeg.a
 usr/lib/*/libturbojpeg.so
 usr/lib/*/pkgconfig/libturbojpeg.pc
-/usr/lib/*/cmake/
+usr/lib/*/cmake/libjpeg-turbo/*

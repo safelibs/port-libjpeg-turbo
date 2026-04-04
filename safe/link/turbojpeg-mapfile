@@ -1,3 +1,4 @@
+/* Non-JNI TurboJPEG symbol surface used by native consumers. */
 TURBOJPEG_1.0
 {
   global:

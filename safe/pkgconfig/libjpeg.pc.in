@@ -1,5 +1,5 @@
 prefix=@CMAKE_INSTALL_PREFIX@
-exec_prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
 libdir=@CMAKE_INSTALL_FULL_LIBDIR@
 includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
@@ -7,4 +7,6 @@ Name: libjpeg
 Description: A SIMD-accelerated JPEG codec that provides the libjpeg API
 Version: @VERSION@
 Libs: -L${libdir} -ljpeg
+# The multiarch jconfig.h lives under /usr/include/@MULTIARCH@, which native
+# Debian toolchains already search by default.
 Cflags: -I${includedir}

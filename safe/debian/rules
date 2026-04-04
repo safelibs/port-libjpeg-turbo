@@ -10,14 +10,14 @@ export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
 	dh $@
 
 override_dh_auto_build:
-	cargo build --manifest-path Cargo.toml --workspace --release
+	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) cargo build --manifest-path Cargo.toml --workspace --release
 
 override_dh_auto_clean:
 	dh_auto_clean
 	rm -rf stage target/rendered target/java-tools target/docker-home
 
 override_dh_auto_install:
-	bash scripts/stage-install.sh --with-java=1
+	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) bash scripts/stage-install.sh --with-java=1
 	rm -rf debian/tmp
 	mkdir -p debian/tmp
 	cp -a stage/usr debian/tmp/

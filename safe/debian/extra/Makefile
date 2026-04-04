@@ -1,9 +1,9 @@
 INSTALL = install -m755
 INSTALLDIR = install -m755 -d
 DESTDIR =
-prefix  = /usr/local
-bindir  = $(prefix)/bin
-mandir  = $(prefix)/share/man/man1
+prefix ?= /usr
+bindir ?= $(prefix)/bin
+mandir ?= $(prefix)/share/man/man1
 
 all: jpegexiforient
 
