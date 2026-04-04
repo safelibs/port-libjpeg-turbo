@@ -1,7 +1,7 @@
 use core::ffi::{c_int, c_ulong};
 
 use super::turbojpeg::{
-    tjscalingfactor, TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY, SCALING_FACTORS,
+    tjscalingfactor, SCALING_FACTORS, TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY,
     TJ_MCU_HEIGHT, TJ_MCU_WIDTH,
 };
 
@@ -16,7 +16,11 @@ pub const fn pad(value: c_int, align: c_int) -> c_int {
 }
 
 pub const fn plane_count(subsamp: c_int) -> c_int {
-    if subsamp == TJSAMP_GRAY { 1 } else { 3 }
+    if subsamp == TJSAMP_GRAY {
+        1
+    } else {
+        3
+    }
 }
 
 pub fn plane_width(component: c_int, width: c_int, subsamp: c_int) -> Option<c_int> {
@@ -31,7 +35,13 @@ pub fn plane_height(component: c_int, height: c_int, subsamp: c_int) -> Option<c
     Some(if component == 0 { padded } else { padded / vsf })
 }
 
-pub fn plane_size(component: c_int, width: c_int, stride: c_int, height: c_int, subsamp: c_int) -> Option<c_ulong> {
+pub fn plane_size(
+    component: c_int,
+    width: c_int,
+    stride: c_int,
+    height: c_int,
+    subsamp: c_int,
+) -> Option<c_ulong> {
     let plane_width = plane_width(component, width, subsamp)? as c_ulong;
     let plane_height = plane_height(component, height, subsamp)? as c_ulong;
     let abs_stride = if stride == 0 {
@@ -64,7 +74,11 @@ pub fn yuv_size(width: c_int, align: c_int, height: c_int, subsamp: c_int) -> Op
 }
 
 pub fn parse_subsamp(spec: &str) -> Option<c_int> {
-    if spec.eq_ignore_ascii_case("gray") || spec.eq_ignore_ascii_case("grayscale") {
+    if spec
+        .as_bytes()
+        .first()
+        .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'g'))
+    {
         Some(TJSAMP_GRAY)
     } else if spec == "444" {
         Some(TJSAMP_444)
@@ -81,10 +95,13 @@ pub fn parse_scaling_factor(spec: &str) -> Option<tjscalingfactor> {
     let (num, denom) = spec.split_once('/')?;
     let num = num.parse::<c_int>().ok()?;
     let denom = denom.parse::<c_int>().ok()?;
-    SCALING_FACTORS
-        .iter()
-        .copied()
-        .find(|factor| factor.num == num && factor.denom == denom)
+    if num <= 0 || denom <= 0 {
+        return None;
+    }
+
+    SCALING_FACTORS.iter().copied().find(|factor| {
+        i64::from(num) * i64::from(factor.denom) == i64::from(factor.num) * i64::from(denom)
+    })
 }
 
 pub fn format_scaling_factor_list() -> String {

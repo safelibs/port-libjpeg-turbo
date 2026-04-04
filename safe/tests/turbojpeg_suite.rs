@@ -244,7 +244,12 @@ fn run_rust_release_command(
         .current_dir(temp_dir)
         .args(args)
         .output()
-        .map_err(|error| format!("failed to spawn Rust release {tool} at {}: {error}", path.display()))
+        .map_err(|error| {
+            format!(
+                "failed to spawn Rust release {tool} at {}: {error}",
+                path.display()
+            )
+        })
 }
 
 fn command_failure(tool: &str, output: &Output) -> String {
@@ -315,11 +320,7 @@ fn assert_bmp_payload_identical(left: &Path, right: &Path) -> Result<(), String>
     }
 }
 
-fn run_tjexample_subset<F>(
-    stage: &StagePaths,
-    temp_dir: &Path,
-    runner: F,
-) -> Result<(), String>
+fn run_tjexample_subset<F>(stage: &StagePaths, temp_dir: &Path, runner: F) -> Result<(), String>
 where
     F: Fn(&StagePaths, &Path, &[OsString]) -> Result<Output, String>,
 {
@@ -334,8 +335,10 @@ where
     let ref_rot90 = temp_dir.join("ref_rot90_jpegtran.jpg");
     let ref_gray_rot90 = temp_dir.join("ref_gray_rot90_jpegtran.jpg");
     let actual_jpeg = temp_dir.join("tjexample_420_fast.jpg");
+    let actual_gray_alias_jpeg = temp_dir.join("tjexample_gray_alias.jpg");
     let actual_default_bmp = temp_dir.join("tjexample_default.bmp");
     let actual_nosmooth_bmp = temp_dir.join("tjexample_nosmooth.bmp");
+    let actual_full_scale_bmp = temp_dir.join("tjexample_full_scale.bmp");
     let actual_half_bmp = temp_dir.join("tjexample_half.bmp");
     let actual_rot90 = temp_dir.join("tjexample_rot90.jpg");
     let actual_gray_rot90 = temp_dir.join("tjexample_gray_rot90.jpg");
@@ -493,12 +496,45 @@ where
             stage,
             temp_dir,
             &[
+                image.clone().into_os_string(),
+                actual_gray_alias_jpeg.clone().into_os_string(),
+                "-q".into(),
+                "95".into(),
+                "-subsamp".into(),
+                "g".into(),
+                "-fastdct".into(),
+            ],
+        )?,
+    )?;
+    assert_files_identical(&actual_gray_alias_jpeg, &ref_gray_fast)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
                 ref_420_fast.clone().into_os_string(),
                 actual_default_bmp.clone().into_os_string(),
             ],
         )?,
     )?;
     assert_bmp_payload_identical(&actual_default_bmp, &ref_420_default_bmp)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_full_scale_bmp.clone().into_os_string(),
+                "-scale".into(),
+                "2/2".into(),
+            ],
+        )?,
+    )?;
+    assert_bmp_payload_identical(&actual_full_scale_bmp, &ref_420_default_bmp)?;
 
     assert_success(
         "tjexample",
@@ -563,6 +599,21 @@ where
     assert_files_identical(&actual_gray_rot90, &ref_gray_rot90)?;
 
     Ok(())
+}
+
+#[test]
+fn turbojpeg_option_parsers_match_upstream_cli_aliases() {
+    let full_scale = tjutil::parse_scaling_factor("2/2").expect("2/2 scaling factor");
+    assert_eq!(full_scale.num, 1);
+    assert_eq!(full_scale.denom, 1);
+
+    let half_scale = tjutil::parse_scaling_factor("2/4").expect("2/4 scaling factor");
+    assert_eq!(half_scale.num, 1);
+    assert_eq!(half_scale.denom, 2);
+
+    assert_eq!(tjutil::parse_subsamp("g"), Some(TJSAMP_GRAY));
+    assert_eq!(tjutil::parse_subsamp("GRAY"), Some(TJSAMP_GRAY));
+    assert_eq!(tjutil::parse_subsamp("grayscale"), Some(TJSAMP_GRAY));
 }
 
 #[test]

@@ -126,6 +126,8 @@ esac
 
 "$BINDIR/cjpeg" -quality 95 -dct fast -sample 2x2 \
   -outfile "$TMPDIR/ref_tjexample.jpg" "$TMPDIR/tjexample_input.bmp" >/dev/null 2>&1
+"$BINDIR/cjpeg" -quality 95 -dct fast -grayscale \
+  -outfile "$TMPDIR/ref_tjexample_gray.jpg" "$TMPDIR/tjexample_input.bmp" >/dev/null 2>&1
 "$BINDIR/djpeg" -rgb -bmp -outfile "$TMPDIR/ref_tjexample.bmp" \
   "$TMPDIR/ref_tjexample.jpg" >/dev/null 2>&1
 "$BINDIR/jpegtran" -crop 70x60+16+16 -rotate 90 -trim \
@@ -136,9 +138,19 @@ esac
 cmp -s "$TMPDIR/ref_tjexample.jpg" "$TMPDIR/tjexample.jpg" \
   || die "Rust tjexample JPEG output differed from staged cjpeg reference"
 
+"$TJEXAMPLE_BIN" "$TMPDIR/tjexample_input.bmp" "$TMPDIR/tjexample_gray.jpg" \
+  -q 95 -subsamp g -fastdct >/dev/null 2>&1
+cmp -s "$TMPDIR/ref_tjexample_gray.jpg" "$TMPDIR/tjexample_gray.jpg" \
+  || die "Rust tjexample grayscale alias output differed from staged cjpeg reference"
+
 "$TJEXAMPLE_BIN" "$TMPDIR/ref_tjexample.jpg" "$TMPDIR/tjexample.bmp" >/dev/null 2>&1
 compare_bmp_payload "$TMPDIR/ref_tjexample.bmp" "$TMPDIR/tjexample.bmp" \
   || die "Rust tjexample BMP output differed from staged djpeg reference"
+
+"$TJEXAMPLE_BIN" "$TMPDIR/ref_tjexample.jpg" "$TMPDIR/tjexample_full_scale.bmp" \
+  -scale 2/2 >/dev/null 2>&1
+compare_bmp_payload "$TMPDIR/ref_tjexample.bmp" "$TMPDIR/tjexample_full_scale.bmp" \
+  || die "Rust tjexample full-scale alias output differed from staged djpeg reference"
 
 "$TJEXAMPLE_BIN" "$TMPDIR/ref_tjexample.jpg" "$TMPDIR/tjexample_rot90.jpg" \
   -rot90 -crop 70x60+16+16 >/dev/null 2>&1
