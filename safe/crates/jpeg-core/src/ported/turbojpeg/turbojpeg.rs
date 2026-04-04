@@ -2,8 +2,12 @@ use core::ffi::{c_int, c_ulong, c_void};
 
 pub type TjHandle = *mut c_void;
 
+pub const SOURCE_FILE: &str = "turbojpeg.c";
+pub const HEADER_FILE: &str = "turbojpeg.h";
+
 pub const TJ_NUMSAMP: c_int = 6;
 pub const TJ_NUMPF: c_int = 12;
+pub const TJ_NUMCS: c_int = 5;
 
 pub const TJSAMP_444: c_int = 0;
 pub const TJSAMP_422: c_int = 1;
@@ -26,6 +30,12 @@ pub const TJPF_ARGB: c_int = 10;
 pub const TJPF_CMYK: c_int = 11;
 pub const TJPF_UNKNOWN: c_int = -1;
 
+pub const TJCS_RGB: c_int = 0;
+pub const TJCS_YCBCR: c_int = 1;
+pub const TJCS_GRAY: c_int = 2;
+pub const TJCS_CMYK: c_int = 3;
+pub const TJCS_YCCK: c_int = 4;
+
 pub const TJFLAG_BOTTOMUP: c_int = 2;
 pub const TJFLAG_FORCEMMX: c_int = 8;
 pub const TJFLAG_FORCESSE: c_int = 16;
@@ -42,6 +52,23 @@ pub const TJFLAG_LIMITSCANS: c_int = 32768;
 pub const TJERR_WARNING: c_int = 0;
 pub const TJERR_FATAL: c_int = 1;
 
+pub const TJXOP_NONE: c_int = 0;
+pub const TJXOP_HFLIP: c_int = 1;
+pub const TJXOP_VFLIP: c_int = 2;
+pub const TJXOP_TRANSPOSE: c_int = 3;
+pub const TJXOP_TRANSVERSE: c_int = 4;
+pub const TJXOP_ROT90: c_int = 5;
+pub const TJXOP_ROT180: c_int = 6;
+pub const TJXOP_ROT270: c_int = 7;
+
+pub const TJXOPT_PERFECT: c_int = 1;
+pub const TJXOPT_TRIM: c_int = 2;
+pub const TJXOPT_CROP: c_int = 4;
+pub const TJXOPT_GRAY: c_int = 8;
+pub const TJXOPT_NOOUTPUT: c_int = 16;
+pub const TJXOPT_PROGRESSIVE: c_int = 32;
+pub const TJXOPT_COPYNONE: c_int = 64;
+
 pub const TJ_MCU_WIDTH: [c_int; TJ_NUMSAMP as usize] = [8, 16, 16, 8, 8, 32];
 pub const TJ_MCU_HEIGHT: [c_int; TJ_NUMSAMP as usize] = [8, 8, 16, 8, 16, 8];
 
@@ -53,6 +80,9 @@ pub const TJ_BLUE_OFFSET: [c_int; TJ_NUMPF as usize] =
 pub const TJ_ALPHA_OFFSET: [c_int; TJ_NUMPF as usize] =
     [-1, -1, -1, -1, -1, -1, -1, 3, 3, 0, 0, -1];
 pub const TJ_PIXEL_SIZE: [c_int; TJ_NUMPF as usize] = [3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4, 4];
+pub const TJ_SUBSAMP_NAMES: [&str; TJ_NUMSAMP as usize] =
+    ["4:4:4", "4:2:2", "4:2:0", "Grayscale", "4:4:0", "4:1:1"];
+pub const TJ_COLORSPACE_NAMES: [&str; TJ_NUMCS as usize] = ["RGB", "YCbCr", "GRAY", "CMYK", "YCCK"];
 
 pub const NUM_SCALING_FACTORS: c_int = 16;
 
@@ -269,6 +299,24 @@ pub fn plane_size_yuv_checked(
     } else {
         Ok(retval as c_ulong)
     }
+}
+
+pub fn subsamp_name(subsamp: c_int) -> &'static str {
+    TJ_SUBSAMP_NAMES
+        .get(subsamp as usize)
+        .copied()
+        .unwrap_or("Unknown")
+}
+
+pub fn colorspace_name(colorspace: c_int) -> &'static str {
+    TJ_COLORSPACE_NAMES
+        .get(colorspace as usize)
+        .copied()
+        .unwrap_or("Unknown")
+}
+
+pub const fn scaled(dimension: c_int, factor: tjscalingfactor) -> c_int {
+    (dimension * factor.num + factor.denom - 1) / factor.denom
 }
 
 pub fn buf_size_yuv2_checked(

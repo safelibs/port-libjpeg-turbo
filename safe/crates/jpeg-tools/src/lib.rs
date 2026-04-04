@@ -13,6 +13,7 @@ pub const PACKAGED_TOOL_NAMES: &[&str] = &[
     "jpegexiforient",
     "exifautotran",
 ];
+pub const TURBOJPEG_DEV_TOOL_NAMES: &[&str] = &["tjexample"];
 
 pub const MANPAGE_NAMES: &[&str] = &[
     "cjpeg.1",

@@ -6,6 +6,6 @@ mod generated {
 
 fn main() {
     let _ = libjpeg_abi::common_exports::jpeg_std_error as *const ();
-    let _ = libturbojpeg_abi::generated::turbojpeg::tjInitCompress as *const ();
+    let _ = libturbojpeg_abi::non_jni::tjInitCompress as *const ();
     generated::tjbench::main();
 }

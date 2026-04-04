@@ -4,6 +4,14 @@ pub mod generated;
 
 pub const SONAME: &str = "libturbojpeg.so.0";
 pub const LINK_NAME: &str = "turbojpeg";
+pub const NON_JNI_SOURCE_FILES: &[&str] = &[
+    jpeg_core::ported::turbojpeg::turbojpeg::SOURCE_FILE,
+    jpeg_core::ported::turbojpeg::jdatasrc_tj::SOURCE_FILE,
+    jpeg_core::ported::turbojpeg::jdatadst_tj::SOURCE_FILE,
+    jpeg_core::ported::turbojpeg::tjutil::SOURCE_FILE,
+];
+pub const HELPER_IMAGE_IO_SOURCE_FILES: &[&str] = &["rdbmp.c", "rdppm.c", "wrbmp.c", "wrppm.c"];
+pub const TURBOJPEG_TOOL_SOURCE_FILES: &[&str] = &["tjbench.c", "tjexample.c"];
 
 pub const VERSIONED_EXPORTS: &[(&str, &str)] = &[
     ("TJBUFSIZE", "TURBOJPEG_1.0"),
@@ -122,3 +130,24 @@ pub const EXPECTED_JNI_SYMBOLS: &[&str] = &[
     "Java_org_libjpegturbo_turbojpeg_TJ_planeSizeYUV__IIIII",
     "Java_org_libjpegturbo_turbojpeg_TJ_planeWidth__III",
 ];
+
+pub fn version_for_export(symbol: &str) -> Option<&'static str> {
+    VERSIONED_EXPORTS
+        .iter()
+        .find_map(|(name, version)| (*name == symbol).then_some(*version))
+}
+
+pub mod non_jni {
+    pub use crate::generated::turbojpeg::{
+        tjAlloc, tjCompress2, tjDecompress2, tjDecompressHeader3, tjDestroy, tjFree,
+        tjGetErrorCode, tjGetErrorStr, tjGetErrorStr2, tjInitCompress, tjInitDecompress,
+        tjInitTransform, tjLoadImage, tjSaveImage, tjTransform, tjhandle, tjregion,
+        tjscalingfactor, tjtransform, TJCS_CMYK, TJCS_GRAY, TJCS_RGB, TJCS_YCbCr,
+        TJCS_YCCK, TJERR_FATAL, TJERR_WARNING, TJFLAG_ACCURATEDCT, TJFLAG_BOTTOMUP,
+        TJFLAG_FASTDCT, TJFLAG_FASTUPSAMPLE, TJPF_BGRX, TJPF_GRAY, TJPF_UNKNOWN,
+        TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY, TJXOP_HFLIP, TJXOP_NONE,
+        TJXOP_ROT180, TJXOP_ROT270, TJXOP_ROT90, TJXOP_TRANSPOSE, TJXOP_TRANSVERSE,
+        TJXOP_VFLIP, TJXOPT_COPYNONE, TJXOPT_CROP, TJXOPT_GRAY, TJXOPT_NOOUTPUT,
+        TJXOPT_PERFECT, TJXOPT_PROGRESSIVE, TJXOPT_TRIM,
+    };
+}

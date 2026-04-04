@@ -309,6 +309,16 @@ run_jar() {
   fi
 }
 
+cargo_release_build() {
+  local rustflags="${RUSTFLAGS:-}"
+
+  if [[ "$rustflags" == *"-Cembed-bitcode=no"* ]]; then
+    cargo "$@"
+  else
+    RUSTFLAGS="${rustflags:+$rustflags }-Cembed-bitcode=no" cargo "$@"
+  fi
+}
+
 render_jconfig_h() {
   local output="$1"
   cat >"$output" <<EOF
@@ -509,26 +519,27 @@ java_home_dir() {
 
 ensure_rust_libjpeg_staticlib() {
   local staticlib="$SAFE_ROOT/target/release/liblibjpeg_abi.a"
-  cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libjpeg-abi --release >/dev/null \
+  cargo_release_build build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libjpeg-abi --release >/dev/null \
     || die "failed to build libjpeg-abi release staticlib"
   printf '%s\n' "$staticlib"
 }
 
 ensure_rust_libturbojpeg_staticlib() {
   local staticlib="$SAFE_ROOT/target/release/liblibturbojpeg_abi.a"
-  cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libturbojpeg-abi --release >/dev/null \
+  cargo_release_build build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libturbojpeg-abi --release >/dev/null \
     || die "failed to build libturbojpeg-abi release staticlib"
   printf '%s\n' "$staticlib"
 }
 
 ensure_packaged_tool_binaries() {
-  cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p jpeg-tools --release \
+  cargo_release_build build --manifest-path "$SAFE_ROOT/Cargo.toml" -p jpeg-tools --release \
     --bin cjpeg \
     --bin djpeg \
     --bin jpegtran \
     --bin rdjpgcom \
     --bin wrjpgcom \
     --bin tjbench \
+    --bin tjexample \
     --bin jpegexiforient >/dev/null \
     || die "failed to build staged jpeg-tools binaries"
 }
@@ -544,6 +555,7 @@ link_rust_libjpeg() {
   render_version_script "$SAFE_ROOT/debian/libjpeg-turbo8.symbols" "$version_script"
 
   gcc -shared \
+    -fno-lto \
     -Wl,-soname,libjpeg.so.8 \
     -Wl,--version-script,"$version_script" \
     -o "$output" \
@@ -565,6 +577,7 @@ build_staged_libturbojpeg() {
   mkdir -p "$libdir"
 
   gcc -shared \
+    -fno-lto \
     -Wl,-soname,libturbojpeg.so.0 \
     -Wl,--version-script,"$SAFE_ROOT/link/turbojpeg-mapfile.jni" \
     -o "$output" \

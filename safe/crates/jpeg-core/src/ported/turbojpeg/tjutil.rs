@@ -1,6 +1,11 @@
 use core::ffi::{c_int, c_ulong};
 
-use super::turbojpeg::{TJSAMP_GRAY, TJ_MCU_HEIGHT, TJ_MCU_WIDTH};
+use super::turbojpeg::{
+    tjscalingfactor, TJSAMP_420, TJSAMP_422, TJSAMP_444, TJSAMP_GRAY, SCALING_FACTORS,
+    TJ_MCU_HEIGHT, TJ_MCU_WIDTH,
+};
+
+pub const SOURCE_FILE: &str = "tjutil.c";
 
 pub const fn pad(value: c_int, align: c_int) -> c_int {
     if align <= 0 {
@@ -56,4 +61,36 @@ pub fn yuv_size(width: c_int, align: c_int, height: c_int, subsamp: c_int) -> Op
         component += 1;
     }
     Some(total)
+}
+
+pub fn parse_subsamp(spec: &str) -> Option<c_int> {
+    if spec.eq_ignore_ascii_case("gray") || spec.eq_ignore_ascii_case("grayscale") {
+        Some(TJSAMP_GRAY)
+    } else if spec == "444" {
+        Some(TJSAMP_444)
+    } else if spec == "422" {
+        Some(TJSAMP_422)
+    } else if spec == "420" {
+        Some(TJSAMP_420)
+    } else {
+        None
+    }
+}
+
+pub fn parse_scaling_factor(spec: &str) -> Option<tjscalingfactor> {
+    let (num, denom) = spec.split_once('/')?;
+    let num = num.parse::<c_int>().ok()?;
+    let denom = denom.parse::<c_int>().ok()?;
+    SCALING_FACTORS
+        .iter()
+        .copied()
+        .find(|factor| factor.num == num && factor.denom == denom)
+}
+
+pub fn format_scaling_factor_list() -> String {
+    SCALING_FACTORS
+        .iter()
+        .map(|factor| format!("{}/{}", factor.num, factor.denom))
+        .collect::<Vec<_>>()
+        .join(", ")
 }

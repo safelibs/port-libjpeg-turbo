@@ -232,6 +232,21 @@ fn run_relinked_command(
         .map_err(|error| format!("failed to spawn relinked {tool}: {error}"))
 }
 
+fn run_rust_release_command(
+    stage: &StagePaths,
+    temp_dir: &Path,
+    tool: &str,
+    args: &[OsString],
+) -> Result<Output, String> {
+    let path = safe::safe_root().join("target/release").join(tool);
+    Command::new(&path)
+        .env("LD_LIBRARY_PATH", &stage.stage_lib)
+        .current_dir(temp_dir)
+        .args(args)
+        .output()
+        .map_err(|error| format!("failed to spawn Rust release {tool} at {}: {error}", path.display()))
+}
+
 fn command_failure(tool: &str, output: &Output) -> String {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -298,6 +313,256 @@ fn assert_bmp_payload_identical(left: &Path, right: &Path) -> Result<(), String>
             right.display()
         ))
     }
+}
+
+fn run_tjexample_subset<F>(
+    stage: &StagePaths,
+    temp_dir: &Path,
+    runner: F,
+) -> Result<(), String>
+where
+    F: Fn(&StagePaths, &Path, &[OsString]) -> Result<Output, String>,
+{
+    let image = stage
+        .repo_root
+        .join("original/testimages/vgl_6548_0026a.bmp");
+    let ref_420_fast = temp_dir.join("ref_420_fast_cjpeg.jpg");
+    let ref_420_default_bmp = temp_dir.join("ref_420_default_djpeg.bmp");
+    let ref_420_nosmooth_bmp = temp_dir.join("ref_420_nosmooth_djpeg.bmp");
+    let ref_420_half_bmp = temp_dir.join("ref_420_half_djpeg.bmp");
+    let ref_gray_fast = temp_dir.join("ref_gray_fast_cjpeg.jpg");
+    let ref_rot90 = temp_dir.join("ref_rot90_jpegtran.jpg");
+    let ref_gray_rot90 = temp_dir.join("ref_gray_rot90_jpegtran.jpg");
+    let actual_jpeg = temp_dir.join("tjexample_420_fast.jpg");
+    let actual_default_bmp = temp_dir.join("tjexample_default.bmp");
+    let actual_nosmooth_bmp = temp_dir.join("tjexample_nosmooth.bmp");
+    let actual_half_bmp = temp_dir.join("tjexample_half.bmp");
+    let actual_rot90 = temp_dir.join("tjexample_rot90.jpg");
+    let actual_gray_rot90 = temp_dir.join("tjexample_gray_rot90.jpg");
+
+    assert_success(
+        "cjpeg",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "cjpeg",
+            &[
+                "-quality".into(),
+                "95".into(),
+                "-dct".into(),
+                "fast".into(),
+                "-sample".into(),
+                "2x2".into(),
+                "-outfile".into(),
+                ref_420_fast.clone().into_os_string(),
+                image.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "cjpeg",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "cjpeg",
+            &[
+                "-quality".into(),
+                "95".into(),
+                "-dct".into(),
+                "fast".into(),
+                "-grayscale".into(),
+                "-outfile".into(),
+                ref_gray_fast.clone().into_os_string(),
+                image.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "djpeg",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "djpeg",
+            &[
+                "-rgb".into(),
+                "-bmp".into(),
+                "-outfile".into(),
+                ref_420_default_bmp.clone().into_os_string(),
+                ref_420_fast.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "djpeg",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "djpeg",
+            &[
+                "-nosmooth".into(),
+                "-rgb".into(),
+                "-bmp".into(),
+                "-outfile".into(),
+                ref_420_nosmooth_bmp.clone().into_os_string(),
+                ref_420_fast.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "djpeg",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "djpeg",
+            &[
+                "-rgb".into(),
+                "-bmp".into(),
+                "-scale".into(),
+                "1/2".into(),
+                "-outfile".into(),
+                ref_420_half_bmp.clone().into_os_string(),
+                ref_420_fast.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "jpegtran",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "jpegtran",
+            &[
+                "-crop".into(),
+                "70x60+16+16".into(),
+                "-rotate".into(),
+                "90".into(),
+                "-trim".into(),
+                "-outfile".into(),
+                ref_rot90.clone().into_os_string(),
+                ref_420_fast.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "jpegtran",
+        run_stage_command(
+            stage,
+            temp_dir,
+            "jpegtran",
+            &[
+                "-crop".into(),
+                "70x60+16+16".into(),
+                "-rotate".into(),
+                "90".into(),
+                "-trim".into(),
+                "-grayscale".into(),
+                "-outfile".into(),
+                ref_gray_rot90.clone().into_os_string(),
+                ref_gray_fast.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                image.clone().into_os_string(),
+                actual_jpeg.clone().into_os_string(),
+                "-q".into(),
+                "95".into(),
+                "-subsamp".into(),
+                "420".into(),
+                "-fastdct".into(),
+            ],
+        )?,
+    )?;
+    assert_files_identical(&actual_jpeg, &ref_420_fast)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_default_bmp.clone().into_os_string(),
+            ],
+        )?,
+    )?;
+    assert_bmp_payload_identical(&actual_default_bmp, &ref_420_default_bmp)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_nosmooth_bmp.clone().into_os_string(),
+                "-fastupsample".into(),
+            ],
+        )?,
+    )?;
+    assert_bmp_payload_identical(&actual_nosmooth_bmp, &ref_420_nosmooth_bmp)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_half_bmp.clone().into_os_string(),
+                "-scale".into(),
+                "1/2".into(),
+            ],
+        )?,
+    )?;
+    assert_bmp_payload_identical(&actual_half_bmp, &ref_420_half_bmp)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_rot90.clone().into_os_string(),
+                "-rot90".into(),
+                "-crop".into(),
+                "70x60+16+16".into(),
+            ],
+        )?,
+    )?;
+    assert_files_identical(&actual_rot90, &ref_rot90)?;
+
+    assert_success(
+        "tjexample",
+        runner(
+            stage,
+            temp_dir,
+            &[
+                ref_420_fast.clone().into_os_string(),
+                actual_gray_rot90.clone().into_os_string(),
+                "-rot90".into(),
+                "-grayscale".into(),
+                "-crop".into(),
+                "70x60+16+16".into(),
+            ],
+        )?,
+    )?;
+    assert_files_identical(&actual_gray_rot90, &ref_gray_rot90)?;
+
+    Ok(())
 }
 
 #[test]
@@ -632,283 +897,23 @@ fn tjbench_tile_regressions_match_upstream_md5s() {
 }
 
 #[test]
-fn tjexample_shell_contract_subset_passes() {
+fn rust_tjexample_shell_contract_subset_passes() {
     let _guard = main_lock();
     let stage = stage_paths().expect("stage paths");
-    let temp_dir = new_temp_dir("tjexample").expect("temp dir");
+    let temp_dir = new_temp_dir("rust-tjexample").expect("temp dir");
+    run_tjexample_subset(&stage, &temp_dir, |stage, temp_dir, args| {
+        run_rust_release_command(stage, temp_dir, "tjexample", args)
+    })
+    .expect("Rust tjexample subset");
+}
 
-    let image = stage
-        .repo_root
-        .join("original/testimages/vgl_6548_0026a.bmp");
-    let ref_420_fast = temp_dir.join("ref_420_fast_cjpeg.jpg");
-    let ref_420_default_bmp = temp_dir.join("ref_420_default_djpeg.bmp");
-    let ref_420_nosmooth_bmp = temp_dir.join("ref_420_nosmooth_djpeg.bmp");
-    let ref_420_half_bmp = temp_dir.join("ref_420_half_djpeg.bmp");
-    let ref_gray_fast = temp_dir.join("ref_gray_fast_cjpeg.jpg");
-    let ref_rot90 = temp_dir.join("ref_rot90_jpegtran.jpg");
-    let ref_gray_rot90 = temp_dir.join("ref_gray_rot90_jpegtran.jpg");
-    let actual_jpeg = temp_dir.join("tjexample_420_fast.jpg");
-    let actual_default_bmp = temp_dir.join("tjexample_default.bmp");
-    let actual_nosmooth_bmp = temp_dir.join("tjexample_nosmooth.bmp");
-    let actual_half_bmp = temp_dir.join("tjexample_half.bmp");
-    let actual_rot90 = temp_dir.join("tjexample_rot90.jpg");
-    let actual_gray_rot90 = temp_dir.join("tjexample_gray_rot90.jpg");
-
-    assert_success(
-        "cjpeg",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "cjpeg",
-            &[
-                "-quality".into(),
-                "95".into(),
-                "-dct".into(),
-                "fast".into(),
-                "-sample".into(),
-                "2x2".into(),
-                "-outfile".into(),
-                ref_420_fast.clone().into_os_string(),
-                image.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn cjpeg 420 fast"),
-    )
-    .expect("cjpeg 420 fast");
-
-    assert_success(
-        "cjpeg",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "cjpeg",
-            &[
-                "-quality".into(),
-                "95".into(),
-                "-dct".into(),
-                "fast".into(),
-                "-grayscale".into(),
-                "-outfile".into(),
-                ref_gray_fast.clone().into_os_string(),
-                image.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn cjpeg gray fast"),
-    )
-    .expect("cjpeg gray fast");
-
-    assert_success(
-        "djpeg",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "djpeg",
-            &[
-                "-rgb".into(),
-                "-bmp".into(),
-                "-outfile".into(),
-                ref_420_default_bmp.clone().into_os_string(),
-                ref_420_fast.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn djpeg default"),
-    )
-    .expect("djpeg default");
-
-    assert_success(
-        "djpeg",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "djpeg",
-            &[
-                "-nosmooth".into(),
-                "-rgb".into(),
-                "-bmp".into(),
-                "-outfile".into(),
-                ref_420_nosmooth_bmp.clone().into_os_string(),
-                ref_420_fast.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn djpeg nosmooth"),
-    )
-    .expect("djpeg nosmooth");
-
-    assert_success(
-        "djpeg",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "djpeg",
-            &[
-                "-rgb".into(),
-                "-bmp".into(),
-                "-scale".into(),
-                "1/2".into(),
-                "-outfile".into(),
-                ref_420_half_bmp.clone().into_os_string(),
-                ref_420_fast.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn djpeg half"),
-    )
-    .expect("djpeg half");
-
-    assert_success(
-        "jpegtran",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "jpegtran",
-            &[
-                "-crop".into(),
-                "70x60+16+16".into(),
-                "-rotate".into(),
-                "90".into(),
-                "-trim".into(),
-                "-outfile".into(),
-                ref_rot90.clone().into_os_string(),
-                ref_420_fast.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn jpegtran rot90"),
-    )
-    .expect("jpegtran rot90");
-
-    assert_success(
-        "jpegtran",
-        run_stage_command(
-            &stage,
-            &temp_dir,
-            "jpegtran",
-            &[
-                "-crop".into(),
-                "70x60+16+16".into(),
-                "-rotate".into(),
-                "90".into(),
-                "-trim".into(),
-                "-grayscale".into(),
-                "-outfile".into(),
-                ref_gray_rot90.clone().into_os_string(),
-                ref_gray_fast.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn jpegtran gray rot90"),
-    )
-    .expect("jpegtran gray rot90");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                image.clone().into_os_string(),
-                actual_jpeg.clone().into_os_string(),
-                "-q".into(),
-                "95".into(),
-                "-subsamp".into(),
-                "420".into(),
-                "-fastdct".into(),
-            ],
-        )
-        .expect("spawn tjexample compress"),
-    )
-    .expect("tjexample compress");
-    assert_files_identical(&actual_jpeg, &ref_420_fast).expect("tjexample compress output");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                ref_420_fast.clone().into_os_string(),
-                actual_default_bmp.clone().into_os_string(),
-            ],
-        )
-        .expect("spawn tjexample default decode"),
-    )
-    .expect("tjexample default decode");
-    assert_bmp_payload_identical(&actual_default_bmp, &ref_420_default_bmp)
-        .expect("tjexample default decode output");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                ref_420_fast.clone().into_os_string(),
-                actual_nosmooth_bmp.clone().into_os_string(),
-                "-fastupsample".into(),
-            ],
-        )
-        .expect("spawn tjexample nosmooth decode"),
-    )
-    .expect("tjexample nosmooth decode");
-    assert_bmp_payload_identical(&actual_nosmooth_bmp, &ref_420_nosmooth_bmp)
-        .expect("tjexample nosmooth decode output");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                ref_420_fast.clone().into_os_string(),
-                actual_half_bmp.clone().into_os_string(),
-                "-scale".into(),
-                "1/2".into(),
-            ],
-        )
-        .expect("spawn tjexample half decode"),
-    )
-    .expect("tjexample half decode");
-    assert_bmp_payload_identical(&actual_half_bmp, &ref_420_half_bmp)
-        .expect("tjexample half decode output");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                ref_420_fast.clone().into_os_string(),
-                actual_rot90.clone().into_os_string(),
-                "-rot90".into(),
-                "-crop".into(),
-                "70x60+16+16".into(),
-            ],
-        )
-        .expect("spawn tjexample rot90"),
-    )
-    .expect("tjexample rot90");
-    assert_files_identical(&actual_rot90, &ref_rot90).expect("tjexample rot90 output");
-
-    assert_success(
-        "tjexample",
-        run_relinked_command(
-            &stage,
-            &temp_dir,
-            "tjexample",
-            &[
-                ref_420_fast.clone().into_os_string(),
-                actual_gray_rot90.clone().into_os_string(),
-                "-rot90".into(),
-                "-grayscale".into(),
-                "-crop".into(),
-                "70x60+16+16".into(),
-            ],
-        )
-        .expect("spawn tjexample gray rot90"),
-    )
-    .expect("tjexample gray rot90");
-    assert_files_identical(&actual_gray_rot90, &ref_gray_rot90)
-        .expect("tjexample gray rot90 output");
+#[test]
+fn relinked_tjexample_shell_contract_subset_passes() {
+    let _guard = main_lock();
+    let stage = stage_paths().expect("stage paths");
+    let temp_dir = new_temp_dir("relinked-tjexample").expect("temp dir");
+    run_tjexample_subset(&stage, &temp_dir, |stage, temp_dir, args| {
+        run_relinked_command(stage, temp_dir, "tjexample", args)
+    })
+    .expect("relinked tjexample subset");
 }

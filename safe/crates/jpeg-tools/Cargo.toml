@@ -9,5 +9,6 @@ build = "build.rs"
 path = "src/lib.rs"
 
 [dependencies]
+jpeg-core = { path = "../jpeg-core" }
 libjpeg-abi = { path = "../libjpeg-abi" }
 libturbojpeg-abi = { path = "../libturbojpeg-abi" }

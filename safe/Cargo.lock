@@ -131,6 +131,7 @@ dependencies = [
 name = "jpeg-tools"
 version = "0.1.0"
 dependencies = [
+ "jpeg-core",
  "libjpeg-abi",
  "libturbojpeg-abi",
 ]
