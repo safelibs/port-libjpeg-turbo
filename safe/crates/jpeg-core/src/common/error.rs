@@ -2,8 +2,8 @@ use core::ffi::c_char;
 
 use ffi_types::{
     boolean, int, j_common_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_error_mgr, JHUFF_TBL,
-    JQUANT_TBL, J_MESSAGE_CODE, DSTATE_START, JMSG_LASTMSGCODE, JMSG_LENGTH_MAX, JPOOL_NUMPOOLS,
-    JPOOL_PERMANENT, CSTATE_START, FALSE,
+    JQUANT_TBL, J_MESSAGE_CODE, CSTATE_START, DSTATE_START, FALSE, JMSG_LASTMSGCODE,
+    JMSG_LENGTH_MAX, JPEG_STD_MESSAGE_TABLE_LEN, JPOOL_NUMPOOLS, JPOOL_PERMANENT,
 };
 
 use crate::common::{memory, registry};
@@ -20,7 +20,7 @@ const fn cstr(bytes: &'static [u8]) -> *const c_char {
 }
 
 #[no_mangle]
-pub static mut jpeg_std_message_table: [*const c_char; 129] = [
+pub static mut jpeg_std_message_table: [*const c_char; JPEG_STD_MESSAGE_TABLE_LEN] = [
     cstr(b"Bogus message code %d\0"),
     cstr(b"ALIGN_TYPE is wrong, please fix\0"),
     cstr(b"MAX_ALLOC_CHUNK is wrong, please fix\0"),

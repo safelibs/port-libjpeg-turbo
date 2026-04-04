@@ -43,6 +43,7 @@ pub const JCS_EXTENSIONS: int = 1;
 pub const JCS_ALPHA_EXTENSIONS: int = 1;
 pub const JMSG_LENGTH_MAX: usize = 200;
 pub const JMSG_STR_PARM_MAX: usize = 80;
+pub const JPEG_MSG_PARMS_MAX: usize = 8;
 pub const JPOOL_PERMANENT: int = 0;
 pub const JPOOL_IMAGE: int = 1;
 pub const JPOOL_NUMPOOLS: usize = 2;
@@ -153,13 +154,13 @@ pub type jpeg_saved_marker_ptr = *mut jpeg_marker_struct;
 
 #[repr(C)]
 pub struct jpeg_error_mgr_msg_parm {
-    pub i: [int; 8],
+    pub i: [int; JPEG_MSG_PARMS_MAX],
     pub s: [::core::ffi::c_char; JMSG_STR_PARM_MAX],
 }
 
 #[repr(C)]
 pub union jpeg_error_mgr_msg_parm_union {
-    pub i: [int; 8],
+    pub i: [int; JPEG_MSG_PARMS_MAX],
     pub s: [::core::ffi::c_char; JMSG_STR_PARM_MAX],
 }
 
@@ -943,3 +944,4 @@ pub enum J_MESSAGE_CODE {
 }
 
 pub const JMSG_LASTMSGCODE: int = J_MESSAGE_CODE::JMSG_LASTMSGCODE as int;
+pub const JPEG_STD_MESSAGE_TABLE_LEN: usize = JMSG_LASTMSGCODE as usize + 1;

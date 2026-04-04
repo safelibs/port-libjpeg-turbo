@@ -16,5 +16,9 @@ unsafe extern "C" {
     pub fn jpeg_rs_invoke_error_exit(cinfo: ffi_types::j_common_ptr);
 }
 
+#[used]
+static JPEG_RS_ERROR_BRIDGE_LINK_GUARD: unsafe extern "C" fn(ffi_types::j_common_ptr) =
+    jpeg_rs_invoke_error_exit;
+
 pub const SONAME: &str = "libjpeg.so.8";
 pub const LINK_NAME: &str = "jpeg";

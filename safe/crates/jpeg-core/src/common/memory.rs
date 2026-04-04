@@ -454,6 +454,7 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
                         * (*sptr).samplesperrow as ffi_types::long
                         * size_of::<JSAMPLE>() as ffi_types::long,
                 );
+                (*sptr).b_s_open = TRUE;
             }
             (*sptr).mem_buffer = alloc_sarray(cinfo, JPOOL_IMAGE, (*sptr).samplesperrow, (*sptr).rows_in_mem);
             (*sptr).rowsperchunk = (*mem).last_rowsperchunk;
@@ -479,6 +480,7 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
                         * (*bptr).blocksperrow as ffi_types::long
                         * size_of::<JBLOCK>() as ffi_types::long,
                 );
+                (*bptr).b_s_open = TRUE;
             }
             (*bptr).mem_buffer = alloc_barray(cinfo, JPOOL_IMAGE, (*bptr).blocksperrow, (*bptr).rows_in_mem);
             (*bptr).rowsperchunk = (*mem).last_rowsperchunk;

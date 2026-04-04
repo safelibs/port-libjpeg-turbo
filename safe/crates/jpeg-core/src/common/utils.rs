@@ -82,7 +82,9 @@ pub unsafe fn copy_sample_rows(
     let count = num_cols as usize * core::mem::size_of::<JSAMPLE>();
     let mut row = num_rows;
     while row > 0 {
-        ptr::copy_nonoverlapping(*input, *output, count);
+        // Upstream allows row duplication, so the individual row copies must
+        // tolerate aliasing within the caller-provided sample arrays.
+        ptr::copy(*input, *output, count);
         input = input.add(1);
         output = output.add(1);
         row -= 1;

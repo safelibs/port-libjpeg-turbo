@@ -6,7 +6,7 @@ use ffi_types::{
     JPEG_EOI, FALSE, TRUE,
 };
 
-use crate::common::{error, registry};
+use crate::common::error;
 
 const INPUT_BUF_SIZE: usize = 4096;
 const OUTPUT_BUF_SIZE: usize = 4096;
@@ -24,22 +24,14 @@ extern "C" {
 #[repr(C)]
 struct MySourceMgr {
     pub_: jpeg_source_mgr,
-    magic: u32,
     infile: *mut FILE,
     buffer: *mut JOCTET,
     start_of_file: boolean,
 }
 
 #[repr(C)]
-struct MyMemSourceMgr {
-    pub_: jpeg_source_mgr,
-    magic: u32,
-}
-
-#[repr(C)]
 struct MyDestinationMgr {
     pub_: jpeg_destination_mgr,
-    magic: u32,
     outfile: *mut FILE,
     buffer: *mut JOCTET,
 }
@@ -47,12 +39,35 @@ struct MyDestinationMgr {
 #[repr(C)]
 struct MyMemDestinationMgr {
     pub_: jpeg_destination_mgr,
-    magic: u32,
     outbuffer: *mut *mut u8,
     outsize: *mut ffi_types::ulong,
     newbuffer: *mut u8,
     buffer: *mut JOCTET,
     bufsize: size_t,
+}
+
+#[inline]
+unsafe fn has_stdio_src_manager(src: *mut jpeg_source_mgr) -> bool {
+    let expected: unsafe extern "C" fn(j_decompress_ptr) = init_source;
+    !src.is_null() && (*src).init_source == Some(expected)
+}
+
+#[inline]
+unsafe fn has_mem_src_manager(src: *mut jpeg_source_mgr) -> bool {
+    let expected: unsafe extern "C" fn(j_decompress_ptr) = init_mem_source;
+    !src.is_null() && (*src).init_source == Some(expected)
+}
+
+#[inline]
+unsafe fn has_stdio_dest_manager(dest: *mut jpeg_destination_mgr) -> bool {
+    let expected: unsafe extern "C" fn(j_compress_ptr) = init_destination;
+    !dest.is_null() && (*dest).init_destination == Some(expected)
+}
+
+#[inline]
+unsafe fn has_mem_dest_manager(dest: *mut jpeg_destination_mgr) -> bool {
+    let expected: unsafe extern "C" fn(j_compress_ptr) = init_mem_destination;
+    !dest.is_null() && (*dest).init_destination == Some(expected)
 }
 
 unsafe extern "C" fn init_source(cinfo: j_decompress_ptr) {
@@ -165,13 +180,12 @@ pub unsafe fn jpeg_stdio_src(cinfo: j_decompress_ptr, infile: *mut FILE) {
             .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MySourceMgr>())
             as *mut MySourceMgr;
         ptr::write_bytes(src as *mut u8, 0, size_of::<MySourceMgr>());
-        (*src).magic = registry::STDIO_SRC_MAGIC;
         (*src).buffer = (*(*cinfo).mem)
             .alloc_small
             .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, INPUT_BUF_SIZE)
             as *mut JOCTET;
         (*cinfo).src = &mut (*src).pub_;
-    } else if (*( (*cinfo).src as *mut MySourceMgr )).magic != registry::STDIO_SRC_MAGIC {
+    } else if !has_stdio_src_manager((*cinfo).src) {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
     }
 
@@ -193,22 +207,22 @@ pub unsafe fn jpeg_mem_src(cinfo: j_decompress_ptr, inbuffer: *const u8, insize:
     if (*cinfo).src.is_null() {
         let src = (*(*cinfo).mem)
             .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MyMemSourceMgr>())
-            as *mut MyMemSourceMgr;
-        ptr::write_bytes(src as *mut u8, 0, size_of::<MyMemSourceMgr>());
-        (*src).magic = registry::MEM_SRC_MAGIC;
-        (*cinfo).src = &mut (*src).pub_;
-    } else if (*( (*cinfo).src as *mut MyMemSourceMgr )).magic != registry::MEM_SRC_MAGIC {
+            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<jpeg_source_mgr>())
+            as *mut jpeg_source_mgr;
+        ptr::write_bytes(src as *mut u8, 0, size_of::<jpeg_source_mgr>());
+        (*cinfo).src = src;
+    } else if !has_mem_src_manager((*cinfo).src) {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
     }
 
-    (*(*cinfo).src).init_source = Some(init_mem_source);
-    (*(*cinfo).src).fill_input_buffer = Some(fill_mem_input_buffer);
-    (*(*cinfo).src).skip_input_data = Some(skip_input_data);
-    (*(*cinfo).src).resync_to_restart = Some(jpeg_resync_to_restart);
-    (*(*cinfo).src).term_source = Some(term_source);
-    (*(*cinfo).src).bytes_in_buffer = insize as usize;
-    (*(*cinfo).src).next_input_byte = inbuffer;
+    let src = (*cinfo).src;
+    (*src).init_source = Some(init_mem_source);
+    (*src).fill_input_buffer = Some(fill_mem_input_buffer);
+    (*src).skip_input_data = Some(skip_input_data);
+    (*src).resync_to_restart = Some(jpeg_resync_to_restart);
+    (*src).term_source = Some(term_source);
+    (*src).bytes_in_buffer = insize as usize;
+    (*src).next_input_byte = inbuffer;
 }
 
 pub unsafe fn jpeg_stdio_dest(cinfo: j_compress_ptr, outfile: *mut FILE) {
@@ -218,9 +232,8 @@ pub unsafe fn jpeg_stdio_dest(cinfo: j_compress_ptr, outfile: *mut FILE) {
             .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MyDestinationMgr>())
             as *mut MyDestinationMgr;
         ptr::write_bytes(dest as *mut u8, 0, size_of::<MyDestinationMgr>());
-        (*dest).magic = registry::STDIO_DEST_MAGIC;
         (*cinfo).dest = &mut (*dest).pub_;
-    } else if (*( (*cinfo).dest as *mut MyDestinationMgr )).magic != registry::STDIO_DEST_MAGIC {
+    } else if !has_stdio_dest_manager((*cinfo).dest) {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
     }
 
@@ -245,9 +258,8 @@ pub unsafe fn jpeg_mem_dest(
             .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MyMemDestinationMgr>())
             as *mut MyMemDestinationMgr;
         ptr::write_bytes(dest as *mut u8, 0, size_of::<MyMemDestinationMgr>());
-        (*dest).magic = registry::MEM_DEST_MAGIC;
         (*cinfo).dest = &mut (*dest).pub_;
-    } else if (*( (*cinfo).dest as *mut MyMemDestinationMgr )).magic != registry::MEM_DEST_MAGIC {
+    } else if !has_mem_dest_manager((*cinfo).dest) {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
     }
 

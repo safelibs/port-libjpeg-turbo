@@ -12,6 +12,7 @@ const ICC_OVERHEAD_LEN: usize = 14;
 const MAX_BYTES_IN_MARKER: usize = 65533;
 const MAX_DATA_BYTES_IN_MARKER: usize = MAX_BYTES_IN_MARKER - ICC_OVERHEAD_LEN;
 const MAX_SEQ_NO: usize = 255;
+const ICC_SIGNATURE: [JOCTET; 12] = *b"ICC_PROFILE\0";
 
 extern "C" {
     fn malloc(size: usize) -> *mut c_void;
@@ -21,21 +22,21 @@ extern "C" {
 
 #[inline]
 unsafe fn marker_is_icc(marker: jpeg_saved_marker_ptr) -> bool {
-    !marker.is_null()
-        && (*marker).marker as int == ICC_MARKER
-        && (*marker).data_length as usize >= ICC_OVERHEAD_LEN
-        && *(*marker).data.add(0) == 0x49
-        && *(*marker).data.add(1) == 0x43
-        && *(*marker).data.add(2) == 0x43
-        && *(*marker).data.add(3) == 0x5F
-        && *(*marker).data.add(4) == 0x50
-        && *(*marker).data.add(5) == 0x52
-        && *(*marker).data.add(6) == 0x4F
-        && *(*marker).data.add(7) == 0x46
-        && *(*marker).data.add(8) == 0x49
-        && *(*marker).data.add(9) == 0x4C
-        && *(*marker).data.add(10) == 0x45
-        && *(*marker).data.add(11) == 0x00
+    if marker.is_null()
+        || (*marker).marker as int != ICC_MARKER
+        || ((*marker).data_length as usize) < ICC_OVERHEAD_LEN
+    {
+        return false;
+    }
+
+    let mut i = 0usize;
+    while i < ICC_SIGNATURE.len() {
+        if *(*marker).data.add(i) != ICC_SIGNATURE[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 pub unsafe fn jpeg_write_icc_profile(
@@ -67,8 +68,8 @@ pub unsafe fn jpeg_write_icc_profile(
         }
         icc_data_len -= length as ::core::ffi::c_uint;
         jpeg_write_m_header(cinfo, ICC_MARKER, (length + ICC_OVERHEAD_LEN) as ::core::ffi::c_uint);
-        for byte in [0x49, 0x43, 0x43, 0x5F, 0x50, 0x52, 0x4F, 0x46, 0x49, 0x4C, 0x45, 0x00] {
-            jpeg_write_m_byte(cinfo, byte);
+        for byte in ICC_SIGNATURE {
+            jpeg_write_m_byte(cinfo, byte as int);
         }
         jpeg_write_m_byte(cinfo, cur_marker);
         jpeg_write_m_byte(cinfo, num_markers as int);

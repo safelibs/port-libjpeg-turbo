@@ -8,8 +8,8 @@ use std::sync::Mutex;
 use ffi_types::{
     boolean, j_compress_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_compress_struct,
     jpeg_decompress_struct, jpeg_error_mgr, jpeg_marker_struct, jpeg_marker_writer,
-    CSTATE_SCANNING, DSTATE_READY, FILE, JCS_EXT_RGB, JCS_EXT_RGBA, JMSG_LENGTH_MAX,
-    JPEG_LIB_VERSION, J_MESSAGE_CODE, TRUE,
+    CSTATE_SCANNING, CSTATE_START, DSTATE_READY, DSTATE_START, FALSE, FILE, JCS_EXT_RGB,
+    JCS_EXT_RGBA, JMSG_LENGTH_MAX, JPOOL_IMAGE, JPEG_LIB_VERSION, J_MESSAGE_CODE, TRUE,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -19,8 +19,11 @@ unsafe extern "C" {
     fn jpeg_std_error(err: *mut jpeg_error_mgr) -> *mut jpeg_error_mgr;
     fn jpeg_CreateCompress(cinfo: j_compress_ptr, version: c_int, structsize: usize);
     fn jpeg_CreateDecompress(cinfo: j_decompress_ptr, version: c_int, structsize: usize);
+    fn jpeg_abort_compress(cinfo: j_compress_ptr);
+    fn jpeg_abort_decompress(cinfo: j_decompress_ptr);
     fn jpeg_destroy_compress(cinfo: j_compress_ptr);
     fn jpeg_destroy_decompress(cinfo: j_decompress_ptr);
+    fn jpeg_mem_src(cinfo: j_decompress_ptr, inbuffer: *const u8, insize: u64);
     fn jpeg_stdio_dest(cinfo: j_compress_ptr, outfile: *mut FILE);
     fn jpeg_stdio_src(cinfo: j_decompress_ptr, infile: *mut FILE);
     fn jpeg_mem_dest(cinfo: j_compress_ptr, outbuffer: *mut *mut u8, outsize: *mut u64);
@@ -232,6 +235,99 @@ fn stdio_and_memory_managers_roundtrip() {
         );
         free(outbuffer as *mut c_void);
         jpeg_destroy_compress(&mut mem_cinfo);
+    }
+}
+
+#[test]
+fn abort_preserves_permanent_io_managers() {
+    unsafe {
+        let (mut cinfo, _err) = init_compress();
+        let mut outbuffer: *mut u8 = ptr::null_mut();
+        let mut outsize = 0u64;
+        jpeg_mem_dest(&mut cinfo, &mut outbuffer, &mut outsize);
+        let dest = cinfo.dest;
+        assert!(!dest.is_null());
+
+        jpeg_abort_compress(&mut cinfo);
+        assert_eq!(cinfo.global_state, CSTATE_START);
+        assert_eq!(cinfo.dest, dest);
+
+        jpeg_mem_dest(&mut cinfo, &mut outbuffer, &mut outsize);
+        assert_eq!(cinfo.dest, dest);
+        free(outbuffer as *mut c_void);
+        jpeg_destroy_compress(&mut cinfo);
+
+        let (mut dinfo, _derr) = init_decompress();
+        let jpeg_bytes = [0xFFu8, 0xD8, 0xFF, 0xD9];
+        jpeg_mem_src(&mut dinfo, jpeg_bytes.as_ptr(), jpeg_bytes.len() as u64);
+        let src = dinfo.src;
+        assert!(!src.is_null());
+
+        jpeg_abort_decompress(&mut dinfo);
+        assert_eq!(dinfo.global_state, DSTATE_START);
+        assert_eq!(dinfo.src, src);
+        assert!(dinfo.marker_list.is_null());
+
+        jpeg_mem_src(&mut dinfo, jpeg_bytes.as_ptr(), jpeg_bytes.len() as u64);
+        assert_eq!(dinfo.src, src);
+        jpeg_destroy_decompress(&mut dinfo);
+    }
+}
+
+#[test]
+fn virtual_sample_arrays_obey_prezero_and_pool_semantics() {
+    unsafe {
+        let (mut cinfo, _err) = init_compress();
+        let mem = cinfo.mem;
+        let request = (*mem).request_virt_sarray.unwrap();
+        let realize = (*mem).realize_virt_arrays.unwrap();
+        let access = (*mem).access_virt_sarray.unwrap();
+
+        let array = request(
+            &mut cinfo as *mut jpeg_compress_struct as *mut jpeg_common_struct,
+            JPOOL_IMAGE,
+            TRUE,
+            4,
+            3,
+            2,
+        );
+        realize(&mut cinfo as *mut jpeg_compress_struct as *mut jpeg_common_struct);
+
+        let rows = access(
+            &mut cinfo as *mut jpeg_compress_struct as *mut jpeg_common_struct,
+            array,
+            0,
+            2,
+            TRUE,
+        );
+        assert_eq!(std::slice::from_raw_parts(*rows.add(0), 4), &[0, 0, 0, 0]);
+        assert_eq!(std::slice::from_raw_parts(*rows.add(1), 4), &[0, 0, 0, 0]);
+
+        *(*rows.add(0)).add(0) = 17;
+        *(*rows.add(1)).add(3) = 29;
+
+        let reread = access(
+            &mut cinfo as *mut jpeg_compress_struct as *mut jpeg_common_struct,
+            array,
+            0,
+            2,
+            FALSE,
+        );
+        assert_eq!(std::slice::from_raw_parts(*reread.add(0), 4)[0], 17);
+        assert_eq!(std::slice::from_raw_parts(*reread.add(1), 4)[3], 29);
+
+        let tail = access(
+            &mut cinfo as *mut jpeg_compress_struct as *mut jpeg_common_struct,
+            array,
+            2,
+            1,
+            TRUE,
+        );
+        assert_eq!(std::slice::from_raw_parts(*tail.add(0), 4), &[0, 0, 0, 0]);
+
+        jpeg_abort_compress(&mut cinfo);
+        assert_eq!(cinfo.global_state, CSTATE_START);
+        jpeg_destroy_compress(&mut cinfo);
     }
 }
 

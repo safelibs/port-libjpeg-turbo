@@ -34,32 +34,46 @@ pub unsafe extern "C" fn jpeg_alloc_huff_table(cinfo: j_common_ptr) -> *mut JHUF
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_get_small(cinfo: j_common_ptr, sizeofobject: usize) -> *mut c_void {
+pub unsafe extern "C" fn jpeg_get_small(
+    cinfo: j_common_ptr,
+    sizeofobject: ffi_types::size_t,
+) -> *mut c_void {
     jpeg_core::common::memory::jpeg_get_small(cinfo, sizeofobject)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_free_small(cinfo: j_common_ptr, object: *mut c_void, sizeofobject: usize) {
+pub unsafe extern "C" fn jpeg_free_small(
+    cinfo: j_common_ptr,
+    object: *mut c_void,
+    sizeofobject: ffi_types::size_t,
+) {
     jpeg_core::common::memory::jpeg_free_small(cinfo, object, sizeofobject)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_get_large(cinfo: j_common_ptr, sizeofobject: usize) -> *mut c_void {
+pub unsafe extern "C" fn jpeg_get_large(
+    cinfo: j_common_ptr,
+    sizeofobject: ffi_types::size_t,
+) -> *mut c_void {
     jpeg_core::common::memory::jpeg_get_large(cinfo, sizeofobject)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_free_large(cinfo: j_common_ptr, object: *mut c_void, sizeofobject: usize) {
+pub unsafe extern "C" fn jpeg_free_large(
+    cinfo: j_common_ptr,
+    object: *mut c_void,
+    sizeofobject: ffi_types::size_t,
+) {
     jpeg_core::common::memory::jpeg_free_large(cinfo, object, sizeofobject)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_mem_available(
     cinfo: j_common_ptr,
-    min_bytes_needed: usize,
-    max_bytes_needed: usize,
-    already_allocated: usize,
-) -> usize {
+    min_bytes_needed: ffi_types::size_t,
+    max_bytes_needed: ffi_types::size_t,
+    already_allocated: ffi_types::size_t,
+) -> ffi_types::size_t {
     jpeg_core::common::memory::jpeg_mem_available(cinfo, min_bytes_needed, max_bytes_needed, already_allocated)
 }
 
@@ -115,7 +129,7 @@ pub unsafe extern "C" fn jcopy_block_row(input_row: JBLOCKROW, output_row: JBLOC
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jzero_far(target: *mut c_void, bytestozero: usize) {
+pub unsafe extern "C" fn jzero_far(target: *mut c_void, bytestozero: ffi_types::size_t) {
     jpeg_core::common::utils::zero_far(target, bytestozero)
 }
 

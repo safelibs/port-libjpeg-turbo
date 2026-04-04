@@ -20,6 +20,17 @@ die() {
   exit 1
 }
 
+refresh_stage() {
+  if [[ "${LIBJPEG_TURBO_SKIP_STAGE_REFRESH:-0}" == 1 ]]; then
+    [[ -e "$STAGE_DIR/usr/lib" ]] || die "missing staged install: $STAGE_DIR"
+    return
+  fi
+
+  CARGO_PROFILE_RELEASE_LTO=false \
+  RUSTFLAGS=-Clinker-plugin-lto=no \
+    bash "$SAFE_ROOT/scripts/stage-install.sh" --clean --stage-dir "$STAGE_DIR"
+}
+
 while (($#)); do
   case "$1" in
     --stage-dir)
@@ -38,9 +49,7 @@ done
 
 [[ -d "$TESTS_DIR" ]] || die "missing Debian tests directory: $TESTS_DIR"
 
-if [[ ! -e "$STAGE_DIR/usr/lib" ]]; then
-  bash "$SAFE_ROOT/scripts/stage-install.sh" --stage-dir "$STAGE_DIR"
-fi
+refresh_stage
 
 MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || gcc -print-multiarch)"
 LIB_DIR="$STAGE_DIR/usr/lib/$MULTIARCH"
