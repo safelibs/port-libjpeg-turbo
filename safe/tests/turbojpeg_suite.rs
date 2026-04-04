@@ -617,6 +617,26 @@ fn turbojpeg_option_parsers_match_upstream_cli_aliases() {
 }
 
 #[test]
+fn packaged_tool_contracts_reference_committed_safe_sources() {
+    let stage = stage_paths().expect("stage paths");
+
+    for contract in jpeg_tools::PACKAGED_TOOL_CONTRACTS {
+        assert!(
+            stage.repo_root.join(contract.frontend_source).is_file(),
+            "missing packaged frontend source for {}: {}",
+            contract.binary_name,
+            contract.frontend_source,
+        );
+        assert!(
+            stage.repo_root.join(contract.manpage_source).is_file(),
+            "missing packaged manpage source for {}: {}",
+            contract.binary_name,
+            contract.manpage_source,
+        );
+    }
+}
+
+#[test]
 fn turbojpeg_exports_and_geometry_match_reference_tables() {
     let _guard = main_lock();
     let stage = stage_paths().expect("stage paths");

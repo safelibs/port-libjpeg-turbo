@@ -18,6 +18,12 @@ compresses the named image file, or the standard input if no file is
 named, and produces a JPEG/JFIF file on the standard output.
 The currently supported input file formats are: PPM (PBMPLUS color
 format), PGM (PBMPLUS grayscale format), BMP, GIF, and Targa.
+.PP
+The staged safe package installs the Rust-built
+.B cjpeg
+frontend together with this committed manpage source from
+.BR safe/debian ,
+so package assembly and smoke verification remain self-contained.
 .SH OPTIONS
 All switch names may be abbreviated; for example,
 .B \-grayscale

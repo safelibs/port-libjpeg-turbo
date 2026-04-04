@@ -20,6 +20,12 @@ for example from baseline JPEG to progressive JPEG or vice versa.  It can also
 perform some rearrangements of the image data, for example turning an image
 from landscape to portrait format by rotation.
 .PP
+The staged safe package installs the Rust-built
+.B jpegtran
+frontend together with this committed manpage source from
+.BR safe/debian ,
+so package assembly and smoke verification remain self-contained.
+.PP
 For EXIF files and JPEG files containing Exif data, you may prefer to use
 .B exiftran
 instead.

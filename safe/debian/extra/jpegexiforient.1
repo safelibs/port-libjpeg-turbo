@@ -10,6 +10,14 @@ This is a utility program to get and set the Exif Orientation Tag.
 It can be used together with jpegtran in scripts for automatic
 orientation correction of digital camera pictures.
 .PP
+The staged safe package installs the Rust
+.B jpegexiforient
+helper together with this committed manpage source from
+.BR safe/debian/extra ,
+and the sibling
+.B exifautotran
+wrapper relies on that packaged pairing.
+.PP
 The Exif orientation value gives the orientation of the camera
 relative to the scene when the image was captured.  The relation
 of the '0th row' and '0th column' to visual position is shown as

@@ -5,7 +5,10 @@ use std::{
     path::PathBuf,
 };
 
+const TOOL_NAME: &str = "jpegexiforient";
+
 fn main() {
+    let _ = jpeg_tools::packaged_tool_contract(TOOL_NAME);
     std::process::exit(run());
 }
 
@@ -36,7 +39,11 @@ fn run() -> i32 {
                     no_newline = true;
                 }
                 "-1" | "-2" | "-3" | "-4" | "-5" | "-6" | "-7" | "-8" => {
-                    set_orientation = arg_text.as_bytes().get(1).copied().map(|value| value - b'0');
+                    set_orientation = arg_text
+                        .as_bytes()
+                        .get(1)
+                        .copied()
+                        .map(|value| value - b'0');
                 }
                 _ => {
                     usage(&program_name, io::stderr());
@@ -90,6 +97,10 @@ fn usage(program_name: &str, mut out: impl Write) {
     let _ = writeln!(
         out,
         "jpegexiforient reads or writes the Exif Orientation Tag in a JPEG Exif file."
+    );
+    let _ = writeln!(
+        out,
+        "The packaged exifautotran wrapper invokes this helper from the same installed directory."
     );
     let _ = writeln!(out, "Usage: {program_name} [switches] jpegfile");
     let _ = writeln!(out, "Switches:");
@@ -162,7 +173,11 @@ fn find_orientation_tag(bytes: &[u8]) -> Option<OrientationTag> {
     None
 }
 
-fn find_orientation_in_tiff(bytes: &[u8], tiff_start: usize, tiff_end: usize) -> Option<OrientationTag> {
+fn find_orientation_in_tiff(
+    bytes: &[u8],
+    tiff_start: usize,
+    tiff_end: usize,
+) -> Option<OrientationTag> {
     if tiff_start + 8 > tiff_end {
         return None;
     }

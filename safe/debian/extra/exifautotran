@@ -2,12 +2,14 @@
 # exifautotran [list of files]
 #
 # Transforms Exif files so that Orientation becomes 1
+# This committed wrapper is the authoritative packaged source under safe/debian/extra.
 #
 set -eu
 
 bindir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 jpegtran_bin="$bindir/jpegtran"
 jpegexiforient_bin="$bindir/jpegexiforient"
+tempfile=''
 
 test -x "$jpegtran_bin" || {
   echo "missing sibling jpegtran helper: $jpegtran_bin" >&2
@@ -45,7 +47,7 @@ EOF
  *) transform="";;
  esac
  if test -n "$transform"; then
-  tempfile="$(mktemp)";
+  tempfile="$(mktemp "${TMPDIR:-/tmp}/exifautotran.XXXXXX")";
   if test "$?" -ne "0"; then
     echo "Failed to create temporary file" >&2
     exit 1;

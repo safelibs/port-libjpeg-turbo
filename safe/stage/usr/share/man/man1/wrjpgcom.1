@@ -24,6 +24,12 @@ reads the named JPEG/JFIF file, or the standard input if no file is named,
 and generates a new JPEG/JFIF file on standard output.  A comment block is
 added to the file.
 .PP
+The staged safe package installs the Rust-built
+.B wrjpgcom
+frontend together with this committed manpage source from
+.BR safe/debian ,
+so package assembly and smoke verification remain self-contained.
+.PP
 The JPEG standard allows "comment" (COM) blocks to occur within a JPEG file.
 Although the standard doesn't actually define what COM blocks are for, they
 are widely used to hold user-supplied text strings.  This lets you add

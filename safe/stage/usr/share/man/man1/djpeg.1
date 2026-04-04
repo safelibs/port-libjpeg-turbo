@@ -17,6 +17,12 @@ djpeg \- decompress a JPEG file to an image file
 decompresses the named JPEG file, or the standard input if no file is named,
 and produces an image file on the standard output.  PBMPLUS (PPM/PGM), BMP,
 GIF, or Targa output format can be selected.
+.PP
+The staged safe package installs the Rust-built
+.B djpeg
+frontend together with this committed manpage source from
+.BR safe/debian ,
+so package assembly and smoke verification remain self-contained.
 .SH OPTIONS
 All switch names may be abbreviated; for example,
 .B \-grayscale

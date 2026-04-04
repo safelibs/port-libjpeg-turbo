@@ -16,7 +16,10 @@ mod generated {
     pub mod rdtarga;
 }
 
+const TOOL_NAME: &str = "cjpeg";
+
 fn main() {
+    let _ = jpeg_tools::packaged_tool_contract(TOOL_NAME);
     let _ = libjpeg_abi::common_exports::jpeg_std_error as *const ();
     generated::cjpeg::main();
 }
