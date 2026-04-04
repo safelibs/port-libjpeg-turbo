@@ -34,9 +34,9 @@ libjpeg core.
 --stage-dir overrides the staged install root.
 --with-java controls whether turbojpeg.jar is built from the committed Java
 sources:
-  auto: enable when javac/jar are available locally or via the Docker fallback
+  auto: enable when Java compiler/jar tooling is available locally or via the Docker fallback
   0: disable turbojpeg.jar generation
-  1: require the local host (or Docker fallback) to provide javac/jar
+  1: require the local host (or Docker fallback) to provide Java compiler/jar tooling
 --clean removes the rendered staging output first.
 EOF
 }
@@ -259,7 +259,7 @@ maybe_reexec_for_java() {
 
   if [[ -n "${LIBJPEG_TURBO_STAGE_INSTALL_IN_DOCKER:-}" ]]; then
     if [[ "$WITH_JAVA_MODE" == "1" ]]; then
-      die "--with-java=1 requires javac/jar support inside the Docker fallback image"
+      die "--with-java=1 requires Java compiler/jar tooling inside the Docker fallback image"
     fi
     return 0
   fi
@@ -268,7 +268,7 @@ maybe_reexec_for_java() {
     reexec_stage_install_in_docker
   fi
 
-  die "JDK tools are required to build turbojpeg.jar, or Docker for fallback"
+  die "Java compiler/jar tooling is required to build turbojpeg.jar, or Docker for fallback"
 }
 
 resolve_with_java() {
@@ -282,7 +282,7 @@ resolve_with_java() {
       ;;
     0|1)
       if [[ "$WITH_JAVA_MODE" == "1" ]] && ! local_java_build_available; then
-        die "--with-java=1 requires javac/jar support"
+        die "--with-java=1 requires Java compiler/jar tooling"
       fi
       printf '%s\n' "$WITH_JAVA_MODE"
       ;;
