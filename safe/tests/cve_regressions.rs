@@ -117,8 +117,7 @@ fn progressive_dimensions_are_rejected_before_allocation() {
 fn scan_limit_policy_flags_excessive_scan_counts() {
     let mut cinfo = unsafe { MaybeUninit::<jpeg_decompress_struct>::zeroed().assume_init() };
     unsafe {
-        libjpeg_abi::decompress_exports::jpeg_rs_set_max_scans(&mut cinfo, 5);
-        libjpeg_abi::decompress_exports::jpeg_rs_set_warnings_fatal(&mut cinfo, TRUE);
+        libjpeg_abi::decompress_exports::jpeg_rs_configure_decompress_policy(&mut cinfo, 5, TRUE);
     }
     cinfo.input_scan_number = 6;
 
@@ -126,6 +125,14 @@ fn scan_limit_policy_flags_excessive_scan_counts() {
         .expect("policy must exist");
     assert_eq!(policy.max_scans, Some(5));
     assert!(policy.warnings_fatal);
+    assert_eq!(
+        unsafe { libjpeg_abi::decompress_exports::jpeg_rs_get_max_scans(&mut cinfo) },
+        5
+    );
+    assert_eq!(
+        unsafe { libjpeg_abi::decompress_exports::jpeg_rs_get_warnings_fatal(&mut cinfo) },
+        TRUE
+    );
     assert_eq!(
         unsafe { jpeg_core::common::registry::decompress_scan_limit_exceeded(&mut cinfo) },
         Some(5)
@@ -135,6 +142,90 @@ fn scan_limit_policy_flags_excessive_scan_counts() {
         jpeg_core::common::registry::clear_decompress_policy(&mut cinfo);
     }
     assert!(unsafe { jpeg_core::common::registry::get_decompress_policy(&mut cinfo) }.is_none());
+}
+
+#[test]
+fn progressive_scan_limit_rejects_excessive_scan_script() {
+    let stage = stage_paths().expect("stage paths");
+    let temp_dir = new_temp_dir("scan-limit").expect("temp dir");
+    let malformed = build_multiscan_progressive_fixture(stage, &temp_dir).expect("fixture");
+    let output = run_stage_command(
+        stage,
+        &temp_dir,
+        "djpeg",
+        vec![
+            "-maxscans".into(),
+            "5".into(),
+            "-ppm".into(),
+            "-outfile".into(),
+            temp_dir.join("scan_limit.ppm").into_os_string(),
+            malformed.into_os_string(),
+        ],
+    )
+    .expect("spawn djpeg");
+
+    assert!(!output.status.success(), "{:?}", output.status);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Scan number 6 exceeds maximum scans (5)")
+            || stderr.contains("JPEG image has more than 5 scans"),
+        "unexpected stderr: {stderr}"
+    );
+}
+
+#[test]
+fn strict_mode_promotes_truncation_warning_to_fatal() {
+    let stage = stage_paths().expect("stage paths");
+    let temp_dir = new_temp_dir("strict-truncation").expect("temp dir");
+    let truncated = build_truncated_fixture(stage, &temp_dir).expect("fixture");
+    let permissive_output = temp_dir.join("permissive.ppm");
+    let permissive = run_stage_command(
+        stage,
+        &temp_dir,
+        "djpeg",
+        vec![
+            "-ppm".into(),
+            "-outfile".into(),
+            permissive_output.clone().into_os_string(),
+            truncated.clone().into_os_string(),
+        ],
+    )
+    .expect("spawn permissive djpeg");
+    assert!(
+        permissive.status.code() == Some(2),
+        "expected warning exit status 2, got {}",
+        command_failure("djpeg", &permissive)
+    );
+    let permissive_len = fs::metadata(&permissive_output)
+        .expect("permissive output metadata")
+        .len();
+
+    let strict_output = temp_dir.join("strict.ppm");
+    let strict = run_stage_command(
+        stage,
+        &temp_dir,
+        "djpeg",
+        vec![
+            "-strict".into(),
+            "-ppm".into(),
+            "-outfile".into(),
+            strict_output.clone().into_os_string(),
+            truncated.into_os_string(),
+        ],
+    )
+    .expect("spawn strict djpeg");
+    assert!(
+        strict.status.code() == Some(1),
+        "expected fatal exit status 1, got {}",
+        command_failure("djpeg", &strict)
+    );
+    let strict_len = fs::metadata(&strict_output)
+        .expect("strict output metadata")
+        .len();
+    assert!(
+        strict_len < permissive_len,
+        "strict output {strict_len} should be shorter than permissive output {permissive_len}"
+    );
 }
 
 fn stage_paths() -> Result<&'static StagePaths, String> {
@@ -261,6 +352,51 @@ fn build_oversized_progressive_fixture(
     fs::write(&malformed, bytes)
         .map_err(|error| format!("write {}: {error}", malformed.display()))?;
     Ok(malformed)
+}
+
+fn build_multiscan_progressive_fixture(
+    stage: &StagePaths,
+    temp_dir: &Path,
+) -> Result<PathBuf, String> {
+    let output_path = temp_dir.join("multiscan_progressive.jpg");
+    let output = run_stage_command(
+        stage,
+        temp_dir,
+        "cjpeg",
+        vec![
+            "-quality".into(),
+            "100".into(),
+            "-dct".into(),
+            "fast".into(),
+            "-scans".into(),
+            stage.original_testimages.join("test.scan").into_os_string(),
+            "-outfile".into(),
+            output_path.clone().into_os_string(),
+            stage
+                .original_testimages
+                .join("testorig.ppm")
+                .into_os_string(),
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(command_failure("cjpeg", &output));
+    }
+    Ok(output_path)
+}
+
+fn build_truncated_fixture(stage: &StagePaths, temp_dir: &Path) -> Result<PathBuf, String> {
+    let input = stage.original_testimages.join("testorig.jpg");
+    let mut bytes =
+        fs::read(&input).map_err(|error| format!("read {}: {error}", input.display()))?;
+    if bytes.len() < 4 {
+        return Err(format!("fixture {} is unexpectedly short", input.display()));
+    }
+    bytes.truncate(bytes.len() - 2);
+
+    let truncated = temp_dir.join("truncated.jpg");
+    fs::write(&truncated, bytes)
+        .map_err(|error| format!("write {}: {error}", truncated.display()))?;
+    Ok(truncated)
 }
 
 fn find_sof_segment(bytes: &[u8], marker: u8) -> Result<usize, String> {

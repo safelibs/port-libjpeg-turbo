@@ -39,6 +39,12 @@ unsafe fn marker_is_icc(marker: jpeg_saved_marker_ptr) -> bool {
     true
 }
 
+#[inline]
+unsafe fn warn_bogus_icc(cinfo: j_decompress_ptr) -> boolean {
+    error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
+    FALSE
+}
+
 pub unsafe fn jpeg_write_icc_profile(
     cinfo: j_compress_ptr,
     mut icc_data_ptr: *const JOCTET,
@@ -113,13 +119,11 @@ pub unsafe fn jpeg_read_icc_profile(
             if num_markers == 0 {
                 num_markers = count;
             } else if num_markers != count {
-                error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
-                return FALSE;
+                return warn_bogus_icc(cinfo);
             }
             let seq_no = *(*marker).data.add(12) as usize;
             if seq_no == 0 || seq_no > num_markers || marker_present[seq_no] != 0 {
-                error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
-                return FALSE;
+                return warn_bogus_icc(cinfo);
             }
             marker_present[seq_no] = 1;
             data_length[seq_no] = (*marker).data_length - ICC_OVERHEAD_LEN as u32;
@@ -135,23 +139,20 @@ pub unsafe fn jpeg_read_icc_profile(
     let mut seq_no = 1usize;
     while seq_no <= num_markers {
         if marker_present[seq_no] == 0 {
-            error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
-            return FALSE;
+            return warn_bogus_icc(cinfo);
         }
         data_offset[seq_no] = total_length;
         total_length = match total_length.checked_add(data_length[seq_no]) {
             Some(length) => length,
             None => {
-                error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
-                return FALSE;
+                return warn_bogus_icc(cinfo);
             }
         };
         seq_no += 1;
     }
 
     if total_length == 0 {
-        error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
-        return FALSE;
+        return warn_bogus_icc(cinfo);
     }
 
     let icc_data = malloc(total_length as usize) as *mut JOCTET;

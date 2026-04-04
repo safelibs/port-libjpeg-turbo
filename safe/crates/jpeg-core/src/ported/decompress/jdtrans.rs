@@ -17,7 +17,11 @@ mod translated {
     include!("generated/jdtrans_translated.rs");
 }
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jpeg_read_coefficients(cinfo: j_decompress_ptr) -> *mut jvirt_barray_ptr {
-    translated::jpeg_read_coefficients(cinfo.cast::<translated::jpeg_decompress_struct>())
-        .cast::<jvirt_barray_ptr>()
+    translated::jpeg_read_coefficients(translated_cinfo(cinfo)).cast::<jvirt_barray_ptr>()
 }

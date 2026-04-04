@@ -797,6 +797,44 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
             runner: None,
         },
         MatrixCase {
+            name: "advanced-decode-progressive-420-q100-ifast-maxscans",
+            commands: vec![
+                cmd(
+                    "cjpeg",
+                    &[
+                        "-quality",
+                        "100",
+                        "-dct",
+                        "fast",
+                        "-scans",
+                        "@ORIG:test.scan",
+                        "-outfile",
+                        "@TMP:testout_420_q100_ifast_limitscans_prog.jpg",
+                        "@ORIG:testorig.ppm",
+                    ],
+                    None,
+                ),
+                cmd(
+                    "djpeg",
+                    &[
+                        "-maxscans",
+                        "64",
+                        "-dct",
+                        "fast",
+                        "-ppm",
+                        "-outfile",
+                        "@TMP:testout_420_q100_ifast_limitscans.ppm",
+                        "@TMP:testout_420_q100_ifast_limitscans_prog.jpg",
+                    ],
+                    Some((
+                        "@TMP:testout_420_q100_ifast_limitscans.ppm",
+                        "5a732542015c278ff43635e473a8a294",
+                    )),
+                ),
+            ],
+            runner: None,
+        },
+        MatrixCase {
             name: "advanced-decode-progressive-3x2-ifast",
             commands: vec![
                 cmd(

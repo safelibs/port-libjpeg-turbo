@@ -17,9 +17,11 @@ mod translated {
     include!("generated/jdpostct_translated.rs");
 }
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jinit_d_post_controller(cinfo: j_decompress_ptr, need_full_buffer: boolean) {
-    translated::jinit_d_post_controller(
-        cinfo.cast::<translated::jpeg_decompress_struct>(),
-        need_full_buffer,
-    )
+    translated::jinit_d_post_controller(translated_cinfo(cinfo), need_full_buffer)
 }

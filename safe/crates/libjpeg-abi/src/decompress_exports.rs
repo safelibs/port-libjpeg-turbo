@@ -164,12 +164,31 @@ pub unsafe extern "C" fn jinit_2pass_quantizer(cinfo: j_decompress_ptr) {
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_rs_set_max_scans(cinfo: j_decompress_ptr, max_scans: int) {
-    jpeg_core::common::registry::set_decompress_scan_limit(cinfo, max_scans)
+    crate::set_decompress_scan_limit(cinfo, max_scans)
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_rs_set_warnings_fatal(cinfo: j_decompress_ptr, fatal: boolean) {
-    jpeg_core::common::registry::set_decompress_warnings_fatal(cinfo, fatal)
+    crate::set_decompress_warnings_fatal(cinfo, fatal)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_rs_configure_decompress_policy(
+    cinfo: j_decompress_ptr,
+    max_scans: int,
+    warnings_fatal: boolean,
+) {
+    crate::configure_decompress_policy(cinfo, max_scans, warnings_fatal)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_rs_get_max_scans(cinfo: j_decompress_ptr) -> int {
+    crate::decompress_scan_limit(cinfo)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn jpeg_rs_get_warnings_fatal(cinfo: j_decompress_ptr) -> boolean {
+    crate::decompress_warnings_fatal(cinfo)
 }
 
 #[no_mangle]

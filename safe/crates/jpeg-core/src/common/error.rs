@@ -183,6 +183,12 @@ unsafe fn set_i(cinfo: j_common_ptr, index: usize, value: int) {
 }
 
 #[inline]
+unsafe fn decode_warning_is_fatal(cinfo: j_common_ptr) -> bool {
+    (*cinfo).is_decompressor != FALSE
+        && registry::decompress_warnings_fatal(cinfo as j_decompress_ptr)
+}
+
+#[inline]
 pub unsafe fn warnms(cinfo: j_common_ptr, code: J_MESSAGE_CODE) {
     set_msg_code(cinfo, code);
     if let Some(emit) = (*err(cinfo)).emit_message {
@@ -271,9 +277,7 @@ unsafe extern "C" fn emit_message(cinfo: j_common_ptr, msg_level: int) {
             }
         }
         (*err).num_warnings += 1;
-        if (*cinfo).is_decompressor != FALSE
-            && registry::decompress_warnings_fatal(cinfo as j_decompress_ptr)
-        {
+        if decode_warning_is_fatal(cinfo) {
             jpeg_rs_invoke_error_exit(cinfo);
             abort_if_returns();
         }

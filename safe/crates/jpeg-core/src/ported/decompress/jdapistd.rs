@@ -31,6 +31,17 @@ unsafe fn update_output_progress(
     }
 }
 
+#[inline]
+unsafe fn sync_upsampler_rows_to_go(
+    cinfo: j_decompress_ptr,
+    master: *mut my_decomp_master,
+    upsample: *mut my_upsampler,
+) {
+    if (*master).using_merged_upsample == FALSE {
+        (*upsample).rows_to_go = (*cinfo).output_height - (*cinfo).output_scanline;
+    }
+}
+
 unsafe fn output_pass_setup(cinfo: j_decompress_ptr) -> boolean {
     if (*cinfo).global_state != DSTATE_PRESCAN {
         (*(*cinfo).master).prepare_for_output_pass.unwrap()(cinfo);
@@ -340,8 +351,8 @@ pub unsafe fn jpeg_skip_scanlines(cinfo: j_decompress_ptr, mut num_lines: JDIMEN
         (*main_ptr).context_state = CTX_PREPARE_FOR_IMCU;
         if (*master).using_merged_upsample == FALSE {
             (*upsample).next_row_out = (*cinfo).max_v_samp_factor;
-            (*upsample).rows_to_go = (*cinfo).output_height - (*cinfo).output_scanline;
         }
+        sync_upsampler_rows_to_go(cinfo, master, upsample);
     } else if num_lines < lines_left_in_iMCU_row {
         increment_simple_rowgroup_ctr(cinfo, num_lines);
         return num_lines;
@@ -351,8 +362,8 @@ pub unsafe fn jpeg_skip_scanlines(cinfo: j_decompress_ptr, mut num_lines: JDIMEN
         (*main_ptr).rowgroup_ctr = 0;
         if (*master).using_merged_upsample == FALSE {
             (*upsample).next_row_out = (*cinfo).max_v_samp_factor;
-            (*upsample).rows_to_go = (*cinfo).output_height - (*cinfo).output_scanline;
         }
+        sync_upsampler_rows_to_go(cinfo, master, upsample);
     }
 
     let lines_to_skip = if (*(*cinfo).upsample).need_context_rows != FALSE {
@@ -373,9 +384,7 @@ pub unsafe fn jpeg_skip_scanlines(cinfo: j_decompress_ptr, mut num_lines: JDIMEN
             (*cinfo).output_iMCU_row += lines_to_skip / lines_per_iMCU_row;
             increment_simple_rowgroup_ctr(cinfo, lines_to_read);
         }
-        if (*master).using_merged_upsample == FALSE {
-            (*upsample).rows_to_go = (*cinfo).output_height - (*cinfo).output_scanline;
-        }
+        sync_upsampler_rows_to_go(cinfo, master, upsample);
         return num_lines;
     }
 
@@ -405,9 +414,7 @@ pub unsafe fn jpeg_skip_scanlines(cinfo: j_decompress_ptr, mut num_lines: JDIMEN
         increment_simple_rowgroup_ctr(cinfo, lines_to_read);
     }
 
-    if (*master).using_merged_upsample == FALSE {
-        (*upsample).rows_to_go = (*cinfo).output_height - (*cinfo).output_scanline;
-    }
+    sync_upsampler_rows_to_go(cinfo, master, upsample);
 
     num_lines
 }

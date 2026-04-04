@@ -68,10 +68,25 @@ pub unsafe fn set_decompress_warnings_fatal(cinfo: j_decompress_ptr, fatal: bool
     });
 }
 
+pub unsafe fn configure_decompress_policy(
+    cinfo: j_decompress_ptr,
+    max_scans: int,
+    warnings_fatal: boolean,
+) {
+    update_policy(cinfo, |policy| {
+        policy.max_scans = (max_scans > 0).then_some(max_scans);
+        policy.warnings_fatal = warnings_fatal != FALSE;
+    });
+}
+
 pub unsafe fn decompress_warnings_fatal(cinfo: j_decompress_ptr) -> bool {
     get_decompress_policy(cinfo)
         .map(|policy| policy.warnings_fatal)
         .unwrap_or(false)
+}
+
+pub unsafe fn decompress_scan_limit(cinfo: j_decompress_ptr) -> Option<int> {
+    get_decompress_policy(cinfo).and_then(|policy| policy.max_scans)
 }
 
 pub unsafe fn decompress_scan_limit_exceeded(cinfo: j_decompress_ptr) -> Option<int> {
@@ -79,11 +94,14 @@ pub unsafe fn decompress_scan_limit_exceeded(cinfo: j_decompress_ptr) -> Option<
         return None;
     }
 
-    let policy = get_decompress_policy(cinfo)?;
-    let max_scans = policy.max_scans?;
+    let max_scans = decompress_scan_limit(cinfo)?;
     ((*cinfo).input_scan_number > max_scans).then_some(max_scans)
 }
 
 pub unsafe fn warnings_fatal_flag(value: bool) -> boolean {
     if value { TRUE } else { FALSE }
+}
+
+pub unsafe fn decompress_warnings_fatal_flag(cinfo: j_decompress_ptr) -> boolean {
+    warnings_fatal_flag(decompress_warnings_fatal(cinfo))
 }

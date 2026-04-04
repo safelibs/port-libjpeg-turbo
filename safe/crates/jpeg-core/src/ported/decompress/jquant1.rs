@@ -17,6 +17,11 @@ mod translated {
     include!("generated/jquant1_translated.rs");
 }
 
+#[inline]
+unsafe fn translated_cinfo(cinfo: j_decompress_ptr) -> *mut translated::jpeg_decompress_struct {
+    cinfo.cast::<translated::jpeg_decompress_struct>()
+}
+
 pub unsafe fn jinit_1pass_quantizer(cinfo: j_decompress_ptr) {
-    translated::jinit_1pass_quantizer(cinfo.cast::<translated::jpeg_decompress_struct>())
+    translated::jinit_1pass_quantizer(translated_cinfo(cinfo))
 }
