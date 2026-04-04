@@ -44,6 +44,30 @@ The remaining C boundary that still exists today is:
   that same C frame to exercise the `setjmp`/`longjmp` error path without
   unwinding through Rust stack frames.
 
+The remaining Rust `unsafe` boundary is broader than that single C shim and is
+now enforced by exact reviewed file categories in `safe/scripts/audit-unsafe.sh`
+rather than by crate-wide allowlists:
+
+- `safe/crates/ffi-types/src/lib.rs` for raw libjpeg/libc FFI structs and
+  callback type declarations.
+- `safe/crates/jpeg-core/src/common/*.rs` plus the reviewed
+  `safe/crates/jpeg-core/src/ported/*` codec modules, which still implement the
+  ported libjpeg state machine with raw pointers and callback tables.
+- `safe/crates/libjpeg-abi/src/common_exports.rs`,
+  `safe/crates/libjpeg-abi/src/decompress_exports.rs`, and
+  `safe/crates/libjpeg-abi/src/jsimd_none.rs` for exported libjpeg ABI hooks and
+  the no-SIMD compatibility surface.
+- `safe/crates/libturbojpeg-abi/src/generated/*.rs` and
+  `safe/crates/jpeg-tools/src/generated/*.rs` for the translated TurboJPEG/JNI
+  and CLI frontend layers.
+- `safe/tests/{compat_smoke,cve_regressions,turbojpeg_suite,upstream_matrix}.rs`
+  for compatibility-harness extern bindings and direct ABI probes.
+
+`safe/scripts/audit-unsafe.sh` now reports executable unsafe
+(`unsafe fn`, `unsafe {}`, and `unsafe extern` blocks) separately from callback
+type signatures such as `Option<unsafe extern "C" fn>`, and it fails if new
+unsafe code appears outside those reviewed files.
+
 `safe/scripts/stage-install.sh` no longer bootstraps the old upstream CMake
 build tree, installs prebuilt compatibility artifacts, redirects packaged
 binaries into a hidden backend tree, or compiles staged C frontend sources.
