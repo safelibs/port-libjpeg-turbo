@@ -3,13 +3,15 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
+STAGE_INSTALL_SCRIPT="$SAFE_ROOT/scripts/stage-install.sh"
+DEPENDENTS_MANIFEST="$ROOT/dependents.json"
 CHECKS="all"
 declare -a ONLY_FILTERS=()
 IMAGE_TAG="${LIBJPEG_TURBO_SAFE_TEST_IMAGE:-libjpeg-turbo-safe-test:ubuntu24.04}"
 
 usage() {
   cat <<'EOF'
-usage: run-dependent-subset.sh [--checks runtime|compile|all] [--only <runtime-package-or-source-package>]...
+usage: run-dependent-subset.sh [--checks runtime|compile|all] [--only <runtime-package-or-source-package>]... [--image-tag <docker-tag>]
 
 Stages the current safe/ bootstrap inside an Ubuntu 24.04 container or
 temporary prefix, then runs the selected runtime-dependent smoke checks against
@@ -20,6 +22,8 @@ for follow-on build verification.
 --only may be repeated. Each value matches either:
   - runtime_dependents[].name
   - build_time_dependents[].source_package
+--image-tag overrides the Docker image name used for the isolated dependency
+subset harness build.
 EOF
 }
 
@@ -36,6 +40,10 @@ while (($#)); do
       ;;
     --only)
       ONLY_FILTERS+=("${2:?missing value for --only}")
+      shift 2
+      ;;
+    --image-tag)
+      IMAGE_TAG="${2:?missing value for --image-tag}"
       shift 2
       ;;
     --help|-h)
@@ -59,8 +67,9 @@ case "$CHECKS" in
 esac
 
 command -v docker >/dev/null 2>&1 || die "docker is required"
-[[ -f "$ROOT/dependents.json" ]] || die "missing dependents.json"
-[[ -f "$SAFE_ROOT/scripts/stage-install.sh" ]] || die "missing bootstrap stage installer"
+command -v jq >/dev/null 2>&1 || die "jq is required"
+[[ -f "$DEPENDENTS_MANIFEST" ]] || die "missing dependents.json"
+[[ -f "$STAGE_INSTALL_SCRIPT" ]] || die "missing bootstrap stage installer"
 
 ONLY_SERIALIZED="$(printf '%s\n' "${ONLY_FILTERS[@]:-}" | paste -sd: -)"
 
@@ -877,7 +886,8 @@ run_runtime_checks() {
 
 cd "$WORK_ROOT/safe"
 cargo build --manifest-path Cargo.toml --workspace --release >/dev/null
-bash scripts/stage-install.sh --clean --stage-dir "$STAGE_ROOT" >/dev/null
+DEB_HOST_MULTIARCH="$MULTIARCH" LIBJPEG_TURBO_STAGE_ROOT="$STAGE_ROOT" \
+  bash scripts/stage-install.sh --clean --stage-dir "$STAGE_ROOT" >/dev/null
 configure_stage_runtime
 validate_filters
 

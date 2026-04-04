@@ -3,24 +3,27 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
-MANIFEST="$SAFE_ROOT/scripts/original-object-groups.json"
-STAGE_DIR="$SAFE_ROOT/target/relink-stage"
+MANIFEST="${LIBJPEG_TURBO_OBJECT_GROUPS_MANIFEST:-$SAFE_ROOT/scripts/original-object-groups.json}"
+STAGE_DIR="${LIBJPEG_TURBO_STAGE_ROOT:-$SAFE_ROOT/target/relink-stage}"
 CACHE_DIR="$SAFE_ROOT/target/original-object-cache"
 OUT_DIR="$SAFE_ROOT/target/original-relinked"
 RUN_TARGETS=0
+LIST_GROUPS=0
 declare -a RELINK_GROUPS=()
 
 usage() {
   cat <<'EOF'
-usage: relink-original-objects.sh [--group <name>]... [--stage-dir <dir>] [--cache-dir <dir>] [--out-dir <dir>] [--run]
+usage: relink-original-objects.sh [--group <name>]... [--stage-dir <dir>] [--cache-dir <dir>] [--out-dir <dir>] [--manifest <json>] [--run] [--list-groups]
 
 Compiles cached upstream test and utility objects against the canonical staged
 headers/configuration, then relinks them against the staged safe libraries.
 
 --group may be repeated. Available groups are defined in
 safe/scripts/original-object-groups.json and include at least:
-  smoke, decompress, compress, turbojpeg, all
+  smoke, decompress, compress, turbojpeg, compat, cli, all
+--manifest overrides the original-object group manifest consumed by this helper.
 --run executes each relinked binary after linking.
+--list-groups prints the available group names and exits.
 EOF
 }
 
@@ -47,8 +50,16 @@ while (($#)); do
       OUT_DIR="${2:?missing value for --out-dir}"
       shift 2
       ;;
+    --manifest)
+      MANIFEST="${2:?missing value for --manifest}"
+      shift 2
+      ;;
     --run)
       RUN_TARGETS=1
+      shift
+      ;;
+    --list-groups)
+      LIST_GROUPS=1
       shift
       ;;
     --help|-h)
@@ -68,12 +79,29 @@ if ((${#RELINK_GROUPS[@]} == 0)); then
 fi
 
 [[ -f "$MANIFEST" ]] || die "missing manifest: $MANIFEST"
+command -v jq >/dev/null 2>&1 || die "jq is required"
 
-if [[ ! -e "$STAGE_DIR/usr/lib" ]]; then
-  bash "$SAFE_ROOT/scripts/stage-install.sh" --stage-dir "$STAGE_DIR"
+if ((LIST_GROUPS)); then
+  jq -r '.groups | keys[]' "$MANIFEST"
+  exit 0
 fi
 
-MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || gcc -print-multiarch)"
+if [[ ! -e "$STAGE_DIR/usr/lib" ]]; then
+  DEB_HOST_MULTIARCH="${DEB_HOST_MULTIARCH:-}" \
+    bash "$SAFE_ROOT/scripts/stage-install.sh" --stage-dir "$STAGE_DIR"
+fi
+
+multiarch() {
+  if [[ -n "${DEB_HOST_MULTIARCH:-}" ]]; then
+    printf '%s\n' "$DEB_HOST_MULTIARCH"
+  elif command -v dpkg-architecture >/dev/null 2>&1; then
+    dpkg-architecture -qDEB_HOST_MULTIARCH
+  else
+    gcc -print-multiarch
+  fi
+}
+
+MULTIARCH="$(multiarch)"
 LIB_DIR="$STAGE_DIR/usr/lib/$MULTIARCH"
 INC_DIR="$STAGE_DIR/usr/include"
 INC_MULTIARCH_DIR="$INC_DIR/$MULTIARCH"

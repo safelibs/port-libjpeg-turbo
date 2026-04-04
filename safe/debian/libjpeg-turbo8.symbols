@@ -1,3 +1,4 @@
+# Canonical staged libjpeg ABI oracle retained under safe/debian.
 libjpeg.so.8 libjpeg8 #MINVER#
  LIBJPEGTURBO_8.0@LIBJPEGTURBO_8.0 8c
  LIBJPEG_8.0@LIBJPEG_8.0 8c

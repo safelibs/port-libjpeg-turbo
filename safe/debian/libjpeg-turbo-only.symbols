@@ -1,3 +1,4 @@
+# Bootstrap-only symbol subset retained under safe/debian for staged checks.
 LIBJPEGTURBO_8.0@LIBJPEGTURBO_8.0
 auxv@LIBJPEG_8.0
 init_simd@LIBJPEG_8.0
