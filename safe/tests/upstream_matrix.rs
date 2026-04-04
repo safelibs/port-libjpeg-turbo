@@ -32,7 +32,6 @@ struct MatrixCase {
 }
 
 struct StagePaths {
-    build_root: PathBuf,
     original_testimages: PathBuf,
     stage_bin: PathBuf,
     stage_lib: PathBuf,
@@ -1421,12 +1420,9 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
                 .parent()
                 .ok_or_else(|| "safe root has no parent".to_string())?
                 .to_path_buf();
-            let build_root = new_temp_dir("stage-build")?;
             let stage_root = new_temp_dir("stage-install")?;
             let status = Command::new("bash")
                 .arg("scripts/stage-install.sh")
-                .arg("--build-dir")
-                .arg(&build_root)
                 .arg("--stage-dir")
                 .arg(&stage_root)
                 .current_dir(&safe_root)
@@ -1440,7 +1436,6 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
             let stage_bin = stage_usr_root.join("bin");
             let stage_lib = find_stage_libdir(&stage_usr_root)?;
             Ok(StagePaths {
-                build_root,
                 original_testimages: repo_root.join("original/testimages"),
                 stage_bin,
                 stage_lib,
@@ -1554,7 +1549,6 @@ fn run_stage_command(
     args: Vec<OsString>,
 ) -> Result<Output, String> {
     Command::new(stage.stage_bin.join(tool))
-        .env("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR", &stage.build_root)
         .env("LIBJPEG_TURBO_STAGE_LIBDIR", &stage.stage_lib)
         .env("LD_LIBRARY_PATH", &stage.stage_lib)
         .current_dir(temp_dir)

@@ -1,3 +1,3 @@
 fn main() {
-    jpeg_tools::exec_upstream_tool("cjpeg");
+    jpeg_tools::exec_packaged_tool_backend("cjpeg");
 }

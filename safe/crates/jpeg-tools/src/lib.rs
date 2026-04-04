@@ -68,7 +68,41 @@ fn join_library_path(paths: &[PathBuf]) -> Result<OsString, String> {
     std::env::join_paths(paths).map_err(|error| format!("join LD_LIBRARY_PATH entries: {error}"))
 }
 
-pub fn exec_upstream_tool(tool: &str) -> ! {
+fn host_multiarch() -> Option<String> {
+    for (program, args) in [
+        ("dpkg-architecture", &["-qDEB_HOST_MULTIARCH"][..]),
+        ("gcc", &["-print-multiarch"][..]),
+    ] {
+        if let Ok(output) = std::process::Command::new(program).args(args).output() {
+            if output.status.success() {
+                let value = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                if !value.is_empty() {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_runtime_backend_dir(safe_root: &Path) -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("LIBJPEG_TURBO_TOOL_BACKEND_DIR") {
+        return Ok(PathBuf::from(path));
+    }
+
+    let multiarch = host_multiarch().ok_or_else(|| "could not determine host multiarch".to_string())?;
+    let path = safe_root.join("runtime").join(multiarch).join("bin");
+    if path.is_dir() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "could not find packaged tool backend directory under {}",
+            path.display()
+        ))
+    }
+}
+
+pub fn exec_packaged_tool_backend(tool: &str) -> ! {
     let exe = match std::env::current_exe() {
         Ok(path) => path,
         Err(error) => {
@@ -76,25 +110,26 @@ pub fn exec_upstream_tool(tool: &str) -> ! {
             std::process::exit(1);
         }
     };
-    let build_dir = std::env::var_os("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR").map(PathBuf::from);
     let safe_root = std::env::var_os("LIBJPEG_TURBO_SAFE_ROOT")
         .map(PathBuf::from)
         .or_else(|| find_safe_root_from(&exe).ok());
 
-    let build_dir = match (build_dir, safe_root.as_ref()) {
-        (Some(path), _) => path,
-        (None, Some(root)) => root.join("target/upstream-bootstrap"),
-        (None, None) => {
-            eprintln!(
-                "{tool}: could not locate safe/ root from {} and LIBJPEG_TURBO_UPSTREAM_BUILD_DIR is unset",
-                exe.display()
-            );
+    let build_dir = match safe_root.as_ref() {
+        Some(root) => match find_runtime_backend_dir(root) {
+            Ok(path) => path,
+            Err(message) => {
+                eprintln!("{tool}: {message}");
+                std::process::exit(1);
+            }
+        },
+        None => {
+            eprintln!("{tool}: could not locate safe/ root from {}", exe.display());
             std::process::exit(1);
         }
     };
     let backend = build_dir.join(tool);
     if !backend.is_file() {
-        eprintln!("{tool}: missing upstream backend tool {}", backend.display());
+        eprintln!("{tool}: missing packaged backend tool {}", backend.display());
         std::process::exit(1);
     }
 

@@ -14,7 +14,7 @@ override_dh_auto_build:
 
 override_dh_auto_clean:
 	dh_auto_clean
-	rm -rf stage target/upstream-bootstrap target/upstream-install target/upstream-source target/rendered
+	rm -rf stage target/rendered target/java-tools target/docker-home
 
 override_dh_auto_install:
 	bash scripts/stage-install.sh --with-java=1

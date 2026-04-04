@@ -63,8 +63,23 @@ if [[ -n "$unexpected_files" ]]; then
   exit 1
 fi
 
+bootstrap_refs="$(
+  rg -n 'LIBJPEG_TURBO_UPSTREAM_BUILD_DIR|target/upstream-bootstrap' \
+    "$SAFE_ROOT/crates" \
+    "$SAFE_ROOT/tests" \
+    "$SAFE_ROOT/scripts" \
+    "$SAFE_ROOT/README.md" \
+    | grep -Fv "$SAFE_ROOT/scripts/audit-unsafe.sh:" \
+    || true
+)"
+
+if [[ -n "$bootstrap_refs" ]]; then
+  printf '%s\n' "$bootstrap_refs" >&2
+  die "obsolete upstream-bootstrap references remain in the committed tree"
+fi
+
 printf '\nResidual compatibility bridge references:\n'
-rg -n 'LIBJPEG_TURBO_BACKEND_LIB|target/upstream-bootstrap|dlopen\(|dlsym\(' \
+rg -n 'LIBJPEG_TURBO_BACKEND_LIB|safe/runtime|dlopen\(|dlsym\(' \
   "$SAFE_ROOT/crates/libturbojpeg-abi/src/lib.rs" \
   "$SAFE_ROOT/crates/jpeg-tools/src/lib.rs" \
   "$SAFE_ROOT/scripts/stage-install.sh" \

@@ -270,6 +270,23 @@ fn find_safe_root_from(path: &Path) -> Result<PathBuf, String> {
     ))
 }
 
+fn host_multiarch() -> Option<String> {
+    for (program, args) in [
+        ("dpkg-architecture", &["-qDEB_HOST_MULTIARCH"][..]),
+        ("gcc", &["-print-multiarch"][..]),
+    ] {
+        if let Ok(output) = std::process::Command::new(program).args(args).output() {
+            if output.status.success() {
+                let value = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                if !value.is_empty() {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
 fn backend_library_path() -> Result<PathBuf, String> {
     if let Some(path) = std::env::var_os(BACKEND_LIBRARY_ENV_VAR) {
         return Ok(PathBuf::from(path));
@@ -277,11 +294,14 @@ fn backend_library_path() -> Result<PathBuf, String> {
 
     let library_path = current_library_path()?;
     let safe_root = find_safe_root_from(&library_path)?;
-    let build_dir = safe_root.join("target/upstream-bootstrap");
+    let runtime_dir = safe_root
+        .join("runtime")
+        .join(host_multiarch().ok_or_else(|| "could not determine host multiarch".to_string())?)
+        .join("lib");
     for candidate in [
-        build_dir.join("libturbojpeg.so.0"),
-        build_dir.join("libturbojpeg.so"),
-        build_dir.join("libturbojpeg.so.0.2.0"),
+        runtime_dir.join("libturbojpeg.so.0.2.0"),
+        runtime_dir.join("libturbojpeg.so.0"),
+        runtime_dir.join("libturbojpeg.so"),
     ] {
         if candidate.is_file() {
             return Ok(candidate);
@@ -289,8 +309,8 @@ fn backend_library_path() -> Result<PathBuf, String> {
     }
 
     Err(format!(
-        "could not find upstream TurboJPEG backend under {}",
-        build_dir.display()
+        "could not find packaged TurboJPEG backend under {}",
+        runtime_dir.display()
     ))
 }
 
