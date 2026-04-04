@@ -1,11 +1,32 @@
 use core::ffi::c_uint;
 
 use ffi_types::{
-    boolean, int, j_decompress_ptr, jpeg_component_info, jpeg_marker_parser_method, JCOEFPTR,
-    JSAMPARRAY, JSAMPIMAGE, JDIMENSION, jvirt_barray_ptr,
+    boolean, int, j_decompress_ptr, jpeg_component_info, jpeg_marker_parser_method,
+    jvirt_barray_ptr, JCOEFPTR, JDIMENSION, JSAMPARRAY, JSAMPIMAGE,
 };
 
 use crate::decompress;
+
+pub const EXPECTED_DECOMPRESS_SYMBOLS: &[&str] = &[
+    "jpeg_CreateDecompress",
+    "jpeg_destroy_decompress",
+    "jpeg_abort_decompress",
+    "jpeg_read_header",
+    "jpeg_consume_input",
+    "jpeg_input_complete",
+    "jpeg_has_multiple_scans",
+    "jpeg_finish_decompress",
+    "jpeg_start_decompress",
+    "jpeg_read_scanlines",
+    "jpeg_crop_scanline",
+    "jpeg_skip_scanlines",
+    "jpeg_read_raw_data",
+    "jpeg_start_output",
+    "jpeg_finish_output",
+    "jpeg_read_coefficients",
+    "jpeg_save_markers",
+    "jpeg_set_marker_processor",
+];
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_CreateDecompress(
@@ -102,9 +123,7 @@ pub unsafe extern "C" fn jpeg_finish_output(cinfo: j_decompress_ptr) -> boolean 
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_read_coefficients(
-    cinfo: j_decompress_ptr,
-) -> *mut jvirt_barray_ptr {
+pub unsafe extern "C" fn jpeg_read_coefficients(cinfo: j_decompress_ptr) -> *mut jvirt_barray_ptr {
     decompress::jdtrans::jpeg_read_coefficients(cinfo)
 }
 
@@ -208,12 +227,7 @@ pub unsafe extern "C" fn jpeg_fill_bit_buffer(
     bits_left: int,
     nbits: int,
 ) -> boolean {
-    jpeg_core::ported::decompress::jdhuff::jpeg_fill_bit_buffer(
-        state,
-        get_buffer,
-        bits_left,
-        nbits,
-    )
+    jpeg_core::ported::decompress::jdhuff::jpeg_fill_bit_buffer(state, get_buffer, bits_left, nbits)
 }
 
 #[no_mangle]
@@ -225,11 +239,7 @@ pub unsafe extern "C" fn jpeg_huff_decode(
     min_bits: int,
 ) -> int {
     jpeg_core::ported::decompress::jdhuff::jpeg_huff_decode(
-        state,
-        get_buffer,
-        bits_left,
-        htbl,
-        min_bits,
+        state, get_buffer, bits_left, htbl, min_bits,
     )
 }
 
@@ -316,37 +326,139 @@ macro_rules! export_idct {
     };
 }
 
-export_idct!(jpeg_idct_1x1, jpeg_core::ported::decompress::jidctred::jpeg_idct_1x1);
-export_idct!(jpeg_idct_1x2, jpeg_core::ported::decompress::jidctint::jpeg_idct_1x2);
-export_idct!(jpeg_idct_2x1, jpeg_core::ported::decompress::jidctint::jpeg_idct_2x1);
-export_idct!(jpeg_idct_2x2, jpeg_core::ported::decompress::jidctred::jpeg_idct_2x2);
-export_idct!(jpeg_idct_2x4, jpeg_core::ported::decompress::jidctint::jpeg_idct_2x4);
-export_idct!(jpeg_idct_3x3, jpeg_core::ported::decompress::jidctint::jpeg_idct_3x3);
-export_idct!(jpeg_idct_3x6, jpeg_core::ported::decompress::jidctint::jpeg_idct_3x6);
-export_idct!(jpeg_idct_4x2, jpeg_core::ported::decompress::jidctint::jpeg_idct_4x2);
-export_idct!(jpeg_idct_4x4, jpeg_core::ported::decompress::jidctred::jpeg_idct_4x4);
-export_idct!(jpeg_idct_4x8, jpeg_core::ported::decompress::jidctint::jpeg_idct_4x8);
-export_idct!(jpeg_idct_5x5, jpeg_core::ported::decompress::jidctint::jpeg_idct_5x5);
-export_idct!(jpeg_idct_5x10, jpeg_core::ported::decompress::jidctint::jpeg_idct_5x10);
-export_idct!(jpeg_idct_6x3, jpeg_core::ported::decompress::jidctint::jpeg_idct_6x3);
-export_idct!(jpeg_idct_6x6, jpeg_core::ported::decompress::jidctint::jpeg_idct_6x6);
-export_idct!(jpeg_idct_6x12, jpeg_core::ported::decompress::jidctint::jpeg_idct_6x12);
-export_idct!(jpeg_idct_7x7, jpeg_core::ported::decompress::jidctint::jpeg_idct_7x7);
-export_idct!(jpeg_idct_7x14, jpeg_core::ported::decompress::jidctint::jpeg_idct_7x14);
-export_idct!(jpeg_idct_8x4, jpeg_core::ported::decompress::jidctint::jpeg_idct_8x4);
-export_idct!(jpeg_idct_8x16, jpeg_core::ported::decompress::jidctint::jpeg_idct_8x16);
-export_idct!(jpeg_idct_9x9, jpeg_core::ported::decompress::jidctint::jpeg_idct_9x9);
-export_idct!(jpeg_idct_10x5, jpeg_core::ported::decompress::jidctint::jpeg_idct_10x5);
-export_idct!(jpeg_idct_10x10, jpeg_core::ported::decompress::jidctint::jpeg_idct_10x10);
-export_idct!(jpeg_idct_11x11, jpeg_core::ported::decompress::jidctint::jpeg_idct_11x11);
-export_idct!(jpeg_idct_12x6, jpeg_core::ported::decompress::jidctint::jpeg_idct_12x6);
-export_idct!(jpeg_idct_12x12, jpeg_core::ported::decompress::jidctint::jpeg_idct_12x12);
-export_idct!(jpeg_idct_13x13, jpeg_core::ported::decompress::jidctint::jpeg_idct_13x13);
-export_idct!(jpeg_idct_14x7, jpeg_core::ported::decompress::jidctint::jpeg_idct_14x7);
-export_idct!(jpeg_idct_14x14, jpeg_core::ported::decompress::jidctint::jpeg_idct_14x14);
-export_idct!(jpeg_idct_15x15, jpeg_core::ported::decompress::jidctint::jpeg_idct_15x15);
-export_idct!(jpeg_idct_16x8, jpeg_core::ported::decompress::jidctint::jpeg_idct_16x8);
-export_idct!(jpeg_idct_16x16, jpeg_core::ported::decompress::jidctint::jpeg_idct_16x16);
-export_idct!(jpeg_idct_float, jpeg_core::ported::decompress::jidctflt::jpeg_idct_float);
-export_idct!(jpeg_idct_ifast, jpeg_core::ported::decompress::jidctfst::jpeg_idct_ifast);
-export_idct!(jpeg_idct_islow, jpeg_core::ported::decompress::jidctint::jpeg_idct_islow);
+export_idct!(
+    jpeg_idct_1x1,
+    jpeg_core::ported::decompress::jidctred::jpeg_idct_1x1
+);
+export_idct!(
+    jpeg_idct_1x2,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_1x2
+);
+export_idct!(
+    jpeg_idct_2x1,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_2x1
+);
+export_idct!(
+    jpeg_idct_2x2,
+    jpeg_core::ported::decompress::jidctred::jpeg_idct_2x2
+);
+export_idct!(
+    jpeg_idct_2x4,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_2x4
+);
+export_idct!(
+    jpeg_idct_3x3,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_3x3
+);
+export_idct!(
+    jpeg_idct_3x6,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_3x6
+);
+export_idct!(
+    jpeg_idct_4x2,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_4x2
+);
+export_idct!(
+    jpeg_idct_4x4,
+    jpeg_core::ported::decompress::jidctred::jpeg_idct_4x4
+);
+export_idct!(
+    jpeg_idct_4x8,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_4x8
+);
+export_idct!(
+    jpeg_idct_5x5,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_5x5
+);
+export_idct!(
+    jpeg_idct_5x10,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_5x10
+);
+export_idct!(
+    jpeg_idct_6x3,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_6x3
+);
+export_idct!(
+    jpeg_idct_6x6,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_6x6
+);
+export_idct!(
+    jpeg_idct_6x12,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_6x12
+);
+export_idct!(
+    jpeg_idct_7x7,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_7x7
+);
+export_idct!(
+    jpeg_idct_7x14,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_7x14
+);
+export_idct!(
+    jpeg_idct_8x4,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_8x4
+);
+export_idct!(
+    jpeg_idct_8x16,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_8x16
+);
+export_idct!(
+    jpeg_idct_9x9,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_9x9
+);
+export_idct!(
+    jpeg_idct_10x5,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_10x5
+);
+export_idct!(
+    jpeg_idct_10x10,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_10x10
+);
+export_idct!(
+    jpeg_idct_11x11,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_11x11
+);
+export_idct!(
+    jpeg_idct_12x6,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_12x6
+);
+export_idct!(
+    jpeg_idct_12x12,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_12x12
+);
+export_idct!(
+    jpeg_idct_13x13,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_13x13
+);
+export_idct!(
+    jpeg_idct_14x7,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_14x7
+);
+export_idct!(
+    jpeg_idct_14x14,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_14x14
+);
+export_idct!(
+    jpeg_idct_15x15,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_15x15
+);
+export_idct!(
+    jpeg_idct_16x8,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_16x8
+);
+export_idct!(
+    jpeg_idct_16x16,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_16x16
+);
+export_idct!(
+    jpeg_idct_float,
+    jpeg_core::ported::decompress::jidctflt::jpeg_idct_float
+);
+export_idct!(
+    jpeg_idct_ifast,
+    jpeg_core::ported::decompress::jidctfst::jpeg_idct_ifast
+);
+export_idct!(
+    jpeg_idct_islow,
+    jpeg_core::ported::decompress::jidctint::jpeg_idct_islow
+);

@@ -4,9 +4,25 @@ use core::{
 };
 
 use ffi_types::{
-    j_common_ptr, j_compress_ptr, j_decompress_ptr, jpeg_error_mgr, JHUFF_TBL, JQUANT_TBL,
-    JSAMPARRAY, JBLOCKROW, JDIMENSION, FILE, JOCTET,
+    j_common_ptr, j_compress_ptr, j_decompress_ptr, jpeg_error_mgr, FILE, JBLOCKROW, JDIMENSION,
+    JHUFF_TBL, JOCTET, JQUANT_TBL, JSAMPARRAY,
 };
+
+pub const EXPECTED_COMMON_SYMBOLS: &[&str] = &[
+    "jpeg_std_error",
+    "jpeg_abort",
+    "jpeg_destroy",
+    "jpeg_alloc_quant_table",
+    "jpeg_alloc_huff_table",
+    "jcopy_sample_rows",
+    "jcopy_block_row",
+    "jpeg_stdio_src",
+    "jpeg_stdio_dest",
+    "jpeg_mem_src",
+    "jpeg_mem_dest",
+    "jpeg_write_icc_profile",
+    "jpeg_read_icc_profile",
+];
 
 #[no_mangle]
 pub unsafe extern "C" fn jpeg_std_error(err: *mut jpeg_error_mgr) -> *mut jpeg_error_mgr {
@@ -74,7 +90,12 @@ pub unsafe extern "C" fn jpeg_mem_available(
     max_bytes_needed: ffi_types::size_t,
     already_allocated: ffi_types::size_t,
 ) -> ffi_types::size_t {
-    jpeg_core::common::memory::jpeg_mem_available(cinfo, min_bytes_needed, max_bytes_needed, already_allocated)
+    jpeg_core::common::memory::jpeg_mem_available(
+        cinfo,
+        min_bytes_needed,
+        max_bytes_needed,
+        already_allocated,
+    )
 }
 
 #[no_mangle]
@@ -120,11 +141,22 @@ pub unsafe extern "C" fn jcopy_sample_rows(
     num_rows: ffi_types::int,
     num_cols: JDIMENSION,
 ) {
-    jpeg_core::common::utils::copy_sample_rows(input_array, source_row, output_array, dest_row, num_rows, num_cols)
+    jpeg_core::common::utils::copy_sample_rows(
+        input_array,
+        source_row,
+        output_array,
+        dest_row,
+        num_rows,
+        num_cols,
+    )
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jcopy_block_row(input_row: JBLOCKROW, output_row: JBLOCKROW, num_blocks: JDIMENSION) {
+pub unsafe extern "C" fn jcopy_block_row(
+    input_row: JBLOCKROW,
+    output_row: JBLOCKROW,
+    num_blocks: JDIMENSION,
+) {
     jpeg_core::common::utils::copy_block_row(input_row, output_row, num_blocks)
 }
 
@@ -144,7 +176,11 @@ pub unsafe extern "C" fn jpeg_stdio_dest(cinfo: j_compress_ptr, outfile: *mut FI
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn jpeg_mem_src(cinfo: j_decompress_ptr, inbuffer: *const u8, insize: ffi_types::ulong) {
+pub unsafe extern "C" fn jpeg_mem_src(
+    cinfo: j_decompress_ptr,
+    inbuffer: *const u8,
+    insize: ffi_types::ulong,
+) {
     jpeg_core::common::source_dest::jpeg_mem_src(cinfo, inbuffer, insize)
 }
 
@@ -184,120 +220,21 @@ pub static mut auxv: *mut c_void = ptr::null_mut();
 
 #[no_mangle]
 pub static jpeg_aritab: [ffi_types::JLONG; 114] = [
-    0x5a1d0181,
-    0x2586020e,
-    0x11140310,
-    0x080b0412,
-    0x03d80514,
-    0x01da0617,
-    0x00e50719,
-    0x006f081c,
-    0x0036091e,
-    0x001a0a21,
-    0x000d0b23,
-    0x00060c09,
-    0x00030d0a,
-    0x00010d0c,
-    0x5a7f0f8f,
-    0x3f251024,
-    0x2cf21126,
-    0x207c1227,
-    0x17b91328,
-    0x1182142a,
-    0x0cef152b,
-    0x09a1162d,
-    0x072f172e,
-    0x055c1830,
-    0x04061931,
-    0x03031a33,
-    0x02401b34,
-    0x01b11c36,
-    0x01441d38,
-    0x00f51e39,
-    0x00b71f3b,
-    0x008a203c,
-    0x0068213e,
-    0x004e223f,
-    0x003b2320,
-    0x002c0921,
-    0x5ae125a5,
-    0x484c2640,
-    0x3a0d2741,
-    0x2ef12843,
-    0x261f2944,
-    0x1f332a45,
-    0x19a82b46,
-    0x15182c48,
-    0x11772d49,
-    0x0e742e4a,
-    0x0bfb2f4b,
-    0x09f8304d,
-    0x0861314e,
-    0x0706324f,
-    0x05cd3330,
-    0x04de3432,
-    0x040f3532,
-    0x03633633,
-    0x02d43734,
-    0x025c3835,
-    0x01f83936,
-    0x01a43a37,
-    0x01603b38,
-    0x01253c39,
-    0x00f63d3a,
-    0x00cb3e3b,
-    0x00ab3f3d,
-    0x008f203d,
-    0x5b1241c1,
-    0x4d044250,
-    0x412c4351,
-    0x37d84452,
-    0x2fe84553,
-    0x293c4654,
-    0x23794756,
-    0x1edf4857,
-    0x1aa94957,
-    0x174e4a48,
-    0x14244b48,
-    0x119c4c4a,
-    0x0f6b4d4a,
-    0x0d514e4b,
-    0x0bb64f4d,
-    0x0a40304d,
-    0x583251d0,
-    0x4d1c5258,
-    0x438e5359,
-    0x3bdd545a,
-    0x34ee555b,
-    0x2eae565c,
-    0x299a575d,
-    0x25164756,
-    0x557059d8,
-    0x4ca95a5f,
-    0x44d95b60,
-    0x3e225c61,
-    0x38245d63,
-    0x32b45e63,
-    0x2e17565d,
-    0x56a860df,
-    0x4f466165,
-    0x47e56266,
-    0x41cf6367,
-    0x3c3d6468,
-    0x375e5d63,
-    0x52316669,
-    0x4c0f676a,
-    0x4639686b,
-    0x415e6367,
-    0x56276ae9,
-    0x50e76b6c,
-    0x4b85676d,
-    0x55976d6e,
-    0x504f6b6f,
-    0x5a106fee,
-    0x55226d70,
-    0x59eb6ff0,
-    0x5a1d7171,
+    0x5a1d0181, 0x2586020e, 0x11140310, 0x080b0412, 0x03d80514, 0x01da0617, 0x00e50719, 0x006f081c,
+    0x0036091e, 0x001a0a21, 0x000d0b23, 0x00060c09, 0x00030d0a, 0x00010d0c, 0x5a7f0f8f, 0x3f251024,
+    0x2cf21126, 0x207c1227, 0x17b91328, 0x1182142a, 0x0cef152b, 0x09a1162d, 0x072f172e, 0x055c1830,
+    0x04061931, 0x03031a33, 0x02401b34, 0x01b11c36, 0x01441d38, 0x00f51e39, 0x00b71f3b, 0x008a203c,
+    0x0068213e, 0x004e223f, 0x003b2320, 0x002c0921, 0x5ae125a5, 0x484c2640, 0x3a0d2741, 0x2ef12843,
+    0x261f2944, 0x1f332a45, 0x19a82b46, 0x15182c48, 0x11772d49, 0x0e742e4a, 0x0bfb2f4b, 0x09f8304d,
+    0x0861314e, 0x0706324f, 0x05cd3330, 0x04de3432, 0x040f3532, 0x03633633, 0x02d43734, 0x025c3835,
+    0x01f83936, 0x01a43a37, 0x01603b38, 0x01253c39, 0x00f63d3a, 0x00cb3e3b, 0x00ab3f3d, 0x008f203d,
+    0x5b1241c1, 0x4d044250, 0x412c4351, 0x37d84452, 0x2fe84553, 0x293c4654, 0x23794756, 0x1edf4857,
+    0x1aa94957, 0x174e4a48, 0x14244b48, 0x119c4c4a, 0x0f6b4d4a, 0x0d514e4b, 0x0bb64f4d, 0x0a40304d,
+    0x583251d0, 0x4d1c5258, 0x438e5359, 0x3bdd545a, 0x34ee555b, 0x2eae565c, 0x299a575d, 0x25164756,
+    0x557059d8, 0x4ca95a5f, 0x44d95b60, 0x3e225c61, 0x38245d63, 0x32b45e63, 0x2e17565d, 0x56a860df,
+    0x4f466165, 0x47e56266, 0x41cf6367, 0x3c3d6468, 0x375e5d63, 0x52316669, 0x4c0f676a, 0x4639686b,
+    0x415e6367, 0x56276ae9, 0x50e76b6c, 0x4b85676d, 0x55976d6e, 0x504f6b6f, 0x5a106fee, 0x55226d70,
+    0x59eb6ff0, 0x5a1d7171,
 ];
 
 #[no_mangle]

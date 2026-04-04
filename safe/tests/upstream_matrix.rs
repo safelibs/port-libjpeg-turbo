@@ -16,6 +16,10 @@ use ffi_types::{
     JPEG_LIB_VERSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED,
     JSAMPARRAY, TRUE,
 };
+use libjpeg_abi::{
+    common_exports::EXPECTED_COMMON_SYMBOLS, decompress_exports::EXPECTED_DECOMPRESS_SYMBOLS,
+    EXPECTED_COMPRESS_SYMBOLS,
+};
 use libtest_mimic::{Arguments, Failed, Trial};
 
 #[derive(Clone)]
@@ -1124,6 +1128,11 @@ fn advanced_decode_cases() -> Vec<MatrixCase> {
 fn encode_transcode_cases() -> Vec<MatrixCase> {
     vec![
         MatrixCase {
+            name: "encode-transcode-libjpeg-symbol-surface",
+            commands: Vec::new(),
+            runner: Some(run_encode_transcode_symbol_surface_case),
+        },
+        MatrixCase {
             name: "encode-transcode-cjpeg-rgb-islow",
             commands: vec![cmd(
                 "cjpeg",
@@ -2103,6 +2112,46 @@ fn run_croptest_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> 
     }
 
     Ok(())
+}
+
+fn run_encode_transcode_symbol_surface_case(
+    stage: &StagePaths,
+    _temp_dir: &Path,
+) -> Result<(), String> {
+    unsafe {
+        let path = stage.stage_lib.join("libjpeg.so.8");
+        let path_c = CString::new(path.to_string_lossy().into_owned())
+            .map_err(|error| format!("invalid dlopen path {}: {error}", path.display()))?;
+        let handle = dlopen(path_c.as_ptr(), RTLD_NOW);
+        if handle.is_null() {
+            return Err(format!(
+                "dlopen {} failed: {}",
+                path.display(),
+                dlerror_message()
+            ));
+        }
+
+        let result = (|| -> Result<(), String> {
+            for symbol in EXPECTED_COMMON_SYMBOLS
+                .iter()
+                .chain(EXPECTED_DECOMPRESS_SYMBOLS.iter())
+                .chain(EXPECTED_COMPRESS_SYMBOLS.iter())
+            {
+                let symbol_c =
+                    CString::new(*symbol).expect("static symbol names never contain NUL");
+                if dlsym(handle, symbol_c.as_ptr()).is_null() {
+                    return Err(format!(
+                        "staged libjpeg is missing symbol {symbol}: {}",
+                        dlerror_message()
+                    ));
+                }
+            }
+            Ok(())
+        })();
+
+        let _ = dlclose(handle);
+        result
+    }
 }
 
 fn read_ppm(path: &Path) -> Result<PpmImage, String> {

@@ -6,11 +6,11 @@ mod generated {
     pub mod jpegtran;
     #[path = "../../generated/rdswitch.rs"]
     pub mod rdswitch;
-    #[path = "../../generated/transupp.rs"]
-    pub mod transupp;
 }
 
 fn main() {
     let _ = libjpeg_abi::common_exports::jpeg_std_error as *const ();
+    let _ = libjpeg_abi::compress::jctrans::jpeg_write_coefficients as *const ();
+    let _ = libjpeg_abi::transform::transupp::jtransform_execute_transform as *const ();
     generated::jpegtran::main();
 }
