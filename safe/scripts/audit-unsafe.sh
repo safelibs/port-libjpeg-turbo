@@ -18,6 +18,10 @@ require_command rg
 require_command awk
 require_command sort
 
+if [[ -e "$SAFE_ROOT/runtime" ]]; then
+  die "obsolete safe/runtime compatibility artifacts still exist"
+fi
+
 declare -a cargo_bridge_files=(
   "$SAFE_ROOT/build.rs"
   "$SAFE_ROOT/crates/jpeg-tools/build.rs"
@@ -79,13 +83,22 @@ if [[ -n "$bootstrap_refs" ]]; then
   die "obsolete upstream-bootstrap references remain in the committed tree"
 fi
 
-printf '\nResidual compatibility bridge references:\n'
-rg -n 'LIBJPEG_TURBO_BACKEND_LIB|safe/runtime|dlopen\(|dlsym\(' \
-  "$SAFE_ROOT/crates/libturbojpeg-abi/src/lib.rs" \
-  "$SAFE_ROOT/crates/jpeg-tools/src/lib.rs" \
-  "$SAFE_ROOT/scripts/stage-install.sh" \
-  "$SAFE_ROOT/tests/turbojpeg_suite.rs" \
-  "$SAFE_ROOT/tests/upstream_matrix.rs" \
-  || true
+legacy_backend_refs="$(
+  rg -n \
+    'LIBJPEG_TURBO_BACKEND_LIB|safe/runtime|libturbojpeg_backend|libjpeg-turbo-tools|exec_packaged_tool_backend|dlopen\(|dlsym\(' \
+    "$ROOT/test-original.sh" \
+    "$SAFE_ROOT/crates" \
+    "$SAFE_ROOT/tests" \
+    "$SAFE_ROOT/scripts" \
+    "$SAFE_ROOT/README.md" \
+    | grep -Ev 'tests/(turbojpeg_suite|upstream_matrix)\.rs:' \
+    | grep -Fv "$SAFE_ROOT/scripts/audit-unsafe.sh:" \
+    || true
+)"
+
+if [[ -n "$legacy_backend_refs" ]]; then
+  printf '%s\n' "$legacy_backend_refs" >&2
+  die "obsolete runtime/backend bridge references remain in the committed tree"
+fi
 
 printf '\naudit-unsafe: ok\n'

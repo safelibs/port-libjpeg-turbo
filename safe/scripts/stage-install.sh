@@ -3,12 +3,13 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
-RUNTIME_ROOT="$SAFE_ROOT/runtime"
 STAGE_DIR="$SAFE_ROOT/stage"
 TMP_RENDER_ROOT="$SAFE_ROOT/target/rendered"
 JAVA_TOOL_ROOT="$SAFE_ROOT/target/java-tools"
 JAVA_TOOL_BIN_DIR="$JAVA_TOOL_ROOT/bin"
 SYMBOLS_TOOL="$SAFE_ROOT/scripts/debian_symbols.py"
+TURBOJPEG_FRONTEND_ROOT="$SAFE_ROOT/c_shim/turbojpeg"
+TOOLS_FRONTEND_ROOT="$SAFE_ROOT/c_shim/tools"
 WITH_JAVA_MODE="auto"
 CLEAN=0
 IGNORED_BUILD_DIR=""
@@ -27,8 +28,9 @@ usage() {
 usage: stage-install.sh [--build-dir <dir>] [--stage-dir <dir>] [--with-java auto|0|1] [--clean]
 
 Stage the self-contained install tree under safe/stage/usr/.  libjpeg is linked
-from the Rust workspace, while the remaining unported runtime pieces are copied
-from the committed compatibility artifacts under safe/runtime/.
+from the Rust workspace, and libturbojpeg plus the packaged command-line tools
+are rebuilt from the committed frontend sources under safe/c_shim/ against the
+Rust libjpeg core.
 
 --build-dir is retained as a compatibility no-op for older harnesses.
 --stage-dir overrides the staged install root.
@@ -252,8 +254,6 @@ reexec_stage_install_in_docker() {
 }
 
 maybe_reexec_for_java() {
-  [[ "$WITH_JAVA_MODE" != "0" ]] || return 0
-
   prepare_java_tool_wrappers
   if local_java_build_available; then
     return 0
@@ -270,9 +270,7 @@ maybe_reexec_for_java() {
     reexec_stage_install_in_docker
   fi
 
-  if [[ "$WITH_JAVA_MODE" == "1" ]]; then
-    die "--with-java=1 requires javac/jar support, or Docker for fallback"
-  fi
+  die "JDK tools/headers are required to stage libturbojpeg, or Docker for fallback"
 }
 
 resolve_with_java() {
@@ -483,6 +481,48 @@ render_version_script() {
   python3 "$SYMBOLS_TOOL" render-version-script "$@" "$symbols_file" "$output"
 }
 
+java_home_dir() {
+  local java_home
+
+  java_home="$(
+    java -XshowSettings:properties -version 2>&1 \
+      | awk -F'= ' '/^[[:space:]]*java.home = / { print $2; exit }'
+  )"
+  [[ -n "$java_home" ]] || die "could not determine java.home"
+  [[ -d "$java_home" ]] || die "reported java.home does not exist: $java_home"
+  printf '%s\n' "$java_home"
+}
+
+append_jni_include_flags() {
+  local -n flags_ref="$1"
+  local java_home os_include
+
+  java_home="$(java_home_dir)"
+  case "$(uname -s)" in
+    Linux)
+      os_include="linux"
+      ;;
+    Darwin)
+      os_include="darwin"
+      ;;
+    *)
+      die "unsupported JNI header platform: $(uname -s)"
+      ;;
+  esac
+
+  [[ -f "$java_home/include/jni.h" ]] || die "missing jni.h under $java_home/include"
+  [[ -d "$java_home/include/$os_include" ]] || die "missing JNI platform headers under $java_home/include/$os_include"
+  flags_ref+=(-I"$java_home/include" -I"$java_home/include/$os_include")
+}
+
+compile_c_object() {
+  local output="$1"
+  local source="$2"
+  shift 2
+
+  gcc "$@" -c "$source" -o "$output"
+}
+
 ensure_rust_libjpeg_staticlib() {
   local staticlib="$SAFE_ROOT/target/release/liblibjpeg_abi.a"
   cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p libjpeg-abi --release >/dev/null \
@@ -495,12 +535,6 @@ ensure_jpegexiforient() {
   cargo build --manifest-path "$SAFE_ROOT/Cargo.toml" -p jpeg-tools --release --bin jpegexiforient >/dev/null \
     || die "failed to build jpegexiforient"
   printf '%s\n' "$binary"
-}
-
-runtime_dir() {
-  local candidate="$RUNTIME_ROOT/$MULTIARCH"
-  [[ -d "$candidate" ]] || die "missing committed runtime artifacts for $MULTIARCH under $candidate"
-  printf '%s\n' "$candidate"
 }
 
 link_rust_libjpeg() {
@@ -525,14 +559,59 @@ link_rust_libjpeg() {
   ln -sfn libjpeg.so.8 "$libdir/libjpeg.so"
 }
 
-install_runtime_libturbojpeg() {
+build_staged_libturbojpeg() {
   local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
-  local source_root
+  local output="$libdir/$LIBTURBOJPEG_REALNAME"
+  local jpeg_staticlib build_dir static_dir source object
+  local -a objects=()
+  local -a cflags=(
+    -std=c99
+    -O3
+    -fPIC
+    -DBMP_SUPPORTED
+    -DPPM_SUPPORTED
+    -I"$STAGE_DIR/usr/include"
+    -I"$STAGE_DIR/usr/include/$MULTIARCH"
+    -I"$ROOT/original"
+    -I"$ROOT/original/java"
+  )
 
-  source_root="$(runtime_dir)"
+  jpeg_staticlib="$(ensure_rust_libjpeg_staticlib)"
+  build_dir="$(fresh_writable_dir "$SAFE_ROOT/target/stage-libturbojpeg" "TurboJPEG frontend build")"
+  static_dir="$(fresh_writable_dir "$SAFE_ROOT/target/stage-libturbojpeg-static" "TurboJPEG static archive build")"
   mkdir -p "$libdir"
-  install -m 644 "$source_root/lib/libturbojpeg.a" "$libdir/libturbojpeg.a"
-  install -m 755 "$source_root/lib/$LIBTURBOJPEG_REALNAME" "$libdir/$LIBTURBOJPEG_REALNAME"
+  append_jni_include_flags cflags
+
+  for source in \
+    "$TURBOJPEG_FRONTEND_ROOT/turbojpeg.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/turbojpeg-jni.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/jdatadst-tj.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/jdatasrc-tj.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/rdbmp.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/rdppm.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/wrbmp.c" \
+    "$TURBOJPEG_FRONTEND_ROOT/wrppm.c"
+  do
+    [[ -f "$source" ]] || die "missing committed TurboJPEG frontend source: $source"
+    object="$build_dir/$(basename "${source%.c}.o")"
+    compile_c_object "$object" "$source" "${cflags[@]}"
+    objects+=("$object")
+  done
+
+  gcc -shared \
+    -Wl,-soname,libturbojpeg.so.0 \
+    -Wl,--version-script,"$SAFE_ROOT/link/turbojpeg-mapfile.jni" \
+    -o "$output" \
+    "${objects[@]}" \
+    -Wl,--whole-archive "$jpeg_staticlib" -Wl,--no-whole-archive \
+    -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
+
+  (
+    cd "$static_dir"
+    ar x "$jpeg_staticlib"
+  )
+  ar crus "$libdir/libturbojpeg.a" "${objects[@]}" "$static_dir"/*.o >/dev/null 2>&1
+  ranlib "$libdir/libturbojpeg.a"
   ln -sfn "$LIBTURBOJPEG_REALNAME" "$libdir/libturbojpeg.so.0"
   ln -sfn libturbojpeg.so.0 "$libdir/libturbojpeg.so"
 }
@@ -651,17 +730,75 @@ install_committed_metadata() {
 }
 
 install_packaged_tools() {
-  local source_root bin_dir man_dir jpegexiforient
+  local bin_dir man_dir jpegexiforient build_dir libdir
+  local -a common_flags=(
+    -std=c99
+    -O3
+    -I"$STAGE_DIR/usr/include"
+    -I"$STAGE_DIR/usr/include/$MULTIARCH"
+    -I"$ROOT/original"
+  )
+  local -a codec_tool_flags=(
+    -DBMP_SUPPORTED
+    -DGIF_SUPPORTED
+    -DPPM_SUPPORTED
+    -DTARGA_SUPPORTED
+  )
 
-  source_root="$(runtime_dir)"
   bin_dir="$STAGE_DIR/usr/bin"
   man_dir="$STAGE_DIR/usr/share/man/man1"
+  libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
+  build_dir="$(fresh_writable_dir "$SAFE_ROOT/target/stage-tools" "packaged tool build")"
   jpegexiforient="$(ensure_jpegexiforient)"
 
   mkdir -p "$bin_dir" "$man_dir"
 
+  gcc "${common_flags[@]}" "${codec_tool_flags[@]}" \
+    -o "$build_dir/cjpeg" \
+    "$TOOLS_FRONTEND_ROOT/cjpeg.c" \
+    "$TOOLS_FRONTEND_ROOT/cdjpeg.c" \
+    "$TOOLS_FRONTEND_ROOT/rdgif.c" \
+    "$TOOLS_FRONTEND_ROOT/rdppm.c" \
+    "$TOOLS_FRONTEND_ROOT/rdswitch.c" \
+    "$TOOLS_FRONTEND_ROOT/rdbmp.c" \
+    "$TOOLS_FRONTEND_ROOT/rdtarga.c" \
+    -L"$libdir" -Wl,-rpath-link,"$libdir" -ljpeg
+
+  gcc "${common_flags[@]}" "${codec_tool_flags[@]}" \
+    -o "$build_dir/djpeg" \
+    "$TOOLS_FRONTEND_ROOT/djpeg.c" \
+    "$TOOLS_FRONTEND_ROOT/cdjpeg.c" \
+    "$TOOLS_FRONTEND_ROOT/rdcolmap.c" \
+    "$TOOLS_FRONTEND_ROOT/rdswitch.c" \
+    "$TOOLS_FRONTEND_ROOT/wrgif.c" \
+    "$TOOLS_FRONTEND_ROOT/wrppm.c" \
+    "$TOOLS_FRONTEND_ROOT/wrbmp.c" \
+    "$TOOLS_FRONTEND_ROOT/wrtarga.c" \
+    -L"$libdir" -Wl,-rpath-link,"$libdir" -ljpeg
+
+  gcc "${common_flags[@]}" \
+    -o "$build_dir/jpegtran" \
+    "$TOOLS_FRONTEND_ROOT/jpegtran.c" \
+    "$TOOLS_FRONTEND_ROOT/cdjpeg.c" \
+    "$TOOLS_FRONTEND_ROOT/rdswitch.c" \
+    "$TOOLS_FRONTEND_ROOT/transupp.c" \
+    -L"$libdir" -Wl,-rpath-link,"$libdir" -ljpeg
+
+  gcc "${common_flags[@]}" \
+    -o "$build_dir/rdjpgcom" \
+    "$TOOLS_FRONTEND_ROOT/rdjpgcom.c"
+
+  gcc "${common_flags[@]}" \
+    -o "$build_dir/wrjpgcom" \
+    "$TOOLS_FRONTEND_ROOT/wrjpgcom.c"
+
+  gcc "${common_flags[@]}" \
+    -o "$build_dir/tjbench" \
+    "$TOOLS_FRONTEND_ROOT/tjbench.c" \
+    -L"$libdir" -Wl,-rpath-link,"$libdir" -lturbojpeg -lm
+
   for tool in cjpeg djpeg jpegtran rdjpgcom wrjpgcom tjbench; do
-    install -m 755 "$source_root/bin/$tool" "$bin_dir/$tool"
+    install -m 755 "$build_dir/$tool" "$bin_dir/$tool"
   done
 
   install -m 755 "$jpegexiforient" "$bin_dir/jpegexiforient"
@@ -721,7 +858,7 @@ fi
 
 install_committed_headers
 link_rust_libjpeg
-install_runtime_libturbojpeg
+build_staged_libturbojpeg
 install_committed_metadata
 install_packaged_tools
 build_java_jar

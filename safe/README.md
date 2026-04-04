@@ -37,26 +37,31 @@ Two committed helper scripts are part of the final cleanup workflow:
 - `safe/scripts/run-bench-smoke.sh` runs a lightweight staged benchmark sweep
   across the packaged tools and TurboJPEG entry points.
 
-The narrow C boundary that still exists today is:
+The remaining C boundary that still exists today is:
 
 - `safe/c_shim/error_bridge.c`, which preserves the libjpeg
   error/`longjmp` contract at the ABI edge.
 - `safe/c_shim/jsimd_none.c`, which provides the no-SIMD fallback hooks that
-  the staged command-line tools still expect from the historical libjpeg ABI.
+  the staged ABI still expects from the historical libjpeg surface.
+- `safe/c_shim/turbojpeg/*.c`, which preserves the TurboJPEG C/JNI frontend
+  layer while linking it directly against the Rust libjpeg core.
+- `safe/c_shim/tools/*.c`, which preserves the classic command-line frontend
+  programs while linking them against the staged Rust-built libraries.
 
 `safe/scripts/stage-install.sh` no longer bootstraps the old upstream CMake
-build tree.  It links `libjpeg.so.8` directly from the
-Rust workspace, then stages the remaining not-yet-ported runtime pieces from
-the committed compatibility artifacts under `safe/runtime/<multiarch>/`.
+build tree, installs prebuilt compatibility artifacts, or redirects packaged
+binaries into a hidden backend tree. It links `libjpeg.so.8` from the Rust
+workspace, rebuilds `libturbojpeg.so.0` from the committed frontend sources
+against that Rust core, and recompiles the packaged tools from the committed
+frontend sources during staging.
 
 Today that means:
 
-- `libjpeg` and the staged development headers/pkg-config/CMake metadata come
-  from the Rust workspace.
-- TurboJPEG and the packaged command-line tools that still depend on the
-  upstream runtime surface are staged from committed compatibility artifacts,
-  so the final package is self-contained and no longer has a build-time
-  dependency on `original/*.c`.
+- `libjpeg`, the staged development headers, and the pkg-config/CMake metadata
+  come from the Rust workspace.
+- `libturbojpeg` and the packaged CLI tools are self-contained staged builds
+  from committed `safe/c_shim/` sources, with no staged dependency on legacy
+  compatibility artifact trees or `original/*.c`.
 
 
 License

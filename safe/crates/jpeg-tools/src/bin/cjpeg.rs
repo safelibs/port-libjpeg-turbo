@@ -1,3 +1,3 @@
 fn main() {
-    jpeg_tools::exec_packaged_tool_backend("cjpeg");
+    jpeg_tools::staged_tool_only("cjpeg");
 }
