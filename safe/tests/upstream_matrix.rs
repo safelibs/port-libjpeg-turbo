@@ -12,8 +12,9 @@ use std::{
 
 use ffi_types::{
     boolean, int, j_decompress_ptr, jpeg_decompress_struct, jpeg_error_mgr, ulong, DSTATE_BUFIMAGE,
-    DSTATE_SCANNING, JDCT_IFAST, JDIMENSION, JPEG_HEADER_OK, JPEG_LIB_VERSION, JPEG_REACHED_EOI,
-    JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED, JSAMPARRAY, TRUE,
+    DSTATE_READY, DSTATE_SCANNING, DSTATE_START, FALSE, JDCT_IFAST, JDIMENSION, JPEG_HEADER_OK,
+    JPEG_LIB_VERSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SCAN_COMPLETED,
+    JSAMPARRAY, TRUE,
 };
 use libtest_mimic::{Arguments, Failed, Trial};
 
@@ -392,6 +393,11 @@ fn baseline_decode_cases() -> Vec<MatrixCase> {
                 ),
             ],
             runner: None,
+        },
+        MatrixCase {
+            name: "baseline-decode-direct-api-sequential",
+            commands: Vec::new(),
+            runner: Some(run_sequential_api_case),
         },
         MatrixCase {
             name: "baseline-decode-422m-ifast-565",
@@ -1585,6 +1591,51 @@ struct PpmImage {
     data: Vec<u8>,
 }
 
+fn ppm_md5(image: &PpmImage) -> String {
+    let mut bytes =
+        format!("P6\n{} {}\n{}\n", image.width, image.height, image.maxval).into_bytes();
+    bytes.extend_from_slice(&image.data);
+    format!("{:x}", md5::compute(bytes))
+}
+
+fn run_sequential_api_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
+    let jpeg_path = temp_dir.join("sequential_api_422_ifast.jpg");
+
+    let output = run_stage_command(
+        stage,
+        temp_dir,
+        "cjpeg",
+        vec![
+            OsString::from("-sample"),
+            OsString::from("2x1"),
+            OsString::from("-dct"),
+            OsString::from("fast"),
+            OsString::from("-opt"),
+            OsString::from("-outfile"),
+            jpeg_path.clone().into_os_string(),
+            stage
+                .original_testimages
+                .join("testorig.ppm")
+                .into_os_string(),
+        ],
+    )?;
+    if !output.status.success() {
+        return Err(command_failure("cjpeg", &output));
+    }
+
+    let jpeg_bytes =
+        fs::read(&jpeg_path).map_err(|error| format!("read {}: {error}", jpeg_path.display()))?;
+    let image = decode_sequential_image(stage, &jpeg_bytes)?;
+    let digest = ppm_md5(&image);
+    if digest != "8dbc65323d62cca7c91ba02dd1cfa81d" {
+        return Err(format!(
+            "sequential ABI decode md5 mismatch: expected 8dbc65323d62cca7c91ba02dd1cfa81d, got {digest}"
+        ));
+    }
+
+    Ok(())
+}
+
 fn run_buffered_image_case(stage: &StagePaths, temp_dir: &Path) -> Result<(), String> {
     let jpeg_path = temp_dir.join("buffered_prog.jpg");
     let reference_path = temp_dir.join("buffered_prog_reference.ppm");
@@ -1720,7 +1771,7 @@ fn decode_buffered_image_passes(
                     ));
                 }
 
-                let image = read_buffered_pass_output(&libjpeg, &mut cinfo)?;
+                let image = read_scanline_output(&libjpeg, &mut cinfo)?;
                 if first_pass.is_none() {
                     first_pass = Some(image.clone());
                 }
@@ -1759,7 +1810,87 @@ fn decode_buffered_image_passes(
     }
 }
 
-fn read_buffered_pass_output(
+fn decode_sequential_image(stage: &StagePaths, jpeg_bytes: &[u8]) -> Result<PpmImage, String> {
+    unsafe {
+        let libjpeg = LoadedLibjpeg::open(&stage.stage_lib.join("libjpeg.so.8"))?;
+        let mut cinfo = MaybeUninit::<jpeg_decompress_struct>::zeroed().assume_init();
+        let mut err = MaybeUninit::<jpeg_error_mgr>::zeroed().assume_init();
+        cinfo.err = (libjpeg.jpeg_std_error)(&mut err);
+        (libjpeg.jpeg_create_decompress)(
+            &mut cinfo,
+            JPEG_LIB_VERSION,
+            std::mem::size_of::<jpeg_decompress_struct>(),
+        );
+
+        let result = (|| -> Result<PpmImage, String> {
+            (libjpeg.jpeg_mem_src)(&mut cinfo, jpeg_bytes.as_ptr(), jpeg_bytes.len() as _);
+            let header_status = (libjpeg.jpeg_read_header)(&mut cinfo, TRUE);
+            if header_status != JPEG_HEADER_OK {
+                return Err(format!(
+                    "jpeg_read_header returned unexpected status {header_status}"
+                ));
+            }
+            if cinfo.global_state != DSTATE_READY {
+                return Err(format!(
+                    "jpeg_read_header left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+            if (libjpeg.jpeg_has_multiple_scans)(&mut cinfo) != 0 {
+                return Err("baseline input unexpectedly reported multiple scans".into());
+            }
+            if (libjpeg.jpeg_input_complete)(&mut cinfo) != FALSE {
+                return Err("baseline input unexpectedly reported complete before output".into());
+            }
+
+            cinfo.dct_method = JDCT_IFAST;
+            cinfo.do_fancy_upsampling = FALSE;
+            if (libjpeg.jpeg_start_decompress)(&mut cinfo) == 0 {
+                return Err("jpeg_start_decompress suspended unexpectedly".into());
+            }
+            if cinfo.global_state != DSTATE_SCANNING {
+                return Err(format!(
+                    "jpeg_start_decompress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+            if cinfo.output_scanline != 0 {
+                return Err(format!(
+                    "jpeg_start_decompress left unexpected output_scanline {}",
+                    cinfo.output_scanline
+                ));
+            }
+
+            let image = read_scanline_output(&libjpeg, &mut cinfo)?;
+            if cinfo.output_scanline != cinfo.output_height {
+                return Err(format!(
+                    "sequential decode stopped at output_scanline {} of {}",
+                    cinfo.output_scanline, cinfo.output_height
+                ));
+            }
+
+            if (libjpeg.jpeg_finish_decompress)(&mut cinfo) == 0 {
+                return Err("jpeg_finish_decompress suspended unexpectedly".into());
+            }
+            if cinfo.global_state != DSTATE_START {
+                return Err(format!(
+                    "jpeg_finish_decompress left unexpected state {}",
+                    cinfo.global_state
+                ));
+            }
+            if (libjpeg.jpeg_input_complete)(&mut cinfo) == 0 {
+                return Err("baseline input did not report complete after finish".into());
+            }
+
+            Ok(image)
+        })();
+
+        (libjpeg.jpeg_destroy_decompress)(&mut cinfo);
+        result
+    }
+}
+
+fn read_scanline_output(
     libjpeg: &LoadedLibjpeg,
     cinfo: &mut jpeg_decompress_struct,
 ) -> Result<PpmImage, String> {
