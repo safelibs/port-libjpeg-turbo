@@ -1,0 +1,772 @@
+linear: true
+yaml_source_mode: inline-only
+verifier_encoding: explicit-phases
+phases:
+  - order: 1
+    id: impl_bootstrap_workspace
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/src/lib.rs
+      - safe/build.rs
+      - safe/.cargo/config.toml
+      - safe/include/install-manifest.txt
+      - safe/link/libjpeg.map
+      - safe/link/turbojpeg-mapfile
+      - safe/link/turbojpeg-mapfile.jni
+      - safe/pkgconfig/libjpeg.pc.in
+      - safe/pkgconfig/libturbojpeg.pc.in
+      - safe/cmake/libjpeg-turboConfig.cmake.in
+      - safe/cmake/libjpeg-turboConfigVersion.cmake.in
+      - safe/cmake/libjpeg-turboTargets.cmake.in
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/run-dependent-subset.sh
+      - safe/scripts/original-object-groups.json
+      - safe/debian/
+      - safe/debian/extra/
+      - original/debian/
+      - original/debian/extra/
+      - original/sharedlib/CMakeLists.txt
+      - original/libjpeg.map.in
+      - original/turbojpeg-mapfile
+      - original/turbojpeg-mapfile.jni
+  - order: 2
+    id: check_bootstrap_stage_tree
+    type: check
+    bounce_target: impl_bootstrap_workspace
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/lib.rs
+      - safe/.cargo/config.toml
+      - safe/include/install-manifest.txt
+      - safe/pkgconfig/libjpeg.pc.in
+      - safe/pkgconfig/libturbojpeg.pc.in
+      - safe/cmake/libjpeg-turboConfig.cmake.in
+      - safe/cmake/libjpeg-turboConfigVersion.cmake.in
+      - safe/cmake/libjpeg-turboTargets.cmake.in
+      - safe/scripts/stage-install.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/run-dependent-subset.sh
+      - safe/debian/
+  - order: 3
+    id: check_bootstrap_symbol_plumbing
+    type: check
+    bounce_target: impl_bootstrap_workspace
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/lib.rs
+      - safe/.cargo/config.toml
+      - safe/include/install-manifest.txt
+      - safe/link/libjpeg.map
+      - safe/link/turbojpeg-mapfile
+      - safe/link/turbojpeg-mapfile.jni
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - original/debian/libjpeg-turbo8.symbols
+      - original/debian/libturbojpeg.symbols
+  - order: 4
+    id: check_bootstrap_software_tester
+    type: check
+    bounce_target: impl_bootstrap_workspace
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - original/debian/libjpeg-turbo8.symbols
+  - order: 5
+    id: check_bootstrap_senior_tester
+    type: check
+    bounce_target: impl_bootstrap_workspace
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - original/debian/libturbojpeg.symbols
+  - order: 6
+    id: impl_common_abi_infra
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/jpeglib.h
+      - original/jmorecfg.h
+      - original/jpegint.h
+      - original/jerror.h
+      - original/jmemsys.h
+      - original/jcomapi.c
+      - original/jerror.c
+      - original/jutils.c
+      - original/jmemmgr.c
+      - original/jmemnobs.c
+      - original/jdatasrc.c
+      - original/jdatadst.c
+      - original/jcicc.c
+      - original/jdicc.c
+      - original/jcstest.c
+      - original/strtest.c
+      - safe/crates/ffi-types/src/lib.rs
+      - safe/crates/jpeg-core/src/common/
+      - safe/crates/libjpeg-abi/src/common_exports.rs
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - safe/tests/layout_ctest.rs
+      - safe/tests/compat_smoke.rs
+      - safe/scripts/run-compat-fixtures.sh
+      - safe/scripts/run-debian-autopkgtests.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+      - safe/c_shim/error_bridge.c
+  - order: 7
+    id: check_common_layouts
+    type: check
+    bounce_target: impl_common_abi_infra
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/layout_ctest.rs
+      - safe/crates/ffi-types/src/lib.rs
+      - safe/crates/libjpeg-abi/src/common_exports.rs
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - original/jpeglib.h
+      - original/jpegint.h
+  - order: 8
+    id: check_common_runtime_boundary
+    type: check
+    bounce_target: impl_common_abi_infra
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/compat_smoke.rs
+      - safe/scripts/run-compat-fixtures.sh
+      - safe/scripts/run-debian-autopkgtests.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+      - original/jcstest.c
+      - original/strtest.c
+  - order: 9
+    id: check_common_software_tester
+    type: check
+    bounce_target: impl_common_abi_infra
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/layout_ctest.rs
+      - safe/tests/compat_smoke.rs
+      - safe/scripts/run-compat-fixtures.sh
+  - order: 10
+    id: check_common_senior_tester
+    type: check
+    bounce_target: impl_common_abi_infra
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/layout_ctest.rs
+      - safe/scripts/run-debian-autopkgtests.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 11
+    id: impl_baseline_decompress
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/jdapimin.c
+      - original/jdapistd.c
+      - original/jdinput.c
+      - original/jdmarker.c
+      - original/jdhuff.c
+      - original/jdcoefct.c
+      - original/jdmainct.c
+      - original/jdmaster.c
+      - original/jdmerge.c
+      - original/jdsample.c
+      - original/jdcolor.c
+      - original/jdcolext.c
+      - original/jddctmgr.c
+      - original/jidctint.c
+      - original/jidctfst.c
+      - original/jidctflt.c
+      - original/jidctred.c
+      - original/CMakeLists.txt
+      - original/testimages/
+      - safe/crates/jpeg-core/src/ported/decompress/
+      - safe/crates/jpeg-core/src/ported/decompress/generated/
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - safe/crates/libjpeg-abi/src/decompress_exports.rs
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+  - order: 12
+    id: check_baseline_decode_matrix
+    type: check
+    bounce_target: impl_baseline_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - original/CMakeLists.txt
+      - original/testimages/
+  - order: 13
+    id: check_baseline_decode_dependents
+    type: check
+    bounce_target: impl_baseline_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/crates/jpeg-core/src/ported/decompress/
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - safe/crates/libjpeg-abi/src/decompress_exports.rs
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+  - order: 14
+    id: check_baseline_software_tester
+    type: check
+    bounce_target: impl_baseline_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+      - original/testimages/
+  - order: 15
+    id: check_baseline_senior_tester
+    type: check
+    bounce_target: impl_baseline_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+  - order: 16
+    id: impl_advanced_decompress
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/jdphuff.c
+      - original/jdarith.c
+      - original/jdpostct.c
+      - original/jquant1.c
+      - original/jquant2.c
+      - original/jdtrans.c
+      - original/jdicc.c
+      - original/jdapistd.c
+      - original/libjpeg.txt
+      - original/ChangeLog.md
+      - relevant_cves.json
+      - safe/crates/jpeg-core/src/ported/decompress/
+      - safe/crates/jpeg-core/src/ported/decompress/generated/
+      - safe/crates/jpeg-core/src/common/error.rs
+      - safe/crates/jpeg-core/src/common/icc.rs
+      - safe/crates/jpeg-core/src/common/registry.rs
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - safe/crates/libjpeg-abi/src/decompress_exports.rs
+      - safe/tests/upstream_matrix.rs
+      - safe/tests/cve_regressions.rs
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 17
+    id: check_advanced_decode_matrix
+    type: check
+    bounce_target: impl_advanced_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - original/CMakeLists.txt
+      - original/testimages/
+      - original/croptest.in
+  - order: 18
+    id: check_decode_cve_and_relink
+    type: check
+    bounce_target: impl_advanced_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/cve_regressions.rs
+      - relevant_cves.json
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 19
+    id: check_advanced_software_tester
+    type: check
+    bounce_target: impl_advanced_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - safe/tests/cve_regressions.rs
+      - relevant_cves.json
+  - order: 20
+    id: check_advanced_senior_tester
+    type: check
+    bounce_target: impl_advanced_decompress
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - relevant_cves.json
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 21
+    id: impl_compress_transforms
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/jcapimin.c
+      - original/jcapistd.c
+      - original/jcinit.c
+      - original/jcmaster.c
+      - original/jcparam.c
+      - original/jcmainct.c
+      - original/jcprepct.c
+      - original/jccolor.c
+      - original/jccolext.c
+      - original/jcsample.c
+      - original/jcdctmgr.c
+      - original/jfdctint.c
+      - original/jfdctfst.c
+      - original/jfdctflt.c
+      - original/jchuff.c
+      - original/jcphuff.c
+      - original/jcarith.c
+      - original/jcmarker.c
+      - original/jctrans.c
+      - original/transupp.c
+      - safe/crates/jpeg-core/src/ported/compress/
+      - safe/crates/jpeg-core/src/ported/transform/transupp.rs
+      - safe/crates/libjpeg-abi/src/lib.rs
+      - safe/crates/libjpeg-abi/src/common_exports.rs
+      - safe/crates/libjpeg-abi/src/decompress_exports.rs
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 22
+    id: check_compress_matrix
+    type: check
+    bounce_target: impl_compress_transforms
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - original/CMakeLists.txt
+      - original/testimages/
+  - order: 23
+    id: check_compress_relink
+    type: check
+    bounce_target: impl_compress_transforms
+    required_preexisting_inputs:
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 24
+    id: check_compress_software_tester
+    type: check
+    bounce_target: impl_compress_transforms
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 25
+    id: check_compress_senior_tester
+    type: check
+    bounce_target: impl_compress_transforms
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/upstream_matrix.rs
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+  - order: 26
+    id: impl_turbojpeg_tools
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/turbojpeg.h
+      - original/turbojpeg.c
+      - original/jdatasrc-tj.c
+      - original/jdatadst-tj.c
+      - original/tjutil.c
+      - original/tjutil.h
+      - original/tjbench.c
+      - original/tjexample.c
+      - original/cjpeg.c
+      - original/djpeg.c
+      - original/jpegtran.c
+      - original/rdjpgcom.c
+      - original/wrjpgcom.c
+      - original/cjpeg.1
+      - original/djpeg.1
+      - original/jpegtran.1
+      - original/rdjpgcom.1
+      - original/wrjpgcom.1
+      - original/rdbmp.c
+      - original/rdppm.c
+      - original/rdgif.c
+      - original/rdtarga.c
+      - original/wrbmp.c
+      - original/wrppm.c
+      - original/wrgif.c
+      - original/wrtarga.c
+      - original/cdjpeg.c
+      - original/cdjpeg.h
+      - original/rdswitch.c
+      - original/rdcolmap.c
+      - original/tjunittest.c
+      - original/tjbenchtest.in
+      - original/tjexampletest.in
+      - original/debian/libjpeg-turbo-progs.install
+      - original/debian/extra/
+      - original/debian/libturbojpeg.symbols
+      - safe/crates/jpeg-core/src/ported/turbojpeg/
+      - safe/crates/libturbojpeg-abi/src/lib.rs
+      - safe/crates/libturbojpeg-abi/src/generated/
+      - safe/crates/jpeg-tools/src/cdjpeg.rs
+      - safe/crates/jpeg-tools/src/rdswitch.rs
+      - safe/crates/jpeg-tools/src/rdcolmap.rs
+      - safe/crates/jpeg-tools/src/lib.rs
+      - safe/crates/jpeg-tools/src/image_io/
+      - safe/crates/jpeg-tools/src/bin/
+      - safe/crates/jpeg-tools/src/generated/
+      - safe/debian/
+      - safe/debian/extra/
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/scripts/run-dependent-subset.sh
+      - safe/scripts/original-object-groups.json
+      - safe/tests/turbojpeg_suite.rs
+      - dependents.json
+  - order: 27
+    id: check_turbojpeg_suite
+    type: check
+    bounce_target: impl_turbojpeg_tools
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/turbojpeg_suite.rs
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+      - original/debian/libturbojpeg.symbols
+      - original/tjunittest.c
+      - original/tjbenchtest.in
+      - original/tjexampletest.in
+  - order: 28
+    id: check_cli_progs_contract
+    type: check
+    bounce_target: impl_turbojpeg_tools
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/debian/
+      - safe/debian/extra/
+  - order: 29
+    id: check_turbojpeg_dependents
+    type: check
+    bounce_target: impl_turbojpeg_tools
+    required_preexisting_inputs:
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+  - order: 30
+    id: check_turbojpeg_software_tester
+    type: check
+    bounce_target: impl_turbojpeg_tools
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/tests/turbojpeg_suite.rs
+      - safe/scripts/stage-install.sh
+      - safe/scripts/run-progs-smoke.sh
+  - order: 31
+    id: check_turbojpeg_senior_tester
+    type: check
+    bounce_target: impl_turbojpeg_tools
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - original/debian/libturbojpeg.symbols
+      - safe/scripts/run-dependent-subset.sh
+      - dependents.json
+  - order: 32
+    id: impl_java_packaging_harness
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - original/java/
+      - original/turbojpeg-jni.c
+      - original/turbojpeg-mapfile.jni
+      - original/debian/
+      - original/debian/libturbojpeg.symbols
+      - safe/java/
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/crates/libturbojpeg-abi/build.rs
+      - safe/crates/libturbojpeg-abi/src/lib.rs
+      - safe/crates/libturbojpeg-abi/src/generated/
+      - safe/link/turbojpeg-mapfile.jni
+      - safe/debian/
+      - test-original.sh
+      - dependents.json
+  - order: 33
+    id: check_java_and_packages
+    type: check
+    bounce_target: impl_java_packaging_harness
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/crates/libturbojpeg-abi/build.rs
+      - safe/crates/libturbojpeg-abi/src/lib.rs
+      - safe/crates/libturbojpeg-abi/src/generated/
+      - safe/link/turbojpeg-mapfile.jni
+      - original/debian/libturbojpeg.symbols
+      - safe/debian/
+      - safe/java/
+  - order: 34
+    id: check_debian_progs_package_contract
+    type: check
+    bounce_target: impl_java_packaging_harness
+    required_preexisting_inputs:
+      - safe/scripts/run-progs-smoke.sh
+      - safe/debian/
+  - order: 35
+    id: check_root_harness_subset
+    type: check
+    bounce_target: impl_java_packaging_harness
+    required_preexisting_inputs:
+      - test-original.sh
+      - dependents.json
+  - order: 36
+    id: check_java_packaging_software_tester
+    type: check
+    bounce_target: impl_java_packaging_harness
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/debian/
+      - test-original.sh
+      - dependents.json
+  - order: 37
+    id: check_java_packaging_senior_tester
+    type: check
+    bounce_target: impl_java_packaging_harness
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - original/debian/libturbojpeg.symbols
+      - safe/debian/
+      - test-original.sh
+      - dependents.json
+  - order: 38
+    id: impl_dependent_matrix_regressions
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - dependents.json
+      - test-original.sh
+      - safe/debian/
+      - safe/java/
+      - safe/scripts/run-dependent-subset.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/stage/usr/
+      - safe/stage/usr/share/java/turbojpeg.jar
+      - safe/debian/libjpeg-turbo8/
+      - safe/debian/libjpeg-turbo8-dev/
+      - safe/debian/libturbojpeg/
+      - safe/debian/libturbojpeg0-dev/
+      - safe/debian/libjpeg-turbo-progs/
+      - safe/debian/libturbojpeg-java/
+  - order: 39
+    id: check_dependent_matrix_capture
+    type: check
+    bounce_target: impl_dependent_matrix_regressions
+    required_preexisting_inputs:
+      - test-original.sh
+      - dependents.json
+  - order: 40
+    id: check_dependent_regressions_reproduce
+    type: check
+    bounce_target: impl_dependent_matrix_regressions
+    required_preexisting_inputs:
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+  - order: 41
+    id: check_dependent_capture_software_tester
+    type: check
+    bounce_target: impl_dependent_matrix_regressions
+    required_preexisting_inputs:
+      - test-original.sh
+      - dependents.json
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+  - order: 42
+    id: check_dependent_capture_senior_tester
+    type: check
+    bounce_target: impl_dependent_matrix_regressions
+    required_preexisting_inputs:
+      - test-original.sh
+      - dependents.json
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+  - order: 43
+    id: impl_dependent_matrix_fixes
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/target/dependent-matrix/summary.json
+      - safe/target/dependent-matrix/
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+      - safe/crates/jpeg-core/src/
+      - safe/crates/libjpeg-abi/src/
+      - safe/crates/libturbojpeg-abi/src/
+      - safe/crates/jpeg-tools/src/
+      - safe/scripts/stage-install.sh
+      - safe/debian/
+      - dependents.json
+      - test-original.sh
+  - order: 44
+    id: check_dependent_regressions_pass
+    type: check
+    bounce_target: impl_dependent_matrix_fixes
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+  - order: 45
+    id: check_dependent_matrix_full_harness
+    type: check
+    bounce_target: impl_dependent_matrix_fixes
+    required_preexisting_inputs:
+      - test-original.sh
+      - dependents.json
+  - order: 46
+    id: check_dependent_fix_software_tester
+    type: check
+    bounce_target: impl_dependent_matrix_fixes
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - test-original.sh
+      - dependents.json
+  - order: 47
+    id: check_dependent_fix_senior_tester
+    type: check
+    bounce_target: impl_dependent_matrix_fixes
+    required_preexisting_inputs:
+      - safe/scripts/run-dependent-regressions.sh
+      - test-original.sh
+      - dependents.json
+  - order: 48
+    id: impl_final_cleanup
+    type: implement
+    bounce_target: null
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/build.rs
+      - safe/src/lib.rs
+      - safe/README.md
+      - safe/crates/ffi-types/src/lib.rs
+      - safe/crates/jpeg-core/src/
+      - safe/crates/libjpeg-abi/src/
+      - safe/crates/libturbojpeg-abi/src/
+      - safe/crates/jpeg-tools/src/
+      - safe/include/install-manifest.txt
+      - safe/link/libjpeg.map
+      - safe/link/turbojpeg-mapfile
+      - safe/link/turbojpeg-mapfile.jni
+      - safe/pkgconfig/libjpeg.pc.in
+      - safe/pkgconfig/libturbojpeg.pc.in
+      - safe/cmake/libjpeg-turboConfig.cmake.in
+      - safe/cmake/libjpeg-turboConfigVersion.cmake.in
+      - safe/cmake/libjpeg-turboTargets.cmake.in
+      - safe/debian/
+      - safe/java/
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/original-object-groups.json
+      - safe/scripts/run-compat-fixtures.sh
+      - safe/scripts/run-debian-autopkgtests.sh
+      - safe/scripts/run-dependent-subset.sh
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/scripts/audit-unsafe.sh
+      - safe/scripts/run-bench-smoke.sh
+      - safe/tests/layout_ctest.rs
+      - safe/tests/compat_smoke.rs
+      - safe/tests/upstream_matrix.rs
+      - safe/tests/cve_regressions.rs
+      - safe/tests/turbojpeg_suite.rs
+      - safe/tests/dependent_regressions.rs
+      - safe/tests/fixtures/dependents/
+      - safe/target/dependent-matrix/summary.json
+      - safe/target/dependent-matrix-fixed/summary.json
+      - original/debian/libjpeg-turbo8.symbols
+      - original/debian/libturbojpeg.symbols
+      - original/CMakeLists.txt
+      - original/testimages/
+      - original/jcstest.c
+      - original/strtest.c
+      - original/tjunittest.c
+      - original/tjbenchtest.in
+      - original/tjexampletest.in
+      - original/croptest.in
+      - original/java/
+      - relevant_cves.json
+      - dependents.json
+      - test-original.sh
+  - order: 49
+    id: check_full_compatibility
+    type: check
+    bounce_target: impl_final_cleanup
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/debian/
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/relink-original-objects.sh
+      - safe/scripts/run-debian-autopkgtests.sh
+      - safe/scripts/run-progs-smoke.sh
+      - safe/scripts/run-java-tests.sh
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/layout_ctest.rs
+      - safe/tests/compat_smoke.rs
+      - safe/tests/upstream_matrix.rs
+      - safe/tests/cve_regressions.rs
+      - safe/tests/turbojpeg_suite.rs
+      - safe/tests/dependent_regressions.rs
+      - original/debian/libjpeg-turbo8.symbols
+      - original/debian/libturbojpeg.symbols
+      - test-original.sh
+      - dependents.json
+  - order: 50
+    id: check_safety_and_perf
+    type: check
+    bounce_target: impl_final_cleanup
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/scripts/audit-unsafe.sh
+      - safe/scripts/run-bench-smoke.sh
+  - order: 51
+    id: check_final_software_tester
+    type: check
+    bounce_target: impl_final_cleanup
+    required_preexisting_inputs:
+      - safe/Cargo.toml
+      - safe/scripts/run-dependent-regressions.sh
+      - safe/tests/dependent_regressions.rs
+      - test-original.sh
+      - dependents.json
+  - order: 52
+    id: check_final_senior_tester
+    type: check
+    bounce_target: impl_final_cleanup
+    required_preexisting_inputs:
+      - safe/scripts/stage-install.sh
+      - safe/scripts/check-symbols.sh
+      - safe/scripts/audit-unsafe.sh
+      - original/debian/libjpeg-turbo8.symbols
+      - original/debian/libturbojpeg.symbols
+      - test-original.sh
+      - dependents.json
