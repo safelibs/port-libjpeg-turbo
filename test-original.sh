@@ -410,9 +410,6 @@ build_safe_packages() {
     exit 1
   }
 
-  export LIBJPEG_TURBO_BACKEND_LIB="$SAFE_SRC_COPY/safe/target/upstream-bootstrap/libturbojpeg.so.0"
-  [[ -f "$LIBJPEG_TURBO_BACKEND_LIB" ]] || die "missing TurboJPEG backend library: $LIBJPEG_TURBO_BACKEND_LIB"
-
   ldconfig
 
   assert_uses_local_soname /usr/bin/dcm2niix libturbojpeg.so.0

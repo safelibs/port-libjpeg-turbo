@@ -65,6 +65,7 @@ fi
 
 bootstrap_refs="$(
   rg -n 'LIBJPEG_TURBO_UPSTREAM_BUILD_DIR|target/upstream-bootstrap' \
+    "$ROOT/test-original.sh" \
     "$SAFE_ROOT/crates" \
     "$SAFE_ROOT/tests" \
     "$SAFE_ROOT/scripts" \
