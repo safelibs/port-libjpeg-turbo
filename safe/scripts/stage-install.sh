@@ -462,13 +462,29 @@ EOF
 render_template() {
   local input="$1"
   local output="$2"
+  shift 2
+  local replacement key value
+  local -a sed_args=(
+    -e "s|@CMAKE_INSTALL_PREFIX@|/usr|g"
+    -e "s|@CMAKE_INSTALL_DEFAULT_PREFIX@|/usr|g"
+    -e "s|@CMAKE_INSTALL_FULL_LIBDIR@|/usr/lib/${MULTIARCH}|g"
+    -e "s|@CMAKE_INSTALL_FULL_INCLUDEDIR@|/usr/include|g"
+    -e "s|@VERSION@|${UPSTREAM_VERSION}|g"
+    -e "s|@PACKAGE_VERSION@|${UPSTREAM_VERSION}|g"
+    -e "s|@MULTIARCH@|${MULTIARCH}|g"
+  )
+
+  for replacement in "$@"; do
+    key="${replacement%%=*}"
+    value="${replacement#*=}"
+    value="${value//\\/\\\\}"
+    value="${value//&/\\&}"
+    value="${value//|/\\|}"
+    sed_args+=(-e "s|${key}|${value}|g")
+  done
+
   sed \
-    -e "s|@CMAKE_INSTALL_PREFIX@|/usr|g" \
-    -e "s|@CMAKE_INSTALL_FULL_LIBDIR@|/usr/lib/${MULTIARCH}|g" \
-    -e "s|@CMAKE_INSTALL_FULL_INCLUDEDIR@|/usr/include|g" \
-    -e "s|@VERSION@|${UPSTREAM_VERSION}|g" \
-    -e "s|@PACKAGE_VERSION@|${UPSTREAM_VERSION}|g" \
-    -e "s|@MULTIARCH@|${MULTIARCH}|g" \
+    "${sed_args[@]}" \
     "$input" >"$output"
 }
 

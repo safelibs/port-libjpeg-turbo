@@ -1,4 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 pub const UPSTREAM_VERSION: &str = "2.1.5";
 pub const UBUNTU_DEBIAN_VERSION: &str = "2.1.5-2ubuntu2";
@@ -20,4 +24,42 @@ pub fn stage_root() -> PathBuf {
 
 pub fn stage_usr_root() -> PathBuf {
     stage_root().join("usr")
+}
+
+pub fn multiarch() -> Option<String> {
+    if let Ok(value) = env::var(MULTIARCH_TRIPLE_ENV) {
+        let value = value.trim().to_owned();
+        if !value.is_empty() {
+            return Some(value);
+        }
+    }
+
+    probe_multiarch("dpkg-architecture", &["-qDEB_HOST_MULTIARCH"])
+        .or_else(|| probe_multiarch("gcc", &["-print-multiarch"]))
+}
+
+pub fn stage_lib_root() -> PathBuf {
+    stage_usr_root().join("lib")
+}
+
+pub fn stage_libdir() -> Option<PathBuf> {
+    Some(stage_lib_root().join(multiarch()?))
+}
+
+pub fn stage_multiarch_include_dir() -> Option<PathBuf> {
+    Some(stage_usr_root().join("include").join(multiarch()?))
+}
+
+fn probe_multiarch(program: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(program).args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }

@@ -1,4 +1,5 @@
 fn main() {
+    println!("cargo:rerun-if-env-changed=DEB_HOST_MULTIARCH");
     if let Some(libdir) = staged_libdir() {
         println!("cargo:rustc-link-search=native={}", libdir.display());
         println!("cargo:rustc-link-arg-tests=-Wl,-rpath,{}", libdir.display());
@@ -40,6 +41,13 @@ fn staged_libdir() -> Option<std::path::PathBuf> {
 }
 
 fn multiarch() -> Option<String> {
+    if let Ok(value) = std::env::var("DEB_HOST_MULTIARCH") {
+        let value = value.trim().to_owned();
+        if !value.is_empty() {
+            return Some(value);
+        }
+    }
+
     for (program, args) in [
         ("dpkg-architecture", &["-qDEB_HOST_MULTIARCH"][..]),
         ("gcc", &["-print-multiarch"][..]),

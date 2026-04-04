@@ -14,6 +14,7 @@ members = [
   "crates/jpeg-tools",
 ]
 default-members = [
+  ".",
   "crates/ffi-types",
   "crates/jpeg-core",
   "crates/libjpeg-abi",
