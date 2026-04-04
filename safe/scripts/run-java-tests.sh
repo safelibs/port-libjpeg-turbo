@@ -77,7 +77,6 @@ STAGE_ROOT="$SAFE_ROOT/stage/usr"
 STAGE_LIBDIR="$STAGE_ROOT/lib/$MULTIARCH"
 STAGE_BINDIR="$STAGE_ROOT/bin"
 STAGE_JAR="$STAGE_ROOT/share/java/turbojpeg.jar"
-BACKEND_LIB="$SAFE_ROOT/target/upstream-bootstrap/libturbojpeg.so.0"
 JAVA_BIN="$(command -v java)"
 
 if [[ ! -f "$STAGE_JAR" || ! -f "$STAGE_LIBDIR/libturbojpeg.so.0" ]]; then
@@ -86,7 +85,6 @@ fi
 
 require_file "$STAGE_JAR"
 require_file "$STAGE_LIBDIR/libturbojpeg.so.0"
-require_file "$BACKEND_LIB"
 require_file "$JAVA_ROOT/TJUnitTest.java"
 require_file "$JAVA_ROOT/tjbenchtest.java.in"
 require_file "$JAVA_ROOT/tjexampletest.java.in"
@@ -125,7 +123,6 @@ render_template \
 chmod +x "$WORK_ROOT/tjbenchtest.java" "$WORK_ROOT/tjexampletest.java"
 
 export LD_LIBRARY_PATH="$STAGE_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export LIBJPEG_TURBO_BACKEND_LIB="$BACKEND_LIB"
 
 run_javac -encoding UTF-8 -cp "$STAGE_JAR" -d "$CLASS_ROOT" "$JAVA_ROOT/TJUnitTest.java"
 

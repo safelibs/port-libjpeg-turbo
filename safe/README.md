@@ -24,6 +24,26 @@ of making high-speed JPEG compression/decompression technology available to a
 broader range of users and developers.
 
 
+Rust Port Notes
+===============
+
+The `safe/` workspace carries the Rust-first libjpeg/libturbojpeg ABI build,
+the staged packaging metadata, and the verification harness used by this port.
+
+Two committed helper scripts are part of the final cleanup workflow:
+
+- `safe/scripts/audit-unsafe.sh` reports the remaining `unsafe` footprint and
+  rejects any new Cargo-side `original/*.c` compilation dependency.
+- `safe/scripts/run-bench-smoke.sh` runs a lightweight staged benchmark sweep
+  across the packaged tools and TurboJPEG entry points.
+
+The narrow C boundary that still exists today is
+`safe/c_shim/error_bridge.c`, which is kept to preserve the libjpeg
+error/`longjmp` contract at the ABI edge.  TurboJPEG compatibility is still
+documented and audited separately while the remaining Rust cutover work is
+completed.
+
+
 License
 =======
 

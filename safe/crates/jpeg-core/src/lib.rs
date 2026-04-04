@@ -1,3 +1,11 @@
+#![allow(clashing_extern_declarations)]
+#![allow(clippy::all)]
+#![allow(dead_code)]
+#![allow(nonstandard_style)]
+#![allow(unreachable_code)]
+#![allow(unused)]
+#![allow(unpredictable_function_pointer_comparisons)]
+
 pub mod common;
 pub mod ported;
 

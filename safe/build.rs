@@ -20,6 +20,9 @@ fn main() {
         "scripts/relink-original-objects.sh",
         "scripts/original-object-groups.json",
         "scripts/run-dependent-subset.sh",
+        "scripts/audit-unsafe.sh",
+        "scripts/run-bench-smoke.sh",
+        "README.md",
     ] {
         println!("cargo:rerun-if-changed={path}");
     }

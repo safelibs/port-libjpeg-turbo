@@ -13,6 +13,13 @@ members = [
   "crates/libturbojpeg-abi",
   "crates/jpeg-tools",
 ]
+default-members = [
+  "crates/ffi-types",
+  "crates/jpeg-core",
+  "crates/libjpeg-abi",
+  "crates/libturbojpeg-abi",
+  "crates/jpeg-tools",
+]
 resolver = "2"
 
 [workspace.package]

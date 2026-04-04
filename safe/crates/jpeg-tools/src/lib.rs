@@ -76,16 +76,22 @@ pub fn exec_upstream_tool(tool: &str) -> ! {
             std::process::exit(1);
         }
     };
-    let safe_root = match find_safe_root_from(&exe) {
-        Ok(path) => path,
-        Err(message) => {
-            eprintln!("{tool}: {message}");
+    let build_dir = std::env::var_os("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR").map(PathBuf::from);
+    let safe_root = std::env::var_os("LIBJPEG_TURBO_SAFE_ROOT")
+        .map(PathBuf::from)
+        .or_else(|| find_safe_root_from(&exe).ok());
+
+    let build_dir = match (build_dir, safe_root.as_ref()) {
+        (Some(path), _) => path,
+        (None, Some(root)) => root.join("target/upstream-bootstrap"),
+        (None, None) => {
+            eprintln!(
+                "{tool}: could not locate safe/ root from {} and LIBJPEG_TURBO_UPSTREAM_BUILD_DIR is unset",
+                exe.display()
+            );
             std::process::exit(1);
         }
     };
-    let build_dir = std::env::var_os("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| safe_root.join("target/upstream-bootstrap"));
     let backend = build_dir.join(tool);
     if !backend.is_file() {
         eprintln!("{tool}: missing upstream backend tool {}", backend.display());
@@ -93,8 +99,12 @@ pub fn exec_upstream_tool(tool: &str) -> ! {
     }
 
     let mut library_paths = Vec::new();
-    if let Ok(stage_libdir) = find_stage_libdir(&safe_root) {
+    if let Some(stage_libdir) = std::env::var_os("LIBJPEG_TURBO_STAGE_LIBDIR").map(PathBuf::from) {
         library_paths.push(stage_libdir);
+    } else if let Some(safe_root) = safe_root.as_ref() {
+        if let Ok(stage_libdir) = find_stage_libdir(safe_root) {
+            library_paths.push(stage_libdir);
+        }
     }
     library_paths.push(build_dir.clone());
     if let Some(existing) = std::env::var_os("LD_LIBRARY_PATH") {

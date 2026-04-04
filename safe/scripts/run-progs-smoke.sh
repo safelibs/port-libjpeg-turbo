@@ -82,11 +82,11 @@ cp "$ROOT/original/testimages/testorig.ppm" "$TMPDIR/testorig.ppm"
 seed_exif_orientation "$ROOT/original/testimages/testorig.jpg" "$TMPDIR/testorig.jpg"
 
 "$BINDIR/cjpeg" -outfile "$TMPDIR/base.jpg" "$TMPDIR/testorig.ppm" >/dev/null 2>&1
-printf 'phase-6 progs smoke comment\n' >"$TMPDIR/comment.txt"
+printf 'phase-8 progs smoke comment\n' >"$TMPDIR/comment.txt"
 "$BINDIR/wrjpgcom" -replace -cfile "$TMPDIR/comment.txt" "$TMPDIR/base.jpg" >"$TMPDIR/commented.jpg"
 comment_output="$("$BINDIR/rdjpgcom" "$TMPDIR/commented.jpg")"
 case "$comment_output" in
-  *"phase-6 progs smoke comment"*)
+  *"phase-8 progs smoke comment"*)
     ;;
   *)
     die "rdjpgcom did not round-trip the staged comment"

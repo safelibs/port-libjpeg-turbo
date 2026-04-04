@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(clippy::all)]
 
 use core::{
     ffi::{c_char, c_int, c_ulong, c_void},

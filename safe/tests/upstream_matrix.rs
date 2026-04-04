@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use std::{
     ffi::{CStr, CString, OsString},
     fs,
@@ -30,6 +32,7 @@ struct MatrixCase {
 }
 
 struct StagePaths {
+    build_root: PathBuf,
     original_testimages: PathBuf,
     stage_bin: PathBuf,
     stage_lib: PathBuf,
@@ -1437,6 +1440,7 @@ fn stage_paths() -> Result<&'static StagePaths, String> {
             let stage_bin = stage_usr_root.join("bin");
             let stage_lib = find_stage_libdir(&stage_usr_root)?;
             Ok(StagePaths {
+                build_root,
                 original_testimages: repo_root.join("original/testimages"),
                 stage_bin,
                 stage_lib,
@@ -1550,6 +1554,8 @@ fn run_stage_command(
     args: Vec<OsString>,
 ) -> Result<Output, String> {
     Command::new(stage.stage_bin.join(tool))
+        .env("LIBJPEG_TURBO_UPSTREAM_BUILD_DIR", &stage.build_root)
+        .env("LIBJPEG_TURBO_STAGE_LIBDIR", &stage.stage_lib)
         .env("LD_LIBRARY_PATH", &stage.stage_lib)
         .current_dir(temp_dir)
         .args(args)

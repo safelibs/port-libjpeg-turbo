@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::mem::{align_of, offset_of, size_of};

@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use std::{
     ffi::{CStr, CString, OsString},
     fs,

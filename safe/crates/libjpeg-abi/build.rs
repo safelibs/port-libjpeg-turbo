@@ -7,7 +7,7 @@ fn main() {
     let stage_multiarch = stage_include.join(&multiarch);
     let shim_source = safe_root.join("c_shim/error_bridge.c");
     let shim_object = out_dir.join("error_bridge.o");
-    let shim_archive = out_dir.join("libjpeg_compat_shims.a");
+    let shim_archive = out_dir.join("liberror_bridge.a");
 
     run(
         std::process::Command::new("gcc")
@@ -42,7 +42,7 @@ fn main() {
         println!("cargo:rerun-if-changed={path}");
     }
     println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!("cargo:rustc-link-lib=static=jpeg_compat_shims");
+    println!("cargo:rustc-link-lib=static=error_bridge");
 }
 
 fn multiarch() -> String {

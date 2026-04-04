@@ -52,6 +52,20 @@ die() {
   exit 1
 }
 
+clear_dir() {
+  local path="$1"
+
+  if [[ -d "$path" && ! -L "$path" ]]; then
+    find "$path" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  else
+    rm -rf "$path"
+    mkdir -p "$path"
+    return
+  fi
+
+  mkdir -p "$path"
+}
+
 trim_leading_ws() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -253,11 +267,33 @@ DOCKERFILE
 
 reexec_stage_install_in_docker() {
   local docker_home="$SAFE_ROOT/target/docker-home"
+  local root_real build_real stage_real
   local uid gid
+  local -a extra_mounts=()
 
   uid="$(id -u)"
   gid="$(id -g)"
-  mkdir -p "$docker_home"
+  mkdir -p "$docker_home" "$BUILD_DIR" "$STAGE_DIR"
+  root_real="$(readlink -f "$ROOT")"
+  build_real="$(readlink -f "$BUILD_DIR")"
+  stage_real="$(readlink -f "$STAGE_DIR")"
+
+  case "$build_real" in
+    "$root_real"|"$root_real"/*)
+      ;;
+    *)
+      extra_mounts+=(-v "$BUILD_DIR":"$BUILD_DIR")
+      ;;
+  esac
+
+  case "$stage_real" in
+    "$root_real"|"$root_real"/*)
+      ;;
+    *)
+      extra_mounts+=(-v "$STAGE_DIR":"$STAGE_DIR")
+      ;;
+  esac
+
   build_java_fallback_image
   docker run --rm \
     --user "$uid:$gid" \
@@ -266,6 +302,7 @@ reexec_stage_install_in_docker() {
     -e CARGO_HOME=/opt/cargo \
     -e RUSTUP_HOME=/opt/rustup \
     -v "$ROOT":"$ROOT" \
+    "${extra_mounts[@]}" \
     -w "$ROOT" \
     "$JAVA_DOCKER_IMAGE" \
     bash "$SAFE_ROOT/scripts/stage-install.sh" "${ARGV[@]}"
@@ -769,8 +806,12 @@ install_packaged_tools() {
 }
 
 if ((CLEAN)); then
-  rm -rf "$BUILD_DIR" "$SOURCE_ROOT" "$STAGE_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT" \
-    "$JAVA_TOOL_ROOT"
+  clear_dir "$BUILD_DIR"
+  rm -rf "$SOURCE_ROOT"
+  clear_dir "$STAGE_DIR"
+  clear_dir "$TMP_INSTALL_ROOT"
+  clear_dir "$TMP_RENDER_ROOT"
+  rm -rf "$JAVA_TOOL_ROOT"
 fi
 
 [[ -d "$ROOT/original" ]] || die "missing original source tree"
@@ -781,8 +822,10 @@ maybe_reexec_for_java
 WITH_JAVA="$(resolve_with_java)"
 JOBS="${JOBS:-$(cpu_count)}"
 
-rm -rf "$BUILD_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT" "$STAGE_DIR"
-mkdir -p "$BUILD_DIR" "$TMP_INSTALL_ROOT" "$TMP_RENDER_ROOT"
+clear_dir "$BUILD_DIR"
+clear_dir "$TMP_INSTALL_ROOT"
+clear_dir "$TMP_RENDER_ROOT"
+clear_dir "$STAGE_DIR"
 prepare_upstream_source_tree
 
 cmake_args=(

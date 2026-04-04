@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 pub mod common_exports;
 pub mod decompress_exports;
 
