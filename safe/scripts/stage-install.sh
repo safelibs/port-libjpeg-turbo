@@ -311,12 +311,16 @@ run_jar() {
 
 cargo_release_build() {
   local rustflags="${RUSTFLAGS:-}"
+  local cargo_profile_release_lto="${CARGO_PROFILE_RELEASE_LTO:-false}"
 
-  if [[ "$rustflags" == *"-Cembed-bitcode=no"* ]]; then
+  [[ "$rustflags" == *"-Clinker-plugin-lto=no"* ]] \
+    || rustflags="${rustflags:+$rustflags }-Clinker-plugin-lto=no"
+  [[ "$rustflags" == *"-Cembed-bitcode=no"* ]] \
+    || rustflags="${rustflags:+$rustflags }-Cembed-bitcode=no"
+
+  CARGO_PROFILE_RELEASE_LTO="$cargo_profile_release_lto" \
+    RUSTFLAGS="$rustflags" \
     cargo "$@"
-  else
-    RUSTFLAGS="${rustflags:+$rustflags }-Cembed-bitcode=no" cargo "$@"
-  fi
 }
 
 render_jconfig_h() {
@@ -570,16 +574,20 @@ link_rust_libjpeg() {
 build_staged_libturbojpeg() {
   local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
   local output="$libdir/$LIBTURBOJPEG_REALNAME"
-  local jpeg_staticlib turbojpeg_staticlib
+  local jpeg_staticlib turbojpeg_staticlib version_script
 
   jpeg_staticlib="$(ensure_rust_libjpeg_staticlib)"
   turbojpeg_staticlib="$(ensure_rust_libturbojpeg_staticlib)"
+  version_script="$TMP_RENDER_ROOT/turbojpeg-mapfile.jni"
   mkdir -p "$libdir"
+  # Render from the committed Debian symbols manifest so the staged SONAME and
+  # package ABI contract stay aligned, including the canonical JNI exports.
+  render_version_script "$SAFE_ROOT/debian/libturbojpeg.symbols" "$version_script"
 
   gcc -shared \
     -fno-lto \
     -Wl,-soname,libturbojpeg.so.0 \
-    -Wl,--version-script,"$SAFE_ROOT/link/turbojpeg-mapfile.jni" \
+    -Wl,--version-script,"$version_script" \
     -o "$output" \
     -Wl,--whole-archive "$turbojpeg_staticlib" -Wl,--no-whole-archive \
     "$jpeg_staticlib" \

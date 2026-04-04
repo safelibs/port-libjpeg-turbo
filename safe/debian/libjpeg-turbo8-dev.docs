@@ -1,4 +1,5 @@
-# documentation files staged from committed safe/ sources
+# documentation files staged from committed safe/ sources so the package build
+# remains self-contained under safe/
 README.ijg
 README.md
 libjpeg.txt

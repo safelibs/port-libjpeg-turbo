@@ -4,13 +4,13 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
 STAGE_DIR="$SAFE_ROOT/stage"
-TESTS_DIR="$ROOT/original/debian/tests"
+TESTS_DIR="$SAFE_ROOT/debian/tests"
 
 usage() {
   cat <<'EOF'
 usage: run-debian-autopkgtests.sh [--stage-dir <dir>]
 
-Run the upstream Debian dev-package autopkgtests against the staged safe
+Run the safe Debian dev-package autopkgtests against the staged safe
 headers, pkg-config files, and libraries.
 EOF
 }

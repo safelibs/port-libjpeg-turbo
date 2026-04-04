@@ -1,4 +1,8 @@
-/* JNI-augmented TurboJPEG symbol surface used by staged Java packaging. */
+/* Reference JNI-augmented TurboJPEG symbol surface mirrored from
+ * safe/debian/libturbojpeg.symbols.  stage-install.sh renders the live linker
+ * version script from the symbols manifest so staged and packaged exports stay
+ * aligned.
+ */
 TURBOJPEG_1.0
 {
   global:

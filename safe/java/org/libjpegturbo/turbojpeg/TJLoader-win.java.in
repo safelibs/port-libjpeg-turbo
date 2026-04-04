@@ -29,6 +29,8 @@
 package org.libjpegturbo.turbojpeg;
 
 final class TJLoader {
+  // The committed TJLoader.java is rendered from the upstream templates so the
+  // Java packaging flow stays aligned with libjpeg-turbo's original layout.
   static void load() {
     System.loadLibrary("@TURBOJPEG_DLL_NAME@");
   }

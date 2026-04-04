@@ -393,6 +393,7 @@ build_safe_packages() {
   mkdir -p "$SAFE_SRC_COPY"
   cp -a "$ROOT/safe" "$SAFE_SRC_COPY/safe"
   cp -a "$ROOT/original" "$SAFE_SRC_COPY/original"
+  rm -rf "$SAFE_SRC_COPY/original/debian"
 
   (
     cd "$SAFE_SRC_COPY/safe"

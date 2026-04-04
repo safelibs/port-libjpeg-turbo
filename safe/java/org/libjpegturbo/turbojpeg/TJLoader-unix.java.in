@@ -29,6 +29,14 @@
 package org.libjpegturbo.turbojpeg;
 
 final class TJLoader {
+  private static void loadUnixLibrary(String libdir) {
+    try {
+      System.load(libdir + "/libturbojpeg.so.0");
+    } catch (java.lang.UnsatisfiedLinkError e) {
+      System.load(libdir + "/libturbojpeg.so");
+    }
+  }
+
   static void load() {
     try {
       System.loadLibrary("turbojpeg");
@@ -42,13 +50,13 @@ final class TJLoader {
         }
       } else {
         try {
-          System.load("@CMAKE_INSTALL_FULL_LIBDIR@/libturbojpeg.so.0");
+          loadUnixLibrary("@CMAKE_INSTALL_FULL_LIBDIR@");
         } catch (java.lang.UnsatisfiedLinkError e3) {
           String libdir = "@CMAKE_INSTALL_FULL_LIBDIR@";
           if (libdir.equals("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib64")) {
-            System.load("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib32/libturbojpeg.so.0");
+            loadUnixLibrary("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib32");
           } else if (libdir.equals("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib32")) {
-            System.load("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib64/libturbojpeg.so.0");
+            loadUnixLibrary("@CMAKE_INSTALL_DEFAULT_PREFIX@/lib64");
           } else {
             throw e3;
           }

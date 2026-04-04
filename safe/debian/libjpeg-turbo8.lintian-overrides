@@ -1,5 +1,5 @@
 # Debian package naming is intentionally kept compatible with the historical
-# libjpeg soname contract.
+# libjpeg soname contract while the safe package flow preserves the drop-in ABI.
 # yes, we specifically want linkers to depends on the standard libjpeg name
 libjpeg-turbo8: symbols-declares-dependency-on-other-package libjpeg8 #MINVER#
 libjpeg-turbo8: package-name-doesnt-match-sonames

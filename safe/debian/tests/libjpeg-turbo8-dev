@@ -1,6 +1,7 @@
 #!/bin/sh
 # Copyright 2021 Simon McVittie
 # SPDX-License-Identifier: MIT
+# Retained under safe/debian/tests so the safe package flow stays self-contained.
 
 set -eux
 

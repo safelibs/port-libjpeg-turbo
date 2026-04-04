@@ -5,6 +5,16 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 SAFE_ROOT="$ROOT/safe"
 STAGE_USR="$SAFE_ROOT/stage/usr"
 TJEXAMPLE_BIN="$SAFE_ROOT/target/release/tjexample"
+USR_ROOT="$STAGE_USR"
+
+usage() {
+  cat <<'EOF'
+usage: run-progs-smoke.sh [--usr-root <path>]
+
+Run the shared packaged-tools smoke suite against a staged or extracted
+package-installed /usr tree.  The default target is safe/stage/usr.
+EOF
+}
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -19,6 +29,17 @@ require_file() {
 require_exec() {
   local path="$1"
   [[ -x "$path" ]] || die "missing required executable: $path"
+}
+
+require_manpage() {
+  local man_dir="$1"
+  local page="$2"
+
+  if [[ -f "$man_dir/$page" || -f "$man_dir/$page.gz" ]]; then
+    return 0
+  fi
+
+  die "missing required manpage: $man_dir/$page(.gz)"
 }
 
 compare_bmp_payload() {
@@ -75,14 +96,30 @@ multiarch() {
   fi
 }
 
-[[ -d "$STAGE_USR" ]] || die "missing staged tree under $STAGE_USR"
+while (($#)); do
+  case "$1" in
+    --usr-root)
+      USR_ROOT="${2:?missing value for --usr-root}"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown option: $1"
+      ;;
+  esac
+done
+
+[[ -d "$USR_ROOT" ]] || die "missing usr root: $USR_ROOT"
 
 MULTIARCH="$(multiarch)"
-LIBDIR="$STAGE_USR/lib/$MULTIARCH"
-BINDIR="$STAGE_USR/bin"
-MANDIR="$STAGE_USR/share/man/man1"
+LIBDIR="$USR_ROOT/lib/$MULTIARCH"
+BINDIR="$USR_ROOT/bin"
+MANDIR="$USR_ROOT/share/man/man1"
 
-[[ -d "$LIBDIR" ]] || die "missing staged library directory: $LIBDIR"
+[[ -d "$LIBDIR" ]] || die "missing library directory: $LIBDIR"
 
 for tool in cjpeg djpeg jpegtran rdjpgcom wrjpgcom tjbench jpegexiforient exifautotran; do
   require_exec "$BINDIR/$tool"
@@ -90,7 +127,7 @@ done
 require_exec "$TJEXAMPLE_BIN"
 
 for page in cjpeg.1 djpeg.1 jpegtran.1 rdjpgcom.1 wrjpgcom.1 tjbench.1 jpegexiforient.1 exifautotran.1; do
-  require_file "$MANDIR/$page"
+  require_manpage "$MANDIR" "$page"
 done
 
 TMPDIR="$(mktemp -d)"
@@ -163,4 +200,4 @@ cmp -s "$TMPDIR/ref_tjexample_rot90.jpg" "$TMPDIR/tjexample_rot90.jpg" \
     -rgb -quiet -benchtime 0.01 -warmup 0 >/dev/null 2>&1
 )
 
-printf 'staged progs smoke passed\n'
+printf 'progs smoke passed for %s\n' "$USR_ROOT"

@@ -7,6 +7,18 @@ JAVA_ROOT="$SAFE_ROOT/java"
 TEST_ROOT="$SAFE_ROOT/target/java-tests"
 WORK_ROOT="$TEST_ROOT/work"
 CLASS_ROOT="$TEST_ROOT/classes"
+SOURCE_ROOT="$TEST_ROOT/source"
+USR_ROOT="$SAFE_ROOT/stage/usr"
+CUSTOM_USR_ROOT=0
+
+usage() {
+  cat <<'EOF'
+usage: run-java-tests.sh [--usr-root <path>]
+
+Run the committed Java compatibility suite against a staged or extracted
+package-installed /usr tree.  The default target is safe/stage/usr.
+EOF
+}
 
 die() {
   printf 'error: %s\n' "$*" >&2
@@ -72,31 +84,49 @@ require_command java
 require_command python3
 have_java_compiler || die "missing Java compiler support (javac or jdk.compiler module)"
 
+while (($#)); do
+  case "$1" in
+    --usr-root)
+      USR_ROOT="${2:?missing value for --usr-root}"
+      CUSTOM_USR_ROOT=1
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown option: $1"
+      ;;
+  esac
+done
+
 MULTIARCH="$(multiarch)"
-STAGE_ROOT="$SAFE_ROOT/stage/usr"
-STAGE_LIBDIR="$STAGE_ROOT/lib/$MULTIARCH"
-STAGE_BINDIR="$STAGE_ROOT/bin"
-STAGE_JAR="$STAGE_ROOT/share/java/turbojpeg.jar"
+STAGE_LIBDIR="$USR_ROOT/lib/$MULTIARCH"
+STAGE_BINDIR="$USR_ROOT/bin"
+STAGE_JAR="$USR_ROOT/share/java/turbojpeg.jar"
 JAVA_BIN="$(command -v java)"
 
-if [[ ! -f "$STAGE_JAR" || ! -f "$STAGE_LIBDIR/libturbojpeg.so.0" ]]; then
+if [[ "$CUSTOM_USR_ROOT" -eq 0 && ( ! -f "$STAGE_JAR" || ! -f "$STAGE_LIBDIR/libturbojpeg.so.0" ) ]]; then
   bash "$SAFE_ROOT/scripts/stage-install.sh" --with-java=1
 fi
 
 require_file "$STAGE_JAR"
 require_file "$STAGE_LIBDIR/libturbojpeg.so.0"
-require_file "$JAVA_ROOT/TJUnitTest.java"
-require_file "$JAVA_ROOT/tjbenchtest.java.in"
-require_file "$JAVA_ROOT/tjexampletest.java.in"
-
-render_template \
-  "$JAVA_ROOT/org/libjpegturbo/turbojpeg/TJLoader-unix.java.in" \
-  "$JAVA_ROOT/org/libjpegturbo/turbojpeg/TJLoader.java" \
-  "@CMAKE_INSTALL_FULL_LIBDIR@=/usr/lib/$MULTIARCH" \
-  "@CMAKE_INSTALL_DEFAULT_PREFIX@=/usr"
 
 rm -rf "$TEST_ROOT"
-mkdir -p "$WORK_ROOT/java" "$CLASS_ROOT"
+mkdir -p "$WORK_ROOT/java" "$CLASS_ROOT" "$SOURCE_ROOT"
+cp -a "$JAVA_ROOT/." "$SOURCE_ROOT/"
+
+require_file "$SOURCE_ROOT/TJUnitTest.java"
+require_file "$SOURCE_ROOT/tjbenchtest.java.in"
+require_file "$SOURCE_ROOT/tjexampletest.java.in"
+
+render_template \
+  "$SOURCE_ROOT/org/libjpegturbo/turbojpeg/TJLoader-unix.java.in" \
+  "$SOURCE_ROOT/org/libjpegturbo/turbojpeg/TJLoader.java" \
+  "@CMAKE_INSTALL_FULL_LIBDIR@=$STAGE_LIBDIR" \
+  "@CMAKE_INSTALL_DEFAULT_PREFIX@=$USR_ROOT"
 
 ln -sf "$STAGE_JAR" "$WORK_ROOT/java/turbojpeg.jar"
 for tool in cjpeg djpeg jpegtran; do
@@ -107,15 +137,18 @@ for lib in libturbojpeg.so libturbojpeg.so.0 libturbojpeg.so.0.2.0; do
     ln -sf "$STAGE_LIBDIR/$lib" "$WORK_ROOT/$lib"
   fi
 done
+if [[ ! -e "$WORK_ROOT/libturbojpeg.so" && -e "$WORK_ROOT/libturbojpeg.so.0" ]]; then
+  ln -sf libturbojpeg.so.0 "$WORK_ROOT/libturbojpeg.so"
+fi
 
 render_template \
-  "$JAVA_ROOT/tjbenchtest.java.in" \
+  "$SOURCE_ROOT/tjbenchtest.java.in" \
   "$WORK_ROOT/tjbenchtest.java" \
   "@CMAKE_CURRENT_SOURCE_DIR@=$ROOT/original" \
   "@CMAKE_CURRENT_BINARY_DIR@=$WORK_ROOT" \
   "@Java_JAVA_EXECUTABLE@=$JAVA_BIN"
 render_template \
-  "$JAVA_ROOT/tjexampletest.java.in" \
+  "$SOURCE_ROOT/tjexampletest.java.in" \
   "$WORK_ROOT/tjexampletest.java" \
   "@CMAKE_CURRENT_SOURCE_DIR@=$ROOT/original" \
   "@CMAKE_CURRENT_BINARY_DIR@=$WORK_ROOT" \
@@ -124,7 +157,7 @@ chmod +x "$WORK_ROOT/tjbenchtest.java" "$WORK_ROOT/tjexampletest.java"
 
 export LD_LIBRARY_PATH="$STAGE_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-run_javac -encoding UTF-8 -cp "$STAGE_JAR" -d "$CLASS_ROOT" "$JAVA_ROOT/TJUnitTest.java"
+run_javac -encoding UTF-8 -cp "$STAGE_JAR" -d "$CLASS_ROOT" "$SOURCE_ROOT/TJUnitTest.java"
 
 run_tjunittest() {
   java -cp "$CLASS_ROOT:$STAGE_JAR" -Djava.library.path="$WORK_ROOT" TJUnitTest "$@"

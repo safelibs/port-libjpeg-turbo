@@ -45,7 +45,7 @@ fn main() {
         "../../scripts/stage-install.sh",
         "../../scripts/check-symbols.sh",
         "../../c_shim/error_bridge.c",
-        "../../../original/debian/libjpeg-turbo8.symbols",
+        "../../debian/libjpeg-turbo8.symbols",
     ] {
         println!("cargo:rerun-if-changed={path}");
     }

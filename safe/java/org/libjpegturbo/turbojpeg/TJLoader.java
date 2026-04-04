@@ -29,6 +29,14 @@
 package org.libjpegturbo.turbojpeg;
 
 final class TJLoader {
+  private static void loadUnixLibrary(String libdir) {
+    try {
+      System.load(libdir + "/libturbojpeg.so.0");
+    } catch (java.lang.UnsatisfiedLinkError e) {
+      System.load(libdir + "/libturbojpeg.so");
+    }
+  }
+
   static void load() {
     try {
       System.loadLibrary("turbojpeg");
@@ -42,13 +50,13 @@ final class TJLoader {
         }
       } else {
         try {
-          System.load("/usr/lib/x86_64-linux-gnu/libturbojpeg.so.0");
+          loadUnixLibrary("/usr/lib/x86_64-linux-gnu");
         } catch (java.lang.UnsatisfiedLinkError e3) {
           String libdir = "/usr/lib/x86_64-linux-gnu";
           if (libdir.equals("/usr/lib64")) {
-            System.load("/usr/lib32/libturbojpeg.so.0");
+            loadUnixLibrary("/usr/lib32");
           } else if (libdir.equals("/usr/lib32")) {
-            System.load("/usr/lib64/libturbojpeg.so.0");
+            loadUnixLibrary("/usr/lib64");
           } else {
             throw e3;
           }

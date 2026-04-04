@@ -1,4 +1,6 @@
-# Packaged command-line tools and their staged manpages.
+# Packaged command-line tools and their staged manpages.  The shared smoke
+# runner consumes this payload either from safe/stage/usr or from an extracted
+# Debian package root.
 usr/bin/cjpeg
 usr/bin/djpeg
 usr/bin/exifautotran

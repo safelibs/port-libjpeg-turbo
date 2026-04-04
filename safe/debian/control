@@ -7,7 +7,6 @@ Uploaders: Mike Gabriel <sunweaver@debian.org>
 Build-Depends: cargo,
                cmake (>= 2.8.12),
                debhelper-compat (= 13),
-               default-jdk,
                help2man,
 	       nasm,
                pkg-config,

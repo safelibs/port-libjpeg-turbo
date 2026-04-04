@@ -4,6 +4,7 @@ pub mod generated;
 
 pub const SONAME: &str = "libturbojpeg.so.0";
 pub const LINK_NAME: &str = "turbojpeg";
+pub const JNI_SOURCE_FILE: &str = "turbojpeg-jni.c";
 pub const NON_JNI_SOURCE_FILES: &[&str] = &[
     jpeg_core::ported::turbojpeg::turbojpeg::SOURCE_FILE,
     jpeg_core::ported::turbojpeg::jdatasrc_tj::SOURCE_FILE,
@@ -130,6 +131,13 @@ pub const EXPECTED_JNI_SYMBOLS: &[&str] = &[
     "Java_org_libjpegturbo_turbojpeg_TJ_planeSizeYUV__IIIII",
     "Java_org_libjpegturbo_turbojpeg_TJ_planeWidth__III",
 ];
+
+pub fn expected_packaged_symbol_names() -> impl Iterator<Item = &'static str> {
+    EXPECTED_NON_JNI_SYMBOLS
+        .iter()
+        .copied()
+        .chain(EXPECTED_JNI_SYMBOLS.iter().copied())
+}
 
 pub fn version_for_export(symbol: &str) -> Option<&'static str> {
     VERSIONED_EXPORTS

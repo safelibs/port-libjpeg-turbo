@@ -1,4 +1,5 @@
-# Keep the staged runtime override pinned to the renamed libturbojpeg package.
+# Keep the staged runtime override pinned to the renamed libturbojpeg package
+# in both the staged and Debian-package flows.
 # upstream (DRC <dcommander@users.sourceforge.net>) states that the below issue
 # can be ignored, see:
 # http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=612341#255

@@ -1,4 +1,5 @@
-# Canonical staged TurboJPEG ABI oracle retained under safe/debian.
+# Canonical staged TurboJPEG ABI oracle retained under safe/debian and used to
+# render the staged linker version script, including the JNI entry points.
 libturbojpeg.so.0 libturbojpeg #MINVER#
 * Build-Depends-Package: libturbojpeg0-dev
  Java_org_libjpegturbo_turbojpeg_TJCompressor_compressFromYUV___3_3B_3II_3III_3BII@TURBOJPEG_1.4 8c

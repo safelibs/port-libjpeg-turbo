@@ -1041,6 +1041,9 @@ Copyright:
  2011-2012, Canonical Ltd.
  2011-2012, Linaro Inc.
 License: BSD-3-clause
+Comment:
+ The safe/ packaging copy is kept self-contained so package builds do not
+ depend on ../original/debian.
 
 Files: debian/extra/*
 Copyright:

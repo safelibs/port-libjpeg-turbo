@@ -1,3 +1,5 @@
+# Kept under safe/debian/tests so autopkgtests and local harnesses do not need
+# to consult original/debian/tests.
 Tests: libjpeg-turbo8-dev libjpeg-turbo8-dev-static
 Depends: build-essential, libjpeg-turbo8-dev, pkg-config
 Restrictions: superficial, allow-stderr

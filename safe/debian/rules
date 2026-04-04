@@ -10,6 +10,8 @@ export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
 	dh $@
 
 override_dh_auto_build:
+	CARGO_PROFILE_RELEASE_LTO=false \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }-Clinker-plugin-lto=no -Cembed-bitcode=no" \
 	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) cargo build --manifest-path Cargo.toml --workspace --release
 
 override_dh_auto_clean:
@@ -17,6 +19,8 @@ override_dh_auto_clean:
 	rm -rf stage target/rendered target/java-tools target/docker-home
 
 override_dh_auto_install:
+	CARGO_PROFILE_RELEASE_LTO=false \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }-Clinker-plugin-lto=no -Cembed-bitcode=no" \
 	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) bash scripts/stage-install.sh --with-java=1
 	rm -rf debian/tmp
 	mkdir -p debian/tmp
@@ -40,7 +44,11 @@ override_dh_makeshlibs:
 	: # keep the original libjpeg symbol version
 	dh_makeshlibs -- -v8c
 	: # ... and mark libjpeg-turbo only symbols with a different version
-	sed -i "$$(for i in $$(cat debian/libjpeg-turbo-only.symbols); do echo "/^ $$i/s/8c$$/8c-2ubuntu5~/;"; done)" debian/libjpeg-turbo8/DEBIAN/symbols
+	python3 scripts/debian_symbols.py rewrite-min-version \
+		--match-version 8c \
+		--replacement-version 8c-2ubuntu5~ \
+		debian/libjpeg-turbo-only.symbols \
+		debian/libjpeg-turbo8/DEBIAN/symbols
 
 override_dh_installchangelogs:
 	dh_installchangelogs -plibjpeg-turbo8-dev change.log

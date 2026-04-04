@@ -209,6 +209,40 @@ def cmd_render_version_script(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rewrite_min_version(args: argparse.Namespace) -> int:
+    only_file = Path(args.only_symbols_file)
+    symbols_file = Path(args.generated_symbols_file)
+
+    if not only_file.is_file():
+        raise SystemExit(f"error: missing symbols subset file: {only_file}")
+    if not symbols_file.is_file():
+        raise SystemExit(f"error: missing generated symbols file: {symbols_file}")
+
+    tokens: list[str] = []
+    for raw_line in only_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tokens.append(line)
+
+    lines = symbols_file.read_text(encoding="utf-8").splitlines()
+    rewritten: list[str] = []
+    old_suffix = f" {args.match_version}"
+    new_suffix = f" {args.replacement_version}"
+
+    for line in lines:
+        updated = line
+        if line.rstrip().endswith(old_suffix):
+            for token in tokens:
+                if token in line:
+                    updated = f"{line[:-len(old_suffix)]}{new_suffix}"
+                    break
+        rewritten.append(updated)
+
+    symbols_file.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Parse Debian .symbols files for bootstrap symbol checks and linker scripts."
@@ -226,6 +260,13 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("symbols_file")
     render.add_argument("output")
     render.set_defaults(func=cmd_render_version_script)
+
+    rewrite = subparsers.add_parser("rewrite-min-version")
+    rewrite.add_argument("--match-version", required=True)
+    rewrite.add_argument("--replacement-version", required=True)
+    rewrite.add_argument("only_symbols_file")
+    rewrite.add_argument("generated_symbols_file")
+    rewrite.set_defaults(func=cmd_rewrite_min_version)
 
     return parser
 
