@@ -29,6 +29,18 @@ if rg -n 'original/.*\.c' "${cargo_bridge_files[@]}"; then
   die "Cargo-side build helpers still reference original/*.c sources"
 fi
 
+if [[ -e "$SAFE_ROOT/bridge/libjpeg_compat.c" ]]; then
+  die "temporary libjpeg compatibility bridge source still exists"
+fi
+
+if rg -n 'bridge/libjpeg_compat\.c|libjpeg_compat\.c' \
+  "$SAFE_ROOT/build.rs" \
+  "$SAFE_ROOT/crates" \
+  "$SAFE_ROOT/scripts/stage-install.sh" \
+  "$SAFE_ROOT/README.md"; then
+  die "temporary libjpeg compatibility bridge is still referenced"
+fi
+
 unsafe_report="$(mktemp)"
 trap 'rm -f "$unsafe_report"' EXIT
 

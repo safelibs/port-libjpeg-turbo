@@ -618,15 +618,12 @@ relink_staged_libjpeg() {
   local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
   local output
   local version_script="$BUILD_DIR/libjpeg-bootstrap.map"
-  local bridge_object="$BUILD_DIR/libjpeg_compat.o"
   local link_dir="$BUILD_DIR/sharedlib"
   local link_txt="$BUILD_DIR/sharedlib/CMakeFiles/jpeg.dir/link.txt"
   local rust_staticlib
   local skip_basenames
 
   render_version_script "$SAFE_ROOT/debian/libjpeg-turbo8.symbols" "$version_script"
-  gcc -O2 -fPIC -I"$BUILD_DIR" -I"$SOURCE_ROOT" -c \
-    "$SAFE_ROOT/bridge/libjpeg_compat.c" -o "$bridge_object"
   rust_staticlib="$(ensure_rust_libjpeg_staticlib)"
   skip_basenames="jcomapi.c.o,jerror.c.o,jutils.c.o,jmemmgr.c.o,jmemnobs.c.o,jdatasrc.c.o,jdatadst.c.o,jcicc.c.o,jdicc.c.o,jcapimin.c.o,jcapistd.c.o,jcarith.c.o,jccoefct.c.o,jccolor.c.o,jcdctmgr.c.o,jchuff.c.o,jcinit.c.o,jcmainct.c.o,jcmarker.c.o,jcmaster.c.o,jcparam.c.o,jcphuff.c.o,jcprepct.c.o,jcsample.c.o,jctrans.c.o,jdapimin.c.o,jdapistd.c.o,jdarith.c.o,jdcoefct.c.o,jdpostct.c.o,jdinput.c.o,jdmarker.c.o,jdhuff.c.o,jdphuff.c.o,jdmainct.c.o,jdmaster.c.o,jdmerge.c.o,jdsample.c.o,jdcolor.c.o,jddctmgr.c.o,jdtrans.c.o,jquant1.c.o,jquant2.c.o,jfdctint.c.o,jfdctfst.c.o,jfdctflt.c.o,jidctint.c.o,jidctfst.c.o,jidctflt.c.o,jidctred.c.o"
 
@@ -637,7 +634,6 @@ relink_staged_libjpeg() {
     "$output" \
     "$version_script" \
     "$skip_basenames" \
-    "$bridge_object" \
     -Wl,--whole-archive \
     "$rust_staticlib" \
     -Wl,--no-whole-archive \
