@@ -1,0 +1,18 @@
+{
+  "id": "timg-sigfpe",
+  "description": "Both the source-built and packaged timg consumers abort with SIGFPE when rendering the dependent JPEG fixture.",
+  "rows": [
+    {
+      "kind": "compile",
+      "source_package": "timg"
+    },
+    {
+      "kind": "runtime",
+      "name": "timg"
+    }
+  ],
+  "runner": {
+    "type": "script",
+    "script": "reproduce.sh"
+  }
+}

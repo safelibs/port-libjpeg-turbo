@@ -1,0 +1,14 @@
+{
+  "id": "krita-turbojpeg-cmake",
+  "description": "Krita's source build fails because the packaged turbojpeg CMake target exports a non-existent include directory.",
+  "rows": [
+    {
+      "kind": "compile",
+      "source_package": "krita"
+    }
+  ],
+  "runner": {
+    "type": "cargo-test",
+    "test": "turbojpeg_cmake_target_reproduces_bad_include_dir_for_krita"
+  }
+}

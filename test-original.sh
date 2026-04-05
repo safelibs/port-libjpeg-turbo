@@ -5,10 +5,11 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_TAG="${LIBJPEG_TURBO_ORIGINAL_TEST_IMAGE:-libjpeg-turbo-original-test:ubuntu24.04}"
 CHECKS="all"
 ONLY=""
+REPORT_DIR=""
 
 usage() {
   cat <<'EOF'
-usage: test-original.sh [--checks runtime|compile|all] [--only <runtime-package-or-source-package>]
+usage: test-original.sh [--checks runtime|compile|all] [--only <runtime-package-or-source-package>] [--report-dir <path>]
 
 Builds the safe Debian packages from ./safe inside an Ubuntu 24.04 Docker
 container, installs them into the container, and then exercises the direct
@@ -23,6 +24,7 @@ all runs compile checks first and runtime checks second.
 
 --only filters by exact runtime package name from runtime_dependents[].name or
 by exact source package name from build_time_dependents[].source_package.
+--report-dir writes machine-readable row results plus per-row logs/artifacts.
 EOF
 }
 
@@ -34,6 +36,10 @@ while (($#)); do
       ;;
     --only)
       ONLY="${2:?missing value for --only}"
+      shift 2
+      ;;
+    --report-dir)
+      REPORT_DIR="${2:?missing value for --report-dir}"
       shift 2
       ;;
     --help|-h)
@@ -72,6 +78,11 @@ command -v docker >/dev/null 2>&1 || {
   echo "missing dependents.json" >&2
   exit 1
 }
+
+if [[ -n "$REPORT_DIR" ]]; then
+  mkdir -p "$REPORT_DIR"
+  REPORT_DIR="$(cd "$REPORT_DIR" && pwd)"
+fi
 
 docker build -t "$IMAGE_TAG" - <<'DOCKERFILE'
 FROM ubuntu:24.04
@@ -131,10 +142,22 @@ RUN sed 's/^Types: deb$/Types: deb-src/' /etc/apt/sources.list.d/ubuntu.sources 
  && chmod -R a+rX /opt/cargo /opt/rustup
 DOCKERFILE
 
-docker run --rm -i \
-  -e "LIBJPEG_TURBO_TEST_CHECKS=$CHECKS" \
-  -e "LIBJPEG_TURBO_TEST_ONLY=$ONLY" \
-  -v "$ROOT":/work:ro \
+docker_run_args=(
+  --rm
+  -i
+  -e "LIBJPEG_TURBO_TEST_CHECKS=$CHECKS"
+  -e "LIBJPEG_TURBO_TEST_ONLY=$ONLY"
+  -v "$ROOT":/work:ro
+)
+
+if [[ -n "$REPORT_DIR" ]]; then
+  docker_run_args+=(
+    -e "LIBJPEG_TURBO_TEST_REPORT_DIR=/report"
+    -v "$REPORT_DIR":/report
+  )
+fi
+
+docker run "${docker_run_args[@]}" \
   "$IMAGE_TAG" \
   bash -s <<'CONTAINER_SCRIPT'
 set -euo pipefail
@@ -145,13 +168,19 @@ export LC_ALL=C.UTF-8
 ROOT=/work
 CHECKS="${LIBJPEG_TURBO_TEST_CHECKS:-all}"
 ONLY_FILTER="${LIBJPEG_TURBO_TEST_ONLY:-}"
+REPORT_DIR="${LIBJPEG_TURBO_TEST_REPORT_DIR:-}"
 MULTIARCH="$(gcc -print-multiarch)"
 HOME=/tmp/libjpeg-home
 FIXTURE_DIR=/tmp/libjpeg-fixtures
-TEST_ROOT=/tmp/libjpeg-dependent-tests
+BASE_TEST_ROOT=/tmp/libjpeg-dependent-tests
+TEST_ROOT="$BASE_TEST_ROOT"
 SAFE_SRC_COPY=/tmp/libjpeg-safe-src
 DEPENDENT_SOURCE_ROOT=/tmp/libjpeg-dependent-sources
 APT_UPDATED=0
+REPORT_ENABLED=0
+ANY_ROW_FAILURE=0
+RUNTIME_REPORT_JSON=
+COMPILE_REPORT_JSON=
 
 mkdir -p "$HOME" "$TEST_ROOT" "$DEPENDENT_SOURCE_ROOT"
 
@@ -167,6 +196,100 @@ die() {
   echo "error: $*" >&2
   exit 1
 }
+
+if [[ -n "$REPORT_DIR" ]]; then
+  REPORT_ENABLED=1
+  rm -rf "$REPORT_DIR/runtime" "$REPORT_DIR/compile"
+  mkdir -p "$REPORT_DIR/runtime" "$REPORT_DIR/compile"
+  RUNTIME_REPORT_JSON="$REPORT_DIR/.runtime-report.json"
+  COMPILE_REPORT_JSON="$REPORT_DIR/.compile-report.json"
+  printf '[]\n' >"$RUNTIME_REPORT_JSON"
+  printf '[]\n' >"$COMPILE_REPORT_JSON"
+fi
+
+append_report_row() {
+  local kind="$1"
+  local authoritative="$2"
+  local key="$3"
+  local label="$4"
+  local status="$5"
+  local command_id="$6"
+  local log_path="$7"
+  local artifact_path="$8"
+  local target tmp jq_program
+
+  case "$kind" in
+    runtime)
+      target="$RUNTIME_REPORT_JSON"
+      jq_program='
+        . += [{
+          name: $authoritative,
+          key: $key,
+          label: $label,
+          status: $status,
+          command: $command_id,
+          log: $log_path,
+          artifacts: $artifact_path
+        }]
+      '
+      ;;
+    compile)
+      target="$COMPILE_REPORT_JSON"
+      jq_program='
+        . += [{
+          source_package: $authoritative,
+          key: $key,
+          label: $label,
+          status: $status,
+          command: $command_id,
+          log: $log_path,
+          artifacts: $artifact_path
+        }]
+      '
+      ;;
+    *)
+      die "unsupported report row kind: $kind"
+      ;;
+  esac
+
+  tmp="$target.tmp"
+  jq \
+    --arg authoritative "$authoritative" \
+    --arg key "$key" \
+    --arg label "$label" \
+    --arg status "$status" \
+    --arg command_id "$command_id" \
+    --arg log_path "$log_path" \
+    --arg artifact_path "$artifact_path" \
+    "$jq_program" \
+    "$target" >"$tmp"
+  mv "$tmp" "$target"
+}
+
+write_summary_report() {
+  local tmp
+
+  if [[ "$REPORT_ENABLED" -eq 0 ]]; then
+    return 0
+  fi
+
+  tmp="$REPORT_DIR/summary.json.tmp"
+  jq -n \
+    --arg checks "$CHECKS" \
+    --arg only "$ONLY_FILTER" \
+    --slurpfile runtime "$RUNTIME_REPORT_JSON" \
+    --slurpfile compile "$COMPILE_REPORT_JSON" \
+    '{
+      checks: $checks,
+      only: (if ($only | length) == 0 then null else $only end),
+      runtime: $runtime[0],
+      compile: $compile[0]
+    }' >"$tmp"
+  mv "$tmp" "$REPORT_DIR/summary.json"
+  rm -f "$RUNTIME_REPORT_JSON" "$COMPILE_REPORT_JSON"
+}
+
+trap 'status=$?; trap - EXIT; write_summary_report; exit "$status"' EXIT
 
 require_nonempty_file() {
   local path="$1"
@@ -261,19 +384,81 @@ find_first_elf_shared_object() {
   return 1
 }
 
+record_skipped_row() {
+  local kind="$1"
+  local authoritative="$2"
+  local key="$3"
+  local label="$4"
+  local command_id="$5"
+  local reason="$6"
+  local row_root row_log log_rel artifact_rel
+
+  if [[ "$REPORT_ENABLED" -eq 0 ]]; then
+    return 0
+  fi
+
+  row_root="$REPORT_DIR/$kind/$key"
+  row_log="$row_root/row.log"
+  log_rel="$kind/$key/row.log"
+  artifact_rel="$kind/$key/artifacts"
+
+  rm -rf "$row_root"
+  mkdir -p "$row_root/artifacts"
+  printf 'status=skipped\nreason=%s\n' "$reason" >"$row_log"
+  append_report_row "$kind" "$authoritative" "$key" "$label" skipped "$command_id" "$log_rel" "$artifact_rel"
+}
+
 run_check() {
-  local key="$1"
-  local label="$2"
-  local fn="$3"
+  local kind="$1"
+  local authoritative="$2"
+  local key="$3"
+  local label="$4"
+  local fn="$5"
+  local command_id="$6"
+  local row_root row_log log_rel artifact_rel saved_test_root status
 
   if [[ -n "${COMPLETED_CHECKS[$key]:-}" ]]; then
+    record_skipped_row "$kind" "$authoritative" "$key" "$label" "$command_id" 'already covered'
     log_step "$label (already covered)"
     return 0
   fi
 
   log_step "$label"
-  "$fn"
-  COMPLETED_CHECKS[$key]=1
+  if [[ "$REPORT_ENABLED" -eq 0 ]]; then
+    "$fn"
+    COMPLETED_CHECKS[$key]=1
+    return 0
+  fi
+
+  row_root="$REPORT_DIR/$kind/$key"
+  row_log="$row_root/row.log"
+  log_rel="$kind/$key/row.log"
+  artifact_rel="$kind/$key/artifacts"
+  saved_test_root="$TEST_ROOT"
+
+  rm -rf "$row_root"
+  mkdir -p "$row_root/artifacts"
+  TEST_ROOT="$row_root/artifacts"
+
+  set +e
+  (
+    "$fn"
+  ) >"$row_log" 2>&1
+  status=$?
+  set -e
+
+  TEST_ROOT="$saved_test_root"
+
+  if [[ "$status" -eq 0 ]]; then
+    append_report_row "$kind" "$authoritative" "$key" "$label" pass "$command_id" "$log_rel" "$artifact_rel"
+    COMPLETED_CHECKS[$key]=1
+    return 0
+  fi
+
+  append_report_row "$kind" "$authoritative" "$key" "$label" fail "$command_id" "$log_rel" "$artifact_rel"
+  ANY_ROW_FAILURE=1
+  printf 'row failed: %s (%s)\n' "$label" "$log_rel" >&2
+  return 0
 }
 
 run_selected_runtime() {
@@ -281,12 +466,14 @@ run_selected_runtime() {
   local key="$2"
   local label="$3"
   local fn="$4"
+  local command_id="$5"
 
   if [[ -n "$ONLY_FILTER" && "$ONLY_FILTER" != "$runtime_name" ]]; then
+    record_skipped_row runtime "$runtime_name" "$key" "$label" "$command_id" "filtered by --only=$ONLY_FILTER"
     return 0
   fi
 
-  run_check "$key" "$label" "$fn"
+  run_check runtime "$runtime_name" "$key" "$label" "$fn" "$command_id"
 }
 
 run_selected_compile() {
@@ -294,12 +481,14 @@ run_selected_compile() {
   local key="$2"
   local label="$3"
   local fn="$4"
+  local command_id="$5"
 
   if [[ -n "$ONLY_FILTER" && "$ONLY_FILTER" != "$source_package" ]]; then
+    record_skipped_row compile "$source_package" "$key" "$label" "$command_id" "filtered by --only=$ONLY_FILTER"
     return 0
   fi
 
-  run_check "$key" "$label" "$fn"
+  run_check compile "$source_package" "$key" "$label" "$fn" "$command_id"
 }
 
 ensure_apt_updated() {
@@ -1592,32 +1781,32 @@ PY
 }
 
 run_compile_checks() {
-  run_selected_compile dcm2niix dcm2niix-source 'dcm2niix source build' check_dcm2niix_source_build
-  run_selected_compile timg timg-source 'timg source build' check_timg_source_build
-  run_selected_compile opencv opencv-source 'opencv source build' check_opencv_source_build
-  run_selected_compile vips vips-source 'vips source build' check_vips_source_build
-  run_selected_compile xpra xpra-source 'xpra source build' check_xpra_source_build
-  run_selected_compile krita krita-source 'krita source build' check_krita_source_build
-  run_selected_compile libreoffice libreoffice-source 'libreoffice source build' check_libreoffice_source_build
-  run_selected_compile webkit2gtk webkit-source 'webkit2gtk source build' check_webkit_source_build
+  run_selected_compile dcm2niix dcm2niix-source 'dcm2niix source build' check_dcm2niix_source_build 'fixture:source/dcm2niix-console'
+  run_selected_compile timg timg-source 'timg source build' check_timg_source_build 'fixture:source/timg-cmake'
+  run_selected_compile opencv opencv-source 'opencv source build' check_opencv_source_build 'fixture:source/opencv-imgcodecs'
+  run_selected_compile vips vips-source 'vips source build' check_vips_source_build 'fixture:source/vips-tools'
+  run_selected_compile xpra xpra-source 'xpra source build' check_xpra_source_build 'fixture:source/xpra-jpeg-codecs'
+  run_selected_compile krita krita-source 'krita source build' check_krita_source_build 'fixture:source/krita-jpeg-modules'
+  run_selected_compile libreoffice libreoffice-source 'libreoffice source build' check_libreoffice_source_build 'fixture:source/libreoffice-vcl-jpeg'
+  run_selected_compile webkit2gtk webkit-source 'webkit2gtk source build' check_webkit_source_build 'fixture:source/webkit2gtk-webkit'
 }
 
 run_runtime_checks() {
-  run_selected_runtime dcm2niix dcm2niix-runtime 'dcm2niix runtime smoke' check_dcm2niix_runtime
-  run_selected_runtime eog eog-runtime 'eog runtime smoke' check_eog_runtime
-  run_selected_runtime gimp gimp-runtime 'gimp runtime smoke' check_gimp_runtime
-  run_selected_runtime gphoto2 gphoto2-runtime 'gphoto2 runtime smoke' check_gphoto2_runtime
-  run_selected_runtime krita krita-runtime 'krita runtime smoke' check_krita_runtime
-  run_selected_runtime libcamera-tools libcamera-tools-runtime 'libcamera-tools runtime smoke' check_libcamera_tools_runtime
-  run_selected_runtime libopencv-imgcodecs406t64 opencv-consumer 'libopencv-imgcodecs406t64 runtime smoke' check_opencv_consumer
-  run_selected_runtime libreoffice-core libreoffice-runtime 'libreoffice-core runtime smoke' check_libreoffice_runtime
-  run_selected_runtime libvips42t64 vips-consumer 'libvips42t64 runtime smoke' check_vips_consumer
-  run_selected_runtime libwebkit2gtk-4.1-0 webkit-consumer 'libwebkit2gtk-4.1-0 runtime smoke' check_webkit_consumer
-  run_selected_runtime openjdk-17-jre-headless openjdk-runtime 'openjdk-17-jre-headless runtime smoke' check_openjdk_runtime
-  run_selected_runtime python3-pil pillow-runtime 'python3-pil runtime smoke' check_pillow_runtime
-  run_selected_runtime timg timg-runtime 'timg runtime smoke' check_timg_runtime
-  run_selected_runtime tracker-extract tracker-extract-runtime 'tracker-extract runtime smoke' check_tracker_extract_runtime
-  run_selected_runtime xpra xpra-jpeg-codec 'xpra runtime smoke' check_xpra_jpeg_codec
+  run_selected_runtime dcm2niix dcm2niix-runtime 'dcm2niix runtime smoke' check_dcm2niix_runtime 'fixture:runtime/dcm2niix-dicom'
+  run_selected_runtime eog eog-runtime 'eog runtime smoke' check_eog_runtime 'fixture:runtime/eog-pattern'
+  run_selected_runtime gimp gimp-runtime 'gimp runtime smoke' check_gimp_runtime 'fixture:runtime/gimp-batch'
+  run_selected_runtime gphoto2 gphoto2-runtime 'gphoto2 runtime smoke' check_gphoto2_runtime 'fixture:runtime/gphoto2-camera-store'
+  run_selected_runtime krita krita-runtime 'krita runtime smoke' check_krita_runtime 'fixture:runtime/krita-import-export'
+  run_selected_runtime libcamera-tools libcamera-tools-runtime 'libcamera-tools runtime smoke' check_libcamera_tools_runtime 'fixture:runtime/libcamera-mjpeg-probe'
+  run_selected_runtime libopencv-imgcodecs406t64 opencv-consumer 'libopencv-imgcodecs406t64 runtime smoke' check_opencv_consumer 'fixture:runtime/opencv-consumer'
+  run_selected_runtime libreoffice-core libreoffice-runtime 'libreoffice-core runtime smoke' check_libreoffice_runtime 'fixture:runtime/libreoffice-convert'
+  run_selected_runtime libvips42t64 vips-consumer 'libvips42t64 runtime smoke' check_vips_consumer 'fixture:runtime/vips-consumer'
+  run_selected_runtime libwebkit2gtk-4.1-0 webkit-consumer 'libwebkit2gtk-4.1-0 runtime smoke' check_webkit_consumer 'fixture:runtime/webkit-html'
+  run_selected_runtime openjdk-17-jre-headless openjdk-runtime 'openjdk-17-jre-headless runtime smoke' check_openjdk_runtime 'fixture:runtime/openjdk-imageio'
+  run_selected_runtime python3-pil pillow-runtime 'python3-pil runtime smoke' check_pillow_runtime 'fixture:runtime/pillow-flip'
+  run_selected_runtime timg timg-runtime 'timg runtime smoke' check_timg_runtime 'fixture:runtime/timg-render'
+  run_selected_runtime tracker-extract tracker-extract-runtime 'tracker-extract runtime smoke' check_tracker_extract_runtime 'fixture:runtime/tracker-extract'
+  run_selected_runtime xpra xpra-jpeg-codec 'xpra runtime smoke' check_xpra_jpeg_codec 'fixture:runtime/xpra-jpeg-codec'
 }
 
 assert_dependents_inventory
@@ -1638,6 +1827,10 @@ case "$CHECKS" in
     run_runtime_checks
     ;;
 esac
+
+if [[ "$ANY_ROW_FAILURE" -ne 0 ]]; then
+  die 'One or more dependent rows failed'
+fi
 
 log_step 'All requested dependent checks passed'
 CONTAINER_SCRIPT
