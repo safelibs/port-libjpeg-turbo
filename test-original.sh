@@ -199,7 +199,7 @@ die() {
 
 if [[ -n "$REPORT_DIR" ]]; then
   REPORT_ENABLED=1
-  rm -rf "$REPORT_DIR/runtime" "$REPORT_DIR/compile"
+  find "$REPORT_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
   mkdir -p "$REPORT_DIR/runtime" "$REPORT_DIR/compile"
   RUNTIME_REPORT_JSON="$REPORT_DIR/.runtime-report.json"
   COMPILE_REPORT_JSON="$REPORT_DIR/.compile-report.json"
@@ -546,33 +546,21 @@ fetch_ubuntu_source() {
   printf '%s\n' "$source_dir"
 }
 
-assert_dependents_inventory() {
-  local expected_runtime expected_build actual_runtime actual_build
-
-  expected_runtime=$'dcm2niix\neog\ngimp\ngphoto2\nkrita\nlibcamera-tools\nlibopencv-imgcodecs406t64\nlibreoffice-core\nlibvips42t64\nlibwebkit2gtk-4.1-0\nopenjdk-17-jre-headless\npython3-pil\ntimg\ntracker-extract\nxpra'
-  actual_runtime="$(jq -r '.runtime_dependents[].name' "$ROOT/dependents.json")"
-
-  if [[ "$actual_runtime" != "$expected_runtime" ]]; then
-    echo "runtime_dependents in dependents.json do not match the expected matrix" >&2
-    diff -u <(printf '%s\n' "$expected_runtime") <(printf '%s\n' "$actual_runtime") >&2 || true
-    exit 1
-  fi
-
-  expected_build=$'dcm2niix\nkrita\nlibreoffice\nopencv\ntimg\nvips\nwebkit2gtk\nxpra'
-  actual_build="$(jq -r '.build_time_dependents[].source_package' "$ROOT/dependents.json")"
-
-  if [[ "$actual_build" != "$expected_build" ]]; then
-    echo "build_time_dependents in dependents.json do not match the expected matrix" >&2
-    diff -u <(printf '%s\n' "$expected_build") <(printf '%s\n' "$actual_build") >&2 || true
-    exit 1
-  fi
-
+validate_only_filter() {
   if [[ -n "$ONLY_FILTER" ]]; then
     jq -e --arg filter "$ONLY_FILTER" '
       (.runtime_dependents[] | select(.name == $filter)) ,
       (.build_time_dependents[] | select(.source_package == $filter))
     ' "$ROOT/dependents.json" >/dev/null || die "--only did not match any runtime package or source package: $ONLY_FILTER"
   fi
+}
+
+list_runtime_dependents() {
+  jq -r '.runtime_dependents[].name' "$ROOT/dependents.json"
+}
+
+list_build_dependents() {
+  jq -r '.build_time_dependents[].source_package' "$ROOT/dependents.json"
 }
 
 build_safe_packages() {
@@ -1780,36 +1768,116 @@ PY
   require_contains "$dir/run.log" 'RGBX'
 }
 
+run_compile_check_for_source_package() {
+  local source_package="$1"
+
+  case "$source_package" in
+    dcm2niix)
+      run_selected_compile "$source_package" dcm2niix-source 'dcm2niix source build' check_dcm2niix_source_build 'fixture:source/dcm2niix-console'
+      ;;
+    krita)
+      run_selected_compile "$source_package" krita-source 'krita source build' check_krita_source_build 'fixture:source/krita-jpeg-modules'
+      ;;
+    libreoffice)
+      run_selected_compile "$source_package" libreoffice-source 'libreoffice source build' check_libreoffice_source_build 'fixture:source/libreoffice-vcl-jpeg'
+      ;;
+    opencv)
+      run_selected_compile "$source_package" opencv-source 'opencv source build' check_opencv_source_build 'fixture:source/opencv-imgcodecs'
+      ;;
+    timg)
+      run_selected_compile "$source_package" timg-source 'timg source build' check_timg_source_build 'fixture:source/timg-cmake'
+      ;;
+    vips)
+      run_selected_compile "$source_package" vips-source 'vips source build' check_vips_source_build 'fixture:source/vips-tools'
+      ;;
+    webkit2gtk)
+      run_selected_compile "$source_package" webkit-source 'webkit2gtk source build' check_webkit_source_build 'fixture:source/webkit2gtk-webkit'
+      ;;
+    xpra)
+      run_selected_compile "$source_package" xpra-source 'xpra source build' check_xpra_source_build 'fixture:source/xpra-jpeg-codecs'
+      ;;
+    *)
+      die "compile smoke is not implemented for source package from dependents.json: $source_package"
+      ;;
+  esac
+}
+
 run_compile_checks() {
-  run_selected_compile dcm2niix dcm2niix-source 'dcm2niix source build' check_dcm2niix_source_build 'fixture:source/dcm2niix-console'
-  run_selected_compile timg timg-source 'timg source build' check_timg_source_build 'fixture:source/timg-cmake'
-  run_selected_compile opencv opencv-source 'opencv source build' check_opencv_source_build 'fixture:source/opencv-imgcodecs'
-  run_selected_compile vips vips-source 'vips source build' check_vips_source_build 'fixture:source/vips-tools'
-  run_selected_compile xpra xpra-source 'xpra source build' check_xpra_source_build 'fixture:source/xpra-jpeg-codecs'
-  run_selected_compile krita krita-source 'krita source build' check_krita_source_build 'fixture:source/krita-jpeg-modules'
-  run_selected_compile libreoffice libreoffice-source 'libreoffice source build' check_libreoffice_source_build 'fixture:source/libreoffice-vcl-jpeg'
-  run_selected_compile webkit2gtk webkit-source 'webkit2gtk source build' check_webkit_source_build 'fixture:source/webkit2gtk-webkit'
+  local -a source_packages=()
+  local source_package
+
+  mapfile -t source_packages < <(list_build_dependents)
+  for source_package in "${source_packages[@]}"; do
+    run_compile_check_for_source_package "$source_package"
+  done
+}
+
+run_runtime_check_for_package() {
+  local runtime_name="$1"
+
+  case "$runtime_name" in
+    dcm2niix)
+      run_selected_runtime "$runtime_name" dcm2niix-runtime 'dcm2niix runtime smoke' check_dcm2niix_runtime 'fixture:runtime/dcm2niix-dicom'
+      ;;
+    eog)
+      run_selected_runtime "$runtime_name" eog-runtime 'eog runtime smoke' check_eog_runtime 'fixture:runtime/eog-pattern'
+      ;;
+    gimp)
+      run_selected_runtime "$runtime_name" gimp-runtime 'gimp runtime smoke' check_gimp_runtime 'fixture:runtime/gimp-batch'
+      ;;
+    gphoto2)
+      run_selected_runtime "$runtime_name" gphoto2-runtime 'gphoto2 runtime smoke' check_gphoto2_runtime 'fixture:runtime/gphoto2-camera-store'
+      ;;
+    krita)
+      run_selected_runtime "$runtime_name" krita-runtime 'krita runtime smoke' check_krita_runtime 'fixture:runtime/krita-import-export'
+      ;;
+    libcamera-tools)
+      run_selected_runtime "$runtime_name" libcamera-tools-runtime 'libcamera-tools runtime smoke' check_libcamera_tools_runtime 'fixture:runtime/libcamera-mjpeg-probe'
+      ;;
+    libopencv-imgcodecs406t64)
+      run_selected_runtime "$runtime_name" opencv-consumer 'libopencv-imgcodecs406t64 runtime smoke' check_opencv_consumer 'fixture:runtime/opencv-consumer'
+      ;;
+    libreoffice-core)
+      run_selected_runtime "$runtime_name" libreoffice-runtime 'libreoffice-core runtime smoke' check_libreoffice_runtime 'fixture:runtime/libreoffice-convert'
+      ;;
+    libvips42t64)
+      run_selected_runtime "$runtime_name" vips-consumer 'libvips42t64 runtime smoke' check_vips_consumer 'fixture:runtime/vips-consumer'
+      ;;
+    libwebkit2gtk-4.1-0)
+      run_selected_runtime "$runtime_name" webkit-consumer 'libwebkit2gtk-4.1-0 runtime smoke' check_webkit_consumer 'fixture:runtime/webkit-html'
+      ;;
+    openjdk-17-jre-headless)
+      run_selected_runtime "$runtime_name" openjdk-runtime 'openjdk-17-jre-headless runtime smoke' check_openjdk_runtime 'fixture:runtime/openjdk-imageio'
+      ;;
+    python3-pil)
+      run_selected_runtime "$runtime_name" pillow-runtime 'python3-pil runtime smoke' check_pillow_runtime 'fixture:runtime/pillow-flip'
+      ;;
+    timg)
+      run_selected_runtime "$runtime_name" timg-runtime 'timg runtime smoke' check_timg_runtime 'fixture:runtime/timg-render'
+      ;;
+    tracker-extract)
+      run_selected_runtime "$runtime_name" tracker-extract-runtime 'tracker-extract runtime smoke' check_tracker_extract_runtime 'fixture:runtime/tracker-extract'
+      ;;
+    xpra)
+      run_selected_runtime "$runtime_name" xpra-jpeg-codec 'xpra runtime smoke' check_xpra_jpeg_codec 'fixture:runtime/xpra-jpeg-codec'
+      ;;
+    *)
+      die "runtime smoke is not implemented for runtime package from dependents.json: $runtime_name"
+      ;;
+  esac
 }
 
 run_runtime_checks() {
-  run_selected_runtime dcm2niix dcm2niix-runtime 'dcm2niix runtime smoke' check_dcm2niix_runtime 'fixture:runtime/dcm2niix-dicom'
-  run_selected_runtime eog eog-runtime 'eog runtime smoke' check_eog_runtime 'fixture:runtime/eog-pattern'
-  run_selected_runtime gimp gimp-runtime 'gimp runtime smoke' check_gimp_runtime 'fixture:runtime/gimp-batch'
-  run_selected_runtime gphoto2 gphoto2-runtime 'gphoto2 runtime smoke' check_gphoto2_runtime 'fixture:runtime/gphoto2-camera-store'
-  run_selected_runtime krita krita-runtime 'krita runtime smoke' check_krita_runtime 'fixture:runtime/krita-import-export'
-  run_selected_runtime libcamera-tools libcamera-tools-runtime 'libcamera-tools runtime smoke' check_libcamera_tools_runtime 'fixture:runtime/libcamera-mjpeg-probe'
-  run_selected_runtime libopencv-imgcodecs406t64 opencv-consumer 'libopencv-imgcodecs406t64 runtime smoke' check_opencv_consumer 'fixture:runtime/opencv-consumer'
-  run_selected_runtime libreoffice-core libreoffice-runtime 'libreoffice-core runtime smoke' check_libreoffice_runtime 'fixture:runtime/libreoffice-convert'
-  run_selected_runtime libvips42t64 vips-consumer 'libvips42t64 runtime smoke' check_vips_consumer 'fixture:runtime/vips-consumer'
-  run_selected_runtime libwebkit2gtk-4.1-0 webkit-consumer 'libwebkit2gtk-4.1-0 runtime smoke' check_webkit_consumer 'fixture:runtime/webkit-html'
-  run_selected_runtime openjdk-17-jre-headless openjdk-runtime 'openjdk-17-jre-headless runtime smoke' check_openjdk_runtime 'fixture:runtime/openjdk-imageio'
-  run_selected_runtime python3-pil pillow-runtime 'python3-pil runtime smoke' check_pillow_runtime 'fixture:runtime/pillow-flip'
-  run_selected_runtime timg timg-runtime 'timg runtime smoke' check_timg_runtime 'fixture:runtime/timg-render'
-  run_selected_runtime tracker-extract tracker-extract-runtime 'tracker-extract runtime smoke' check_tracker_extract_runtime 'fixture:runtime/tracker-extract'
-  run_selected_runtime xpra xpra-jpeg-codec 'xpra runtime smoke' check_xpra_jpeg_codec 'fixture:runtime/xpra-jpeg-codec'
+  local -a runtime_packages=()
+  local runtime_name
+
+  mapfile -t runtime_packages < <(list_runtime_dependents)
+  for runtime_name in "${runtime_packages[@]}"; do
+    run_runtime_check_for_package "$runtime_name"
+  done
 }
 
-assert_dependents_inventory
+validate_only_filter
 log_step 'Building and installing safe Debian packages'
 build_safe_packages
 log_step 'Preparing JPEG, PNG, HTML, DICOM, and pseudo-camera fixtures'
