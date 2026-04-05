@@ -5,6 +5,7 @@ include /usr/share/dpkg/default.mk
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_LDFLAGS_MAINT_STRIP = -Wl,-Bsymbolic-functions
 export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+PACKAGE_STAGE_DIR := $(CURDIR)/debian/stage-root
 
 %:
 	dh $@
@@ -16,15 +17,18 @@ override_dh_auto_build:
 
 override_dh_auto_clean:
 	dh_auto_clean
-	rm -rf stage target/rendered target/java-tools target/docker-home
+	rm -rf target/rendered target/java-tools target/docker-home
+	rm -rf $(PACKAGE_STAGE_DIR)
 
 override_dh_auto_install:
 	CARGO_PROFILE_RELEASE_LTO=false \
 	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }-Clinker-plugin-lto=no -Cembed-bitcode=no" \
-	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) bash scripts/stage-install.sh --with-java=1
+	DEB_HOST_MULTIARCH=$(DEB_HOST_MULTIARCH) \
+	bash scripts/stage-install.sh --with-java=1 --stage-dir "$(PACKAGE_STAGE_DIR)"
 	rm -rf debian/tmp
 	mkdir -p debian/tmp
-	cp -a stage/usr debian/tmp/
+	cp -a "$(PACKAGE_STAGE_DIR)/usr" debian/tmp/
+	rm -rf "$(PACKAGE_STAGE_DIR)"
 	rm -rf debian/tmp/usr/share/doc/libjpeg-turbo
 
 override_dh_auto_test:
