@@ -2,11 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../../../../../ && pwd)"
-REPORT_DIR="$ROOT/safe/target/dependent-regressions/timg-sigfpe"
-SUMMARY="$REPORT_DIR/summary.json"
 
 mkdir -p "$ROOT/safe/target/dependent-regressions"
-rm -rf "$REPORT_DIR"
+REPORT_DIR="$(mktemp -d "$ROOT/safe/target/dependent-regressions/timg-sigfpe.XXXXXX")"
+SUMMARY="$REPORT_DIR/summary.json"
 
 set +e
 "$ROOT/test-original.sh" --checks all --only timg --report-dir "$REPORT_DIR"
