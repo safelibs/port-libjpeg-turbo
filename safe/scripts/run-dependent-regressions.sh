@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/../.. && pwd)"
 CASES_ROOT="$ROOT/safe/tests/fixtures/dependents"
-SUMMARY_PATH="$ROOT/safe/target/dependent-matrix/summary.json"
+SUMMARY_PATH="${LIBJPEG_TURBO_DEPENDENT_MATRIX_SUMMARY:-}"
 MODE="reproduce"
 
 usage() {
@@ -11,7 +11,10 @@ usage() {
 usage: run-dependent-regressions.sh [--mode reproduce|verify] [--summary <path>]
 
 Run the committed dependent-regression reproducers that correspond to the
-failing rows captured in a dependent matrix summary. The default summary path is
+failing rows captured in a dependent matrix summary. The default summary path
+prefers, in order: the explicit LIBJPEG_TURBO_DEPENDENT_MATRIX_SUMMARY value,
+safe/target/dependent-matrix-final/summary.json,
+safe/target/dependent-matrix-fixed/summary.json, then
 safe/target/dependent-matrix/summary.json.
 EOF
 }
@@ -19,6 +22,25 @@ EOF
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+resolve_summary_path() {
+  local candidate
+
+  for candidate in \
+    "$SUMMARY_PATH" \
+    "$ROOT/safe/target/dependent-matrix-final/summary.json" \
+    "$ROOT/safe/target/dependent-matrix-fixed/summary.json" \
+    "$ROOT/safe/target/dependent-matrix/summary.json"
+  do
+    [[ -n "$candidate" ]] || continue
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  die "missing dependent matrix summary"
 }
 
 while (($#)); do
@@ -52,7 +74,7 @@ case "$MODE" in
 esac
 command -v jq >/dev/null 2>&1 || die "jq is required"
 [[ -d "$CASES_ROOT" ]] || die "missing case metadata root: $CASES_ROOT"
-[[ -f "$SUMMARY_PATH" ]] || die "missing dependent matrix summary: $SUMMARY_PATH"
+SUMMARY_PATH="$(resolve_summary_path)"
 
 mapfile -t CASE_FILES < <(find "$CASES_ROOT" -type f -name case.json | sort)
 ((${#CASE_FILES[@]} > 0)) || die "no dependent regression cases found under $CASES_ROOT"
@@ -71,7 +93,13 @@ done < <(
   ' "$SUMMARY_PATH"
 )
 
-((${#FAIL_ROWS[@]} > 0)) || die "summary does not contain any failing dependent rows"
+if ((${#FAIL_ROWS[@]} == 0)); then
+  if [[ "$MODE" == "verify" ]]; then
+    printf 'run-dependent-regressions: no failing dependent rows in %s\n' "$SUMMARY_PATH"
+    exit 0
+  fi
+  die "summary does not contain any failing dependent rows"
+fi
 
 for case_file in "${CASE_FILES[@]}"; do
   case_id="$(jq -r '.id' "$case_file")"

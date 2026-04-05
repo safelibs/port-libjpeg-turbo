@@ -33,16 +33,21 @@ the staged packaging metadata, and the verification harness used by this port.
 Two committed helper scripts are part of the final cleanup workflow:
 
 - `safe/scripts/audit-unsafe.sh` reports the remaining `unsafe` footprint and
-  rejects any new Cargo-side `original/*.c` compilation dependency.
+  rejects any new Cargo-side `original/*.c` compilation dependency and any new
+  Cargo-side C shim compiler beyond `safe/crates/libjpeg-abi/build.rs`.
 - `safe/scripts/run-bench-smoke.sh` runs a lightweight staged benchmark sweep
-  across the packaged tools and TurboJPEG entry points.
+  across the packaged tools and TurboJPEG entry points, and it rejects staged
+  linker-plugin warning regressions.
 
 The remaining C boundary that still exists today is:
 
 - `safe/c_shim/error_bridge.c`, which preserves the libjpeg
   error/`longjmp` contract at the ABI edge.  The integration tests also use
   that same C frame to exercise the `setjmp`/`longjmp` error path without
-  unwinding through Rust stack frames.
+  unwinding through Rust stack frames.  It is compiled exactly once by
+  `safe/crates/libjpeg-abi/build.rs`, and downstream Rust binaries consume it
+  through the propagated native link metadata from `libjpeg-abi` instead of
+  rebuilding their own bridge archive.
 
 The remaining Rust `unsafe` boundary is broader than that single C shim and is
 now enforced by exact reviewed file categories in `safe/scripts/audit-unsafe.sh`
@@ -83,7 +88,7 @@ Today that means:
   committed Rust translations under `safe/crates/libturbojpeg-abi/src/generated/`
   and `safe/crates/jpeg-tools/src/generated/`, with no staged dependency on
   legacy compatibility artifact trees, removed staged C frontend trees, or
-  `original/*.c`.
+  any Cargo-side `original/*.c` compilation step.
 
 
 License

@@ -8,8 +8,9 @@ mod jsimd_none;
 #[doc(hidden)]
 pub use jpeg_core::ported::{compress, decompress, transform};
 
-// Keep the minimal C longjmp/error bridge as a propagated native link
-// dependency for final binaries that pull in jpeg_core through libjpeg-abi.
+// Keep the single reviewed C longjmp/error bridge as the only propagated native
+// build dependency for final binaries that pull in jpeg_core through
+// libjpeg-abi.
 #[allow(improper_ctypes)]
 #[link(name = "error_bridge", kind = "static")]
 unsafe extern "C" {

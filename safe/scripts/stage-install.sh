@@ -47,6 +47,16 @@ die() {
   exit 1
 }
 
+objcopy_bin() {
+  if command -v objcopy >/dev/null 2>&1; then
+    printf 'objcopy\n'
+  elif command -v llvm-objcopy >/dev/null 2>&1; then
+    printf 'llvm-objcopy\n'
+  else
+    die "missing required command: objcopy or llvm-objcopy"
+  fi
+}
+
 acquire_stage_install_lock() {
   mkdir -p "$(dirname "$STAGE_INSTALL_LOCK")"
   exec {stage_install_lock_fd}>"$STAGE_INSTALL_LOCK"
@@ -330,6 +340,21 @@ cargo_release_build() {
     cargo "$@"
 }
 
+sanitize_archive_for_system_linker() {
+  local source="$1"
+  local dest="$2"
+  local tool
+
+  mkdir -p "$(dirname -- "$dest")"
+  cp "$source" "$dest"
+  tool="$(objcopy_bin)"
+  "$tool" \
+    --remove-section=.llvmbc \
+    --remove-section=.llvmcmd \
+    "$dest"
+  ranlib "$dest"
+}
+
 render_jconfig_h() {
   local output="$1"
   cat >"$output" <<EOF
@@ -558,10 +583,12 @@ ensure_packaged_tool_binaries() {
 link_rust_libjpeg() {
   local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
   local output="$libdir/$LIBJPEG_REALNAME"
-  local staticlib version_script
+  local staticlib sanitized_staticlib version_script
 
   mkdir -p "$libdir"
   staticlib="$(ensure_rust_libjpeg_staticlib)"
+  sanitized_staticlib="$TMP_RENDER_ROOT/libjpeg.a"
+  sanitize_archive_for_system_linker "$staticlib" "$sanitized_staticlib"
   version_script="$TMP_RENDER_ROOT/libjpeg.map"
   render_version_script "$SAFE_ROOT/debian/libjpeg-turbo8.symbols" "$version_script"
 
@@ -570,10 +597,11 @@ link_rust_libjpeg() {
     -Wl,-soname,libjpeg.so.8 \
     -Wl,--version-script,"$version_script" \
     -o "$output" \
-    -Wl,--whole-archive "$staticlib" -Wl,--no-whole-archive \
+    -Wl,--whole-archive "$sanitized_staticlib" -Wl,--no-whole-archive \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
 
-  install -m 644 "$staticlib" "$libdir/libjpeg.a"
+  install -m 644 "$sanitized_staticlib" "$libdir/libjpeg.a"
+  ranlib "$libdir/libjpeg.a"
   ln -sfn "$LIBJPEG_REALNAME" "$libdir/libjpeg.so.8"
   ln -sfn libjpeg.so.8 "$libdir/libjpeg.so"
 }
@@ -581,10 +609,14 @@ link_rust_libjpeg() {
 build_staged_libturbojpeg() {
   local libdir="$STAGE_DIR/usr/lib/$MULTIARCH"
   local output="$libdir/$LIBTURBOJPEG_REALNAME"
-  local jpeg_staticlib turbojpeg_staticlib version_script
+  local jpeg_staticlib turbojpeg_staticlib sanitized_jpeg_staticlib sanitized_turbojpeg_staticlib version_script
 
   jpeg_staticlib="$(ensure_rust_libjpeg_staticlib)"
   turbojpeg_staticlib="$(ensure_rust_libturbojpeg_staticlib)"
+  sanitized_jpeg_staticlib="$TMP_RENDER_ROOT/libjpeg-for-libturbojpeg.a"
+  sanitized_turbojpeg_staticlib="$TMP_RENDER_ROOT/libturbojpeg.a"
+  sanitize_archive_for_system_linker "$jpeg_staticlib" "$sanitized_jpeg_staticlib"
+  sanitize_archive_for_system_linker "$turbojpeg_staticlib" "$sanitized_turbojpeg_staticlib"
   version_script="$TMP_RENDER_ROOT/turbojpeg-mapfile.jni"
   mkdir -p "$libdir"
   # Render from the committed Debian symbols manifest so the staged SONAME and
@@ -596,11 +628,11 @@ build_staged_libturbojpeg() {
     -Wl,-soname,libturbojpeg.so.0 \
     -Wl,--version-script,"$version_script" \
     -o "$output" \
-    -Wl,--whole-archive "$turbojpeg_staticlib" -Wl,--no-whole-archive \
-    "$jpeg_staticlib" \
+    -Wl,--whole-archive "$sanitized_turbojpeg_staticlib" -Wl,--no-whole-archive \
+    "$sanitized_jpeg_staticlib" \
     -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
 
-  install -m 644 "$turbojpeg_staticlib" "$libdir/libturbojpeg.a"
+  install -m 644 "$sanitized_turbojpeg_staticlib" "$libdir/libturbojpeg.a"
   ranlib "$libdir/libturbojpeg.a"
   ln -sfn "$LIBTURBOJPEG_REALNAME" "$libdir/libturbojpeg.so.0"
   ln -sfn libturbojpeg.so.0 "$libdir/libturbojpeg.so"

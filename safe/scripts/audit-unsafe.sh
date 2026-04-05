@@ -24,13 +24,27 @@ fi
 
 declare -a cargo_bridge_files=(
   "$SAFE_ROOT/build.rs"
-  "$SAFE_ROOT/crates/jpeg-tools/build.rs"
   "$SAFE_ROOT/crates/libjpeg-abi/build.rs"
-  "$SAFE_ROOT/crates/libturbojpeg-abi/build.rs"
 )
 
 if rg -n 'original/.*\.c' "${cargo_bridge_files[@]}"; then
   die "Cargo-side build helpers still reference original/*.c sources"
+fi
+
+remaining_c_shim_refs="$(
+  rg -n 'c_shim/error_bridge\.c' \
+    "$SAFE_ROOT/build.rs" \
+    "$SAFE_ROOT/crates" \
+    "$SAFE_ROOT/scripts" \
+    | grep -Fv "$SAFE_ROOT/crates/libjpeg-abi/build.rs:" \
+    | grep -Fv "$SAFE_ROOT/build.rs:" \
+    | grep -Fv "$SAFE_ROOT/scripts/audit-unsafe.sh:" \
+    || true
+)"
+
+if [[ -n "$remaining_c_shim_refs" ]]; then
+  printf '%s\n' "$remaining_c_shim_refs" >&2
+  die "only libjpeg-abi/build.rs may compile the minimal error_bridge.c shim"
 fi
 
 if [[ -e "$SAFE_ROOT/bridge/libjpeg_compat.c" ]]; then
@@ -145,8 +159,9 @@ declare -a reviewed_unsafe_operation_patterns=(
   '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/decompress/generated/[^/]+_translated\.rs$'
   '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/transform/transupp\.rs$'
   '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/turbojpeg/turbojpeg\.rs$'
+  '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/bin/tjexample\.rs$'
   '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/[^/]+\.rs$'
-  '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none)\.rs$'
+  '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none|lib)\.rs$'
   '^'"$SAFE_ROOT"'/crates/libturbojpeg-abi/src/generated/[^/]+\.rs$'
   '^'"$SAFE_ROOT"'/tests/(compat_smoke|cve_regressions|turbojpeg_suite|upstream_matrix)\.rs$'
 )
@@ -179,9 +194,9 @@ print_category_summary \
   'ffi-types ABI declarations' '^'"$SAFE_ROOT"'/crates/ffi-types/src/lib\.rs$' \
   'jpeg-core raw-pointer runtime support' '^'"$SAFE_ROOT"'/crates/jpeg-core/src/common/' \
   'jpeg-core ported codec kernels' '^'"$SAFE_ROOT"'/crates/jpeg-core/src/ported/' \
-  'libjpeg ABI exports and jsimd fallback hooks' '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none)\.rs$' \
+  'libjpeg ABI exports and jsimd fallback hooks' '^'"$SAFE_ROOT"'/crates/libjpeg-abi/src/(common_exports|decompress_exports|jsimd_none|lib)\.rs$' \
   'TurboJPEG/JNI frontend translations' '^'"$SAFE_ROOT"'/crates/libturbojpeg-abi/src/generated/' \
-  'CLI frontend translations' '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/generated/' \
+  'CLI frontend translations' '^'"$SAFE_ROOT"'/crates/jpeg-tools/src/(generated/|bin/tjexample\.rs$)' \
   'integration-test harnesses' '^'"$SAFE_ROOT"'/tests/'
 
 print_category_summary \

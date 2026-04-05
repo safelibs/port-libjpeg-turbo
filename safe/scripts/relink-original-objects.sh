@@ -88,7 +88,7 @@ fi
 
 if [[ ! -e "$STAGE_DIR/usr/lib" ]]; then
   DEB_HOST_MULTIARCH="${DEB_HOST_MULTIARCH:-}" \
-    bash "$SAFE_ROOT/scripts/stage-install.sh" --stage-dir "$STAGE_DIR"
+    bash "$SAFE_ROOT/scripts/stage-install.sh" --stage-dir "$STAGE_DIR" --with-java=0
 fi
 
 multiarch() {

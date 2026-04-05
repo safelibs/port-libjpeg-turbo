@@ -1,0 +1,215 @@
+{
+  "checks": "all",
+  "only": null,
+  "runtime": [
+    {
+      "name": "dcm2niix",
+      "key": "dcm2niix-runtime",
+      "label": "dcm2niix runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/dcm2niix-dicom",
+      "log": "runtime/dcm2niix-runtime/row.log",
+      "artifacts": "runtime/dcm2niix-runtime/artifacts"
+    },
+    {
+      "name": "eog",
+      "key": "eog-runtime",
+      "label": "eog runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/eog-pattern",
+      "log": "runtime/eog-runtime/row.log",
+      "artifacts": "runtime/eog-runtime/artifacts"
+    },
+    {
+      "name": "gimp",
+      "key": "gimp-runtime",
+      "label": "gimp runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/gimp-batch",
+      "log": "runtime/gimp-runtime/row.log",
+      "artifacts": "runtime/gimp-runtime/artifacts"
+    },
+    {
+      "name": "gphoto2",
+      "key": "gphoto2-runtime",
+      "label": "gphoto2 runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/gphoto2-camera-store",
+      "log": "runtime/gphoto2-runtime/row.log",
+      "artifacts": "runtime/gphoto2-runtime/artifacts"
+    },
+    {
+      "name": "krita",
+      "key": "krita-runtime",
+      "label": "krita runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/krita-import-export",
+      "log": "runtime/krita-runtime/row.log",
+      "artifacts": "runtime/krita-runtime/artifacts"
+    },
+    {
+      "name": "libcamera-tools",
+      "key": "libcamera-tools-runtime",
+      "label": "libcamera-tools runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/libcamera-mjpeg-probe",
+      "log": "runtime/libcamera-tools-runtime/row.log",
+      "artifacts": "runtime/libcamera-tools-runtime/artifacts"
+    },
+    {
+      "name": "libopencv-imgcodecs406t64",
+      "key": "opencv-consumer",
+      "label": "libopencv-imgcodecs406t64 runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/opencv-consumer",
+      "log": "runtime/opencv-consumer/row.log",
+      "artifacts": "runtime/opencv-consumer/artifacts"
+    },
+    {
+      "name": "libreoffice-core",
+      "key": "libreoffice-runtime",
+      "label": "libreoffice-core runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/libreoffice-convert",
+      "log": "runtime/libreoffice-runtime/row.log",
+      "artifacts": "runtime/libreoffice-runtime/artifacts"
+    },
+    {
+      "name": "libvips42t64",
+      "key": "vips-consumer",
+      "label": "libvips42t64 runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/vips-consumer",
+      "log": "runtime/vips-consumer/row.log",
+      "artifacts": "runtime/vips-consumer/artifacts"
+    },
+    {
+      "name": "libwebkit2gtk-4.1-0",
+      "key": "webkit-consumer",
+      "label": "libwebkit2gtk-4.1-0 runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/webkit-html",
+      "log": "runtime/webkit-consumer/row.log",
+      "artifacts": "runtime/webkit-consumer/artifacts"
+    },
+    {
+      "name": "openjdk-17-jre-headless",
+      "key": "openjdk-runtime",
+      "label": "openjdk-17-jre-headless runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/openjdk-imageio",
+      "log": "runtime/openjdk-runtime/row.log",
+      "artifacts": "runtime/openjdk-runtime/artifacts"
+    },
+    {
+      "name": "python3-pil",
+      "key": "pillow-runtime",
+      "label": "python3-pil runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/pillow-flip",
+      "log": "runtime/pillow-runtime/row.log",
+      "artifacts": "runtime/pillow-runtime/artifacts"
+    },
+    {
+      "name": "timg",
+      "key": "timg-runtime",
+      "label": "timg runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/timg-render",
+      "log": "runtime/timg-runtime/row.log",
+      "artifacts": "runtime/timg-runtime/artifacts"
+    },
+    {
+      "name": "tracker-extract",
+      "key": "tracker-extract-runtime",
+      "label": "tracker-extract runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/tracker-extract",
+      "log": "runtime/tracker-extract-runtime/row.log",
+      "artifacts": "runtime/tracker-extract-runtime/artifacts"
+    },
+    {
+      "name": "xpra",
+      "key": "xpra-jpeg-codec",
+      "label": "xpra runtime smoke",
+      "status": "pass",
+      "command": "fixture:runtime/xpra-jpeg-codec",
+      "log": "runtime/xpra-jpeg-codec/row.log",
+      "artifacts": "runtime/xpra-jpeg-codec/artifacts"
+    }
+  ],
+  "compile": [
+    {
+      "source_package": "dcm2niix",
+      "key": "dcm2niix-source",
+      "label": "dcm2niix source build",
+      "status": "pass",
+      "command": "fixture:source/dcm2niix-console",
+      "log": "compile/dcm2niix-source/row.log",
+      "artifacts": "compile/dcm2niix-source/artifacts"
+    },
+    {
+      "source_package": "krita",
+      "key": "krita-source",
+      "label": "krita source build",
+      "status": "pass",
+      "command": "fixture:source/krita-jpeg-modules",
+      "log": "compile/krita-source/row.log",
+      "artifacts": "compile/krita-source/artifacts"
+    },
+    {
+      "source_package": "libreoffice",
+      "key": "libreoffice-source",
+      "label": "libreoffice source build",
+      "status": "pass",
+      "command": "fixture:source/libreoffice-vcl-jpeg",
+      "log": "compile/libreoffice-source/row.log",
+      "artifacts": "compile/libreoffice-source/artifacts"
+    },
+    {
+      "source_package": "opencv",
+      "key": "opencv-source",
+      "label": "opencv source build",
+      "status": "pass",
+      "command": "fixture:source/opencv-imgcodecs",
+      "log": "compile/opencv-source/row.log",
+      "artifacts": "compile/opencv-source/artifacts"
+    },
+    {
+      "source_package": "timg",
+      "key": "timg-source",
+      "label": "timg source build",
+      "status": "pass",
+      "command": "fixture:source/timg-cmake",
+      "log": "compile/timg-source/row.log",
+      "artifacts": "compile/timg-source/artifacts"
+    },
+    {
+      "source_package": "vips",
+      "key": "vips-source",
+      "label": "vips source build",
+      "status": "pass",
+      "command": "fixture:source/vips-tools",
+      "log": "compile/vips-source/row.log",
+      "artifacts": "compile/vips-source/artifacts"
+    },
+    {
+      "source_package": "webkit2gtk",
+      "key": "webkit-source",
+      "label": "webkit2gtk source build",
+      "status": "pass",
+      "command": "fixture:source/webkit2gtk-webkit",
+      "log": "compile/webkit-source/row.log",
+      "artifacts": "compile/webkit-source/artifacts"
+    },
+    {
+      "source_package": "xpra",
+      "key": "xpra-source",
+      "label": "xpra source build",
+      "status": "pass",
+      "command": "fixture:source/xpra-jpeg-codecs",
+      "log": "compile/xpra-source/row.log",
+      "artifacts": "compile/xpra-source/artifacts"
+    }
+  ]
+}

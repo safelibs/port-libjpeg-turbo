@@ -250,6 +250,12 @@ run_logged_command \
     --stage-dir "$STAGE_DIR" \
     --with-java 0
 
+if rg -q 'Opaque pointers are only supported|-plugin has failed to create LTO module' \
+  "$WORK_ROOT/stage-install.log"; then
+  tail -n 200 "$WORK_ROOT/stage-install.log" >&2 || true
+  die "stage install emitted linker-plugin warnings; archives were not sanitized correctly"
+fi
+
 build_reference_tools
 
 MULTIARCH="$(multiarch)"

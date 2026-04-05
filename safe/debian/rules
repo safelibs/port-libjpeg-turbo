@@ -20,6 +20,11 @@ override_dh_auto_clean:
 	rm -rf target/rendered target/java-tools target/docker-home
 	rm -rf $(PACKAGE_STAGE_DIR)
 
+override_dh_clean:
+	dh_clean -d
+	rm -rf debian/.debhelper
+	rm -f debian/debhelper-build-stamp debian/files debian/*.debhelper.log debian/*.substvars
+
 override_dh_auto_install:
 	CARGO_PROFILE_RELEASE_LTO=false \
 	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }-Clinker-plugin-lto=no -Cembed-bitcode=no" \
