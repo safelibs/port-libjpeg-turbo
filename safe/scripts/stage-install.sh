@@ -8,6 +8,7 @@ TMP_RENDER_ROOT="$SAFE_ROOT/target/rendered"
 JAVA_TOOL_ROOT="$SAFE_ROOT/target/java-tools"
 JAVA_TOOL_BIN_DIR="$JAVA_TOOL_ROOT/bin"
 SYMBOLS_TOOL="$SAFE_ROOT/scripts/debian_symbols.py"
+STAGE_INSTALL_LOCK="$SAFE_ROOT/target/stage-install.lock"
 WITH_JAVA_MODE="auto"
 CLEAN=0
 IGNORED_BUILD_DIR=""
@@ -44,6 +45,12 @@ EOF
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+acquire_stage_install_lock() {
+  mkdir -p "$(dirname "$STAGE_INSTALL_LOCK")"
+  exec {stage_install_lock_fd}>"$STAGE_INSTALL_LOCK"
+  flock "$stage_install_lock_fd"
 }
 
 clear_dir() {
@@ -773,6 +780,7 @@ fi
 MULTIARCH="$(multiarch)"
 maybe_reexec_for_java
 WITH_JAVA="$(resolve_with_java)"
+acquire_stage_install_lock
 
 clear_dir "$TMP_RENDER_ROOT"
 clear_dir "$STAGE_DIR"

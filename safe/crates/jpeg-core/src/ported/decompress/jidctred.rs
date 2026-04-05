@@ -1,4 +1,4 @@
-use ffi_types::{j_decompress_ptr, jpeg_component_info, JCOEFPTR, JSAMPARRAY, JDIMENSION};
+use ffi_types::{j_decompress_ptr, jpeg_component_info, JCOEFPTR, JDIMENSION, JSAMPARRAY};
 
 #[allow(
     dead_code,

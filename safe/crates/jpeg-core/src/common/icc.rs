@@ -1,8 +1,8 @@
 use core::{ffi::c_void, ptr};
 
 use ffi_types::{
-    boolean, int, j_compress_ptr, j_decompress_ptr, jpeg_saved_marker_ptr, JOCTET, J_MESSAGE_CODE,
-    CSTATE_SCANNING, DSTATE_READY, JPEG_APP0, FALSE, TRUE,
+    boolean, int, j_compress_ptr, j_decompress_ptr, jpeg_saved_marker_ptr, CSTATE_SCANNING,
+    DSTATE_READY, FALSE, JOCTET, JPEG_APP0, J_MESSAGE_CODE, TRUE,
 };
 
 use crate::common::error;
@@ -41,7 +41,10 @@ unsafe fn marker_is_icc(marker: jpeg_saved_marker_ptr) -> bool {
 
 #[inline]
 unsafe fn warn_bogus_icc(cinfo: j_decompress_ptr) -> boolean {
-    error::warnms(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JWRN_BOGUS_ICC);
+    error::warnms(
+        cinfo as ffi_types::j_common_ptr,
+        J_MESSAGE_CODE::JWRN_BOGUS_ICC,
+    );
     FALSE
 }
 
@@ -51,7 +54,10 @@ pub unsafe fn jpeg_write_icc_profile(
     mut icc_data_len: ::core::ffi::c_uint,
 ) {
     if icc_data_ptr.is_null() || icc_data_len == 0 {
-        error::errexit(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
+        error::errexit(
+            cinfo as ffi_types::j_common_ptr,
+            J_MESSAGE_CODE::JERR_BUFFER_SIZE,
+        );
     }
     if (*cinfo).global_state < CSTATE_SCANNING {
         error::errexit1(
@@ -73,7 +79,11 @@ pub unsafe fn jpeg_write_icc_profile(
             length = MAX_DATA_BYTES_IN_MARKER;
         }
         icc_data_len -= length as ::core::ffi::c_uint;
-        jpeg_write_m_header(cinfo, ICC_MARKER, (length + ICC_OVERHEAD_LEN) as ::core::ffi::c_uint);
+        jpeg_write_m_header(
+            cinfo,
+            ICC_MARKER,
+            (length + ICC_OVERHEAD_LEN) as ::core::ffi::c_uint,
+        );
         for byte in ICC_SIGNATURE {
             jpeg_write_m_byte(cinfo, byte as int);
         }
@@ -94,7 +104,10 @@ pub unsafe fn jpeg_read_icc_profile(
     icc_data_len: *mut ::core::ffi::c_uint,
 ) -> boolean {
     if icc_data_ptr.is_null() || icc_data_len.is_null() {
-        error::errexit(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
+        error::errexit(
+            cinfo as ffi_types::j_common_ptr,
+            J_MESSAGE_CODE::JERR_BUFFER_SIZE,
+        );
     }
     if (*cinfo).global_state < DSTATE_READY {
         error::errexit1(
@@ -157,7 +170,11 @@ pub unsafe fn jpeg_read_icc_profile(
 
     let icc_data = malloc(total_length as usize) as *mut JOCTET;
     if icc_data.is_null() {
-        error::errexit1(cinfo as ffi_types::j_common_ptr, J_MESSAGE_CODE::JERR_OUT_OF_MEMORY, 11);
+        error::errexit1(
+            cinfo as ffi_types::j_common_ptr,
+            J_MESSAGE_CODE::JERR_OUT_OF_MEMORY,
+            11,
+        );
     }
 
     marker = (*cinfo).marker_list;

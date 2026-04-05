@@ -1,11 +1,11 @@
 use core::{mem::size_of, ptr};
 
 use ffi_types::{
-    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_decompress_struct, DSTATE_INHEADER,
-    DSTATE_RAW_OK, DSTATE_READY, DSTATE_SCANNING, DSTATE_START, DSTATE_STOPPING, FALSE,
-    JDCT_DEFAULT, JDITHER_FS, JPOOL_PERMANENT, JCS_CMYK, JCS_GRAYSCALE, JCS_RGB, JCS_UNKNOWN,
-    JCS_YCCK, JCS_YCbCr, JHUFF_TBL, JPEG_HEADER_OK, JPEG_HEADER_TABLES_ONLY, JPEG_LIB_VERSION,
-    JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_SUSPENDED, J_MESSAGE_CODE, NUM_HUFF_TBLS, TRUE,
+    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_decompress_struct, JCS_YCbCr,
+    DSTATE_INHEADER, DSTATE_RAW_OK, DSTATE_READY, DSTATE_SCANNING, DSTATE_START, DSTATE_STOPPING,
+    FALSE, JCS_CMYK, JCS_GRAYSCALE, JCS_RGB, JCS_UNKNOWN, JCS_YCCK, JDCT_DEFAULT, JDITHER_FS,
+    JHUFF_TBL, JPEG_HEADER_OK, JPEG_HEADER_TABLES_ONLY, JPEG_LIB_VERSION, JPEG_REACHED_EOI,
+    JPEG_REACHED_SOS, JPEG_SUSPENDED, JPOOL_PERMANENT, J_MESSAGE_CODE, NUM_HUFF_TBLS, TRUE,
 };
 
 use crate::{
@@ -14,11 +14,7 @@ use crate::{
 };
 
 #[allow(non_snake_case)]
-pub unsafe fn jpeg_CreateDecompress(
-    cinfo: j_decompress_ptr,
-    version: int,
-    structsize: usize,
-) {
+pub unsafe fn jpeg_CreateDecompress(cinfo: j_decompress_ptr, version: int, structsize: usize) {
     registry::clear_decompress_policy(cinfo);
     (*cinfo).mem = ptr::null_mut();
     if version != JPEG_LIB_VERSION {

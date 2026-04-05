@@ -27,7 +27,9 @@ unsafe fn update_policy(cinfo: j_decompress_ptr, update: impl FnOnce(&mut Decomp
     }
 
     let key = decode_key(cinfo);
-    let mut policies = decode_policies().lock().expect("decode policy mutex poisoned");
+    let mut policies = decode_policies()
+        .lock()
+        .expect("decode policy mutex poisoned");
     let policy = policies.entry(key).or_default();
     update(policy);
     if *policy == DecompressPolicy::default() {
@@ -99,7 +101,11 @@ pub unsafe fn decompress_scan_limit_exceeded(cinfo: j_decompress_ptr) -> Option<
 }
 
 pub unsafe fn warnings_fatal_flag(value: bool) -> boolean {
-    if value { TRUE } else { FALSE }
+    if value {
+        TRUE
+    } else {
+        FALSE
+    }
 }
 
 pub unsafe fn decompress_warnings_fatal_flag(cinfo: j_decompress_ptr) -> boolean {

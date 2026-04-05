@@ -2,8 +2,8 @@ use core::{ffi::c_void, mem::size_of, ptr};
 
 use ffi_types::{
     boolean, int, j_common_ptr, j_compress_ptr, j_decompress_ptr, jpeg_destination_mgr,
-    jpeg_source_mgr, long, size_t, FILE, JOCTET, JPOOL_IMAGE, JPOOL_PERMANENT, J_MESSAGE_CODE,
-    JPEG_EOI, FALSE, TRUE,
+    jpeg_source_mgr, long, size_t, FALSE, FILE, JOCTET, JPEG_EOI, JPOOL_IMAGE, JPOOL_PERMANENT,
+    J_MESSAGE_CODE, TRUE,
 };
 
 use crate::common::error;
@@ -71,14 +71,19 @@ unsafe fn has_mem_dest_manager(dest: *mut jpeg_destination_mgr) -> bool {
 }
 
 unsafe extern "C" fn init_source(cinfo: j_decompress_ptr) {
-    (*( (*cinfo).src as *mut MySourceMgr )).start_of_file = TRUE;
+    (*((*cinfo).src as *mut MySourceMgr)).start_of_file = TRUE;
 }
 
 unsafe extern "C" fn init_mem_source(_cinfo: j_decompress_ptr) {}
 
 unsafe extern "C" fn fill_input_buffer(cinfo: j_decompress_ptr) -> boolean {
     let src = (*cinfo).src as *mut MySourceMgr;
-    let mut nbytes = fread((*src).buffer as *mut c_void, 1, INPUT_BUF_SIZE, (*src).infile);
+    let mut nbytes = fread(
+        (*src).buffer as *mut c_void,
+        1,
+        INPUT_BUF_SIZE,
+        (*src).infile,
+    );
     if nbytes == 0 {
         if (*src).start_of_file != FALSE {
             error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_INPUT_EMPTY);
@@ -119,9 +124,9 @@ unsafe extern "C" fn term_source(_cinfo: j_decompress_ptr) {}
 
 unsafe extern "C" fn init_destination(cinfo: j_compress_ptr) {
     let dest = (*cinfo).dest as *mut MyDestinationMgr;
-    (*dest).buffer = (*(*cinfo).mem)
-        .alloc_small
-        .unwrap()(cinfo as j_common_ptr, JPOOL_IMAGE, OUTPUT_BUF_SIZE) as *mut JOCTET;
+    (*dest).buffer =
+        (*(*cinfo).mem).alloc_small.unwrap()(cinfo as j_common_ptr, JPOOL_IMAGE, OUTPUT_BUF_SIZE)
+            as *mut JOCTET;
     (*(*cinfo).dest).next_output_byte = (*dest).buffer;
     (*(*cinfo).dest).free_in_buffer = OUTPUT_BUF_SIZE;
 }
@@ -130,7 +135,13 @@ unsafe extern "C" fn init_mem_destination(_cinfo: j_compress_ptr) {}
 
 unsafe extern "C" fn empty_output_buffer(cinfo: j_compress_ptr) -> boolean {
     let dest = (*cinfo).dest as *mut MyDestinationMgr;
-    if fwrite((*dest).buffer as *const c_void, 1, OUTPUT_BUF_SIZE, (*dest).outfile) != OUTPUT_BUF_SIZE {
+    if fwrite(
+        (*dest).buffer as *const c_void,
+        1,
+        OUTPUT_BUF_SIZE,
+        (*dest).outfile,
+    ) != OUTPUT_BUF_SIZE
+    {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_FILE_WRITE);
     }
     (*(*cinfo).dest).next_output_byte = (*dest).buffer;
@@ -143,7 +154,11 @@ unsafe extern "C" fn empty_mem_output_buffer(cinfo: j_compress_ptr) -> boolean {
     let nextsize = (*dest).bufsize * 2;
     let nextbuffer = malloc(nextsize) as *mut JOCTET;
     if nextbuffer.is_null() {
-        error::errexit1(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_OUT_OF_MEMORY, 10);
+        error::errexit1(
+            cinfo as j_common_ptr,
+            J_MESSAGE_CODE::JERR_OUT_OF_MEMORY,
+            10,
+        );
     }
     ptr::copy_nonoverlapping((*dest).buffer, nextbuffer, (*dest).bufsize);
     free((*dest).newbuffer as *mut c_void);
@@ -158,7 +173,14 @@ unsafe extern "C" fn empty_mem_output_buffer(cinfo: j_compress_ptr) -> boolean {
 unsafe extern "C" fn term_destination(cinfo: j_compress_ptr) {
     let dest = (*cinfo).dest as *mut MyDestinationMgr;
     let datacount = OUTPUT_BUF_SIZE - (*(*cinfo).dest).free_in_buffer;
-    if datacount > 0 && fwrite((*dest).buffer as *const c_void, 1, datacount, (*dest).outfile) != datacount {
+    if datacount > 0
+        && fwrite(
+            (*dest).buffer as *const c_void,
+            1,
+            datacount,
+            (*dest).outfile,
+        ) != datacount
+    {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_FILE_WRITE);
     }
     let _ = fflush((*dest).outfile);
@@ -175,15 +197,17 @@ unsafe extern "C" fn term_mem_destination(cinfo: j_compress_ptr) {
 
 pub unsafe fn jpeg_stdio_src(cinfo: j_decompress_ptr, infile: *mut FILE) {
     if (*cinfo).src.is_null() {
-        let src = (*(*cinfo).mem)
-            .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MySourceMgr>())
-            as *mut MySourceMgr;
+        let src = (*(*cinfo).mem).alloc_small.unwrap()(
+            cinfo as j_common_ptr,
+            JPOOL_PERMANENT,
+            size_of::<MySourceMgr>(),
+        ) as *mut MySourceMgr;
         ptr::write_bytes(src as *mut u8, 0, size_of::<MySourceMgr>());
-        (*src).buffer = (*(*cinfo).mem)
-            .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, INPUT_BUF_SIZE)
-            as *mut JOCTET;
+        (*src).buffer = (*(*cinfo).mem).alloc_small.unwrap()(
+            cinfo as j_common_ptr,
+            JPOOL_PERMANENT,
+            INPUT_BUF_SIZE,
+        ) as *mut JOCTET;
         (*cinfo).src = &mut (*src).pub_;
     } else if !has_stdio_src_manager((*cinfo).src) {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
@@ -205,10 +229,11 @@ pub unsafe fn jpeg_mem_src(cinfo: j_decompress_ptr, inbuffer: *const u8, insize:
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_INPUT_EMPTY);
     }
     if (*cinfo).src.is_null() {
-        let src = (*(*cinfo).mem)
-            .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<jpeg_source_mgr>())
-            as *mut jpeg_source_mgr;
+        let src = (*(*cinfo).mem).alloc_small.unwrap()(
+            cinfo as j_common_ptr,
+            JPOOL_PERMANENT,
+            size_of::<jpeg_source_mgr>(),
+        ) as *mut jpeg_source_mgr;
         ptr::write_bytes(src as *mut u8, 0, size_of::<jpeg_source_mgr>());
         (*cinfo).src = src;
     } else if !has_mem_src_manager((*cinfo).src) {
@@ -227,10 +252,11 @@ pub unsafe fn jpeg_mem_src(cinfo: j_decompress_ptr, inbuffer: *const u8, insize:
 
 pub unsafe fn jpeg_stdio_dest(cinfo: j_compress_ptr, outfile: *mut FILE) {
     if (*cinfo).dest.is_null() {
-        let dest = (*(*cinfo).mem)
-            .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MyDestinationMgr>())
-            as *mut MyDestinationMgr;
+        let dest = (*(*cinfo).mem).alloc_small.unwrap()(
+            cinfo as j_common_ptr,
+            JPOOL_PERMANENT,
+            size_of::<MyDestinationMgr>(),
+        ) as *mut MyDestinationMgr;
         ptr::write_bytes(dest as *mut u8, 0, size_of::<MyDestinationMgr>());
         (*cinfo).dest = &mut (*dest).pub_;
     } else if !has_stdio_dest_manager((*cinfo).dest) {
@@ -253,10 +279,11 @@ pub unsafe fn jpeg_mem_dest(
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_BUFFER_SIZE);
     }
     if (*cinfo).dest.is_null() {
-        let dest = (*(*cinfo).mem)
-            .alloc_small
-            .unwrap()(cinfo as j_common_ptr, JPOOL_PERMANENT, size_of::<MyMemDestinationMgr>())
-            as *mut MyMemDestinationMgr;
+        let dest = (*(*cinfo).mem).alloc_small.unwrap()(
+            cinfo as j_common_ptr,
+            JPOOL_PERMANENT,
+            size_of::<MyMemDestinationMgr>(),
+        ) as *mut MyMemDestinationMgr;
         ptr::write_bytes(dest as *mut u8, 0, size_of::<MyMemDestinationMgr>());
         (*cinfo).dest = &mut (*dest).pub_;
     } else if !has_mem_dest_manager((*cinfo).dest) {
@@ -274,7 +301,11 @@ pub unsafe fn jpeg_mem_dest(
     if (*outbuffer).is_null() || *outsize == 0 {
         (*dest).newbuffer = malloc(OUTPUT_BUF_SIZE) as *mut u8;
         if (*dest).newbuffer.is_null() {
-            error::errexit1(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_OUT_OF_MEMORY, 10);
+            error::errexit1(
+                cinfo as j_common_ptr,
+                J_MESSAGE_CODE::JERR_OUT_OF_MEMORY,
+                10,
+            );
         }
         *outbuffer = (*dest).newbuffer;
         *outsize = OUTPUT_BUF_SIZE as ffi_types::ulong;

@@ -164,7 +164,8 @@ pub union jpeg_error_mgr_msg_parm_union {
     pub s: [::core::ffi::c_char; JMSG_STR_PARM_MAX],
 }
 
-pub type jpeg_marker_parser_method = Option<unsafe extern "C" fn(cinfo: j_decompress_ptr) -> boolean>;
+pub type jpeg_marker_parser_method =
+    Option<unsafe extern "C" fn(cinfo: j_decompress_ptr) -> boolean>;
 pub type inverse_DCT_method_ptr = Option<
     unsafe extern "C" fn(
         cinfo: j_decompress_ptr,
@@ -303,10 +304,20 @@ pub struct jpeg_source_mgr {
 
 #[repr(C)]
 pub struct jpeg_memory_mgr {
-    pub alloc_small:
-        Option<unsafe extern "C" fn(cinfo: j_common_ptr, pool_id: int, sizeofobject: size_t) -> *mut c_void>,
-    pub alloc_large:
-        Option<unsafe extern "C" fn(cinfo: j_common_ptr, pool_id: int, sizeofobject: size_t) -> *mut c_void>,
+    pub alloc_small: Option<
+        unsafe extern "C" fn(
+            cinfo: j_common_ptr,
+            pool_id: int,
+            sizeofobject: size_t,
+        ) -> *mut c_void,
+    >,
+    pub alloc_large: Option<
+        unsafe extern "C" fn(
+            cinfo: j_common_ptr,
+            pool_id: int,
+            sizeofobject: size_t,
+        ) -> *mut c_void,
+    >,
     pub alloc_sarray: Option<
         unsafe extern "C" fn(
             cinfo: j_common_ptr,
@@ -570,8 +581,7 @@ pub struct jpeg_comp_master {
 
 #[repr(C)]
 pub struct jpeg_c_main_controller {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
     pub process_data: Option<
         unsafe extern "C" fn(
             cinfo: j_compress_ptr,
@@ -584,8 +594,7 @@ pub struct jpeg_c_main_controller {
 
 #[repr(C)]
 pub struct jpeg_c_prep_controller {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
     pub pre_process_data: Option<
         unsafe extern "C" fn(
             cinfo: j_compress_ptr,
@@ -601,8 +610,7 @@ pub struct jpeg_c_prep_controller {
 
 #[repr(C)]
 pub struct jpeg_c_coef_controller {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_compress_ptr, pass_mode: J_BUF_MODE)>,
     pub compress_data:
         Option<unsafe extern "C" fn(cinfo: j_compress_ptr, input_buf: JSAMPIMAGE) -> boolean>,
 }
@@ -654,8 +662,7 @@ pub struct jpeg_forward_dct {
 
 #[repr(C)]
 pub struct jpeg_entropy_encoder {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_compress_ptr, gather_statistics: boolean)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_compress_ptr, gather_statistics: boolean)>,
     pub encode_mcu:
         Option<unsafe extern "C" fn(cinfo: j_compress_ptr, MCU_data: *mut JBLOCKROW) -> boolean>,
     pub finish_pass: Option<unsafe extern "C" fn(cinfo: j_compress_ptr)>,
@@ -699,8 +706,7 @@ pub struct jpeg_input_controller {
 
 #[repr(C)]
 pub struct jpeg_d_main_controller {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, pass_mode: J_BUF_MODE)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, pass_mode: J_BUF_MODE)>,
     pub process_data: Option<
         unsafe extern "C" fn(
             cinfo: j_decompress_ptr,
@@ -723,8 +729,7 @@ pub struct jpeg_d_coef_controller {
 
 #[repr(C)]
 pub struct jpeg_d_post_controller {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, pass_mode: J_BUF_MODE)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, pass_mode: J_BUF_MODE)>,
     pub post_process_data: Option<
         unsafe extern "C" fn(
             cinfo: j_decompress_ptr,
@@ -796,8 +801,7 @@ pub struct jpeg_color_deconverter {
 
 #[repr(C)]
 pub struct jpeg_color_quantizer {
-    pub start_pass:
-        Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, is_pre_scan: boolean)>,
+    pub start_pass: Option<unsafe extern "C" fn(cinfo: j_decompress_ptr, is_pre_scan: boolean)>,
     pub color_quantize: Option<
         unsafe extern "C" fn(
             cinfo: j_decompress_ptr,

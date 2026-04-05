@@ -2,18 +2,16 @@ use std::{
     ffi::{c_char, c_int, c_ulong, CStr, CString},
     fs,
     path::Path,
-    ptr,
-    slice,
+    ptr, slice,
 };
 
 use jpeg_core::ported::turbojpeg::{
     tjutil,
     turbojpeg::{
-        colorspace_name, scaled, subsamp_name, tjscalingfactor, TJPF_BGRX, TJPF_GRAY,
-        TJPF_UNKNOWN, TJSAMP_444, TJSAMP_GRAY, TJXOP_HFLIP, TJXOP_NONE, TJXOP_ROT180,
-        TJXOP_ROT270, TJXOP_ROT90, TJXOP_TRANSPOSE, TJXOP_TRANSVERSE, TJXOP_VFLIP,
-        TJXOPT_CROP, TJXOPT_GRAY, TJXOPT_TRIM, TJFLAG_ACCURATEDCT, TJFLAG_FASTDCT,
-        TJFLAG_FASTUPSAMPLE, TJ_PIXEL_SIZE,
+        colorspace_name, scaled, subsamp_name, tjscalingfactor, TJFLAG_ACCURATEDCT, TJFLAG_FASTDCT,
+        TJFLAG_FASTUPSAMPLE, TJPF_BGRX, TJPF_GRAY, TJPF_UNKNOWN, TJSAMP_444, TJSAMP_GRAY,
+        TJXOPT_CROP, TJXOPT_GRAY, TJXOPT_TRIM, TJXOP_HFLIP, TJXOP_NONE, TJXOP_ROT180, TJXOP_ROT270,
+        TJXOP_ROT90, TJXOP_TRANSPOSE, TJXOP_TRANSVERSE, TJXOP_VFLIP, TJ_PIXEL_SIZE,
     },
 };
 use libturbojpeg_abi::non_jni as tj;
@@ -182,7 +180,8 @@ fn run() -> Result<(), String> {
         let mut jpeg_size = c_ulong::try_from(jpeg_bytes.len())
             .map_err(|_| format!("input file too large: {}", input_path.display()))?;
         let handle = if do_transform {
-            let handle = TjInstance::new(unsafe { tj::tjInitTransform() }, "initializing transformer")?;
+            let handle =
+                TjInstance::new(unsafe { tj::tjInitTransform() }, "initializing transformer")?;
             xform.options |= TJXOPT_TRIM;
             let mut dst_buf = ptr::null_mut();
             let mut dst_size = 0 as c_ulong;
@@ -252,10 +251,9 @@ fn run() -> Result<(), String> {
             && out_subsamp < 0
             && out_qual < 0
         {
-            fs::write(
-                output_path,
-                unsafe { slice::from_raw_parts(jpeg_ptr, jpeg_size as usize) },
-            )
+            fs::write(output_path, unsafe {
+                slice::from_raw_parts(jpeg_ptr, jpeg_size as usize)
+            })
             .map_err(|error| format!("writing output file {}: {error}", output_path.display()))?;
             return Ok(());
         }
@@ -300,7 +298,10 @@ fn run() -> Result<(), String> {
             )
         };
         if raw.is_null() {
-            return Err(format!("loading input image: {}", tj_error(ptr::null_mut())));
+            return Err(format!(
+                "loading input image: {}",
+                tj_error(ptr::null_mut())
+            ));
         }
         image = ImageBuffer::Turbo(OwnedTjBuffer::from_raw(raw));
         if out_subsamp < 0 {
@@ -363,7 +364,10 @@ fn run() -> Result<(), String> {
                 0,
             ) < 0
             {
-                return Err(format!("saving output image: {}", tj_error(ptr::null_mut())));
+                return Err(format!(
+                    "saving output image: {}",
+                    tj_error(ptr::null_mut())
+                ));
             }
         }
     }
@@ -419,7 +423,11 @@ fn parse_crop_spec(spec: &str) -> Option<(c_int, c_int, c_int, c_int)> {
     (w > 0 && h > 0 && x >= 0 && y >= 0).then_some((w, h, x, y))
 }
 
-fn checked_image_buffer_len(width: c_int, height: c_int, pixel_format: c_int) -> Result<usize, String> {
+fn checked_image_buffer_len(
+    width: c_int,
+    height: c_int,
+    pixel_format: c_int,
+) -> Result<usize, String> {
     let pixel_size = *TJ_PIXEL_SIZE
         .get(pixel_format as usize)
         .ok_or_else(|| format!("unsupported pixel format: {pixel_format}"))?;

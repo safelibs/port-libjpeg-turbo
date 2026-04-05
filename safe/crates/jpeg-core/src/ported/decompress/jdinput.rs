@@ -1,10 +1,10 @@
 use core::{mem::size_of, ptr};
 
 use ffi_types::{
-    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_input_controller, JQUANT_TBL,
-    J_MESSAGE_CODE, DCTSIZE, DCTSIZE2, D_MAX_BLOCKS_IN_MCU, FALSE, JPEG_MAX_DIMENSION,
-    JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPOOL_IMAGE, JPOOL_PERMANENT, JPEG_SUSPENDED,
-    MAX_COMPONENTS, MAX_COMPS_IN_SCAN, MAX_SAMP_FACTOR, NUM_QUANT_TBLS, TRUE,
+    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_input_controller, DCTSIZE, DCTSIZE2,
+    D_MAX_BLOCKS_IN_MCU, FALSE, JPEG_MAX_DIMENSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS,
+    JPEG_SUSPENDED, JPOOL_IMAGE, JPOOL_PERMANENT, JQUANT_TBL, J_MESSAGE_CODE, MAX_COMPONENTS,
+    MAX_COMPS_IN_SCAN, MAX_SAMP_FACTOR, NUM_QUANT_TBLS, TRUE,
 };
 
 use crate::common::{error, registry, utils};

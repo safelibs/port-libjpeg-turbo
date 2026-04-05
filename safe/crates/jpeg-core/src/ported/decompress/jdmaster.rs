@@ -2,10 +2,10 @@ use core::ptr;
 
 use ffi_types::{
     boolean, int, j_common_ptr, j_decompress_ptr, jpeg_color_quantizer, jpeg_decomp_master,
-    JDIMENSION, JBUF_CRANK_DEST, JBUF_PASS_THRU, JBUF_SAVE_AND_PASS, JCS_CMYK, JCS_EXT_ABGR,
-    JCS_EXT_ARGB, JCS_EXT_BGR, JCS_EXT_BGRA, JCS_EXT_BGRX, JCS_EXT_RGB, JCS_EXT_RGBA,
+    JCS_YCbCr, CENTERJSAMPLE, FALSE, JBUF_CRANK_DEST, JBUF_PASS_THRU, JBUF_SAVE_AND_PASS, JCS_CMYK,
+    JCS_EXT_ABGR, JCS_EXT_ARGB, JCS_EXT_BGR, JCS_EXT_BGRA, JCS_EXT_BGRX, JCS_EXT_RGB, JCS_EXT_RGBA,
     JCS_EXT_RGBX, JCS_EXT_XBGR, JCS_EXT_XRGB, JCS_GRAYSCALE, JCS_RGB, JCS_RGB565, JCS_YCCK,
-    JCS_YCbCr, J_MESSAGE_CODE, MAXJSAMPLE, CENTERJSAMPLE, FALSE, TRUE,
+    JDIMENSION, J_MESSAGE_CODE, MAXJSAMPLE, TRUE,
 };
 
 use crate::{
@@ -84,17 +84,8 @@ unsafe fn use_merged_upsample(cinfo: j_decompress_ptr) -> boolean {
     }
 
     match (*cinfo).out_color_space {
-        JCS_RGB
-        | JCS_RGB565
-        | JCS_EXT_RGB
-        | JCS_EXT_RGBX
-        | JCS_EXT_BGR
-        | JCS_EXT_BGRX
-        | JCS_EXT_XBGR
-        | JCS_EXT_XRGB
-        | JCS_EXT_RGBA
-        | JCS_EXT_BGRA
-        | JCS_EXT_ABGR
+        JCS_RGB | JCS_RGB565 | JCS_EXT_RGB | JCS_EXT_RGBX | JCS_EXT_BGR | JCS_EXT_BGRX
+        | JCS_EXT_XBGR | JCS_EXT_XRGB | JCS_EXT_RGBA | JCS_EXT_BGRA | JCS_EXT_ABGR
         | JCS_EXT_ARGB => {}
         _ => return FALSE,
     }
@@ -169,8 +160,8 @@ unsafe fn master_selection(cinfo: j_decompress_ptr) {
     jpeg_calc_output_dimensions(cinfo);
     prepare_range_limit_table(cinfo);
 
-    let samplesperrow = (*cinfo).output_width as ffi_types::long
-        * (*cinfo).out_color_components as ffi_types::long;
+    let samplesperrow =
+        (*cinfo).output_width as ffi_types::long * (*cinfo).out_color_components as ffi_types::long;
     let jd_samplesperrow = samplesperrow as JDIMENSION;
     if jd_samplesperrow as ffi_types::long != samplesperrow {
         error::errexit(cinfo as j_common_ptr, J_MESSAGE_CODE::JERR_WIDTH_OVERFLOW);
@@ -256,11 +247,14 @@ unsafe fn master_selection(cinfo: j_decompress_ptr) {
             (*cinfo).num_components
         };
         (*(*cinfo).progress).pass_counter = 0;
-        (*(*cinfo).progress).pass_limit = (*cinfo).total_iMCU_rows as ffi_types::long
-            * nscans as ffi_types::long;
+        (*(*cinfo).progress).pass_limit =
+            (*cinfo).total_iMCU_rows as ffi_types::long * nscans as ffi_types::long;
         (*(*cinfo).progress).completed_passes = 0;
-        (*(*cinfo).progress).total_passes =
-            if (*cinfo).enable_2pass_quant != FALSE { 3 } else { 2 };
+        (*(*cinfo).progress).total_passes = if (*cinfo).enable_2pass_quant != FALSE {
+            3
+        } else {
+            2
+        };
         (*master).pass_number += 1;
     }
 }
@@ -309,11 +303,18 @@ unsafe extern "C" fn prepare_for_output_pass(cinfo: j_decompress_ptr) {
 
     if !(*cinfo).progress.is_null() {
         (*(*cinfo).progress).completed_passes = (*master).pass_number;
-        (*(*cinfo).progress).total_passes =
-            (*master).pass_number + if (*master).pub_.is_dummy_pass != FALSE { 2 } else { 1 };
+        (*(*cinfo).progress).total_passes = (*master).pass_number
+            + if (*master).pub_.is_dummy_pass != FALSE {
+                2
+            } else {
+                1
+            };
         if (*cinfo).buffered_image != FALSE && (*(*cinfo).inputctl).eoi_reached == FALSE {
-            (*(*cinfo).progress).total_passes +=
-                if (*cinfo).enable_2pass_quant != FALSE { 2 } else { 1 };
+            (*(*cinfo).progress).total_passes += if (*cinfo).enable_2pass_quant != FALSE {
+                2
+            } else {
+                1
+            };
         }
     }
 }

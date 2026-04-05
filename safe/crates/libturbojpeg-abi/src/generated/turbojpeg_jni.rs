@@ -340,13 +340,15 @@ pub struct JNINativeInterface_ {
     pub CallBooleanMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jboolean>,
     pub CallByteMethod: Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) -> jbyte>,
-    pub CallByteMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jbyte>,
+    pub CallByteMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jbyte,
+    >,
     pub CallByteMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jbyte>,
     pub CallCharMethod: Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) -> jchar>,
-    pub CallCharMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jchar>,
+    pub CallCharMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jchar,
+    >,
     pub CallCharMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jchar>,
     pub CallShortMethod:
@@ -357,13 +359,15 @@ pub struct JNINativeInterface_ {
     pub CallShortMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jshort>,
     pub CallIntMethod: Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) -> jint>,
-    pub CallIntMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jint>,
+    pub CallIntMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jint,
+    >,
     pub CallIntMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jint>,
     pub CallLongMethod: Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) -> jlong>,
-    pub CallLongMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jlong>,
+    pub CallLongMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> jlong,
+    >,
     pub CallLongMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jlong>,
     pub CallFloatMethod:
@@ -381,8 +385,9 @@ pub struct JNINativeInterface_ {
     pub CallDoubleMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> jdouble>,
     pub CallVoidMethod: Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, ...) -> ()>,
-    pub CallVoidMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> ()>,
+    pub CallVoidMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *mut ::core::ffi::c_void) -> (),
+    >,
     pub CallVoidMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jmethodID, *const jvalue) -> ()>,
     pub CallNonvirtualObjectMethod:
@@ -416,7 +421,13 @@ pub struct JNINativeInterface_ {
     pub CallNonvirtualByteMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, ...) -> jbyte>,
     pub CallNonvirtualByteMethodV: Option<
-        unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *mut ::core::ffi::c_void) -> jbyte,
+        unsafe extern "C" fn(
+            *mut JNIEnv,
+            jobject,
+            jclass,
+            jmethodID,
+            *mut ::core::ffi::c_void,
+        ) -> jbyte,
     >,
     pub CallNonvirtualByteMethodA: Option<
         unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *const jvalue) -> jbyte,
@@ -424,7 +435,13 @@ pub struct JNINativeInterface_ {
     pub CallNonvirtualCharMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, ...) -> jchar>,
     pub CallNonvirtualCharMethodV: Option<
-        unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *mut ::core::ffi::c_void) -> jchar,
+        unsafe extern "C" fn(
+            *mut JNIEnv,
+            jobject,
+            jclass,
+            jmethodID,
+            *mut ::core::ffi::c_void,
+        ) -> jchar,
     >,
     pub CallNonvirtualCharMethodA: Option<
         unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *const jvalue) -> jchar,
@@ -446,7 +463,13 @@ pub struct JNINativeInterface_ {
     pub CallNonvirtualIntMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, ...) -> jint>,
     pub CallNonvirtualIntMethodV: Option<
-        unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *mut ::core::ffi::c_void) -> jint,
+        unsafe extern "C" fn(
+            *mut JNIEnv,
+            jobject,
+            jclass,
+            jmethodID,
+            *mut ::core::ffi::c_void,
+        ) -> jint,
     >,
     pub CallNonvirtualIntMethodA: Option<
         unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *const jvalue) -> jint,
@@ -454,7 +477,13 @@ pub struct JNINativeInterface_ {
     pub CallNonvirtualLongMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, ...) -> jlong>,
     pub CallNonvirtualLongMethodV: Option<
-        unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *mut ::core::ffi::c_void) -> jlong,
+        unsafe extern "C" fn(
+            *mut JNIEnv,
+            jobject,
+            jclass,
+            jmethodID,
+            *mut ::core::ffi::c_void,
+        ) -> jlong,
     >,
     pub CallNonvirtualLongMethodA: Option<
         unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *const jvalue) -> jlong,
@@ -490,7 +519,13 @@ pub struct JNINativeInterface_ {
     pub CallNonvirtualVoidMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, ...) -> ()>,
     pub CallNonvirtualVoidMethodV: Option<
-        unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *mut ::core::ffi::c_void) -> (),
+        unsafe extern "C" fn(
+            *mut JNIEnv,
+            jobject,
+            jclass,
+            jmethodID,
+            *mut ::core::ffi::c_void,
+        ) -> (),
     >,
     pub CallNonvirtualVoidMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jobject, jclass, jmethodID, *const jvalue) -> ()>,
@@ -545,38 +580,44 @@ pub struct JNINativeInterface_ {
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jboolean>,
     pub CallStaticByteMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jbyte>,
-    pub CallStaticByteMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jbyte>,
+    pub CallStaticByteMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jbyte,
+    >,
     pub CallStaticByteMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jbyte>,
     pub CallStaticCharMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jchar>,
-    pub CallStaticCharMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jchar>,
+    pub CallStaticCharMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jchar,
+    >,
     pub CallStaticCharMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jchar>,
     pub CallStaticShortMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jshort>,
-    pub CallStaticShortMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jshort>,
+    pub CallStaticShortMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jshort,
+    >,
     pub CallStaticShortMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jshort>,
     pub CallStaticIntMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jint>,
-    pub CallStaticIntMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jint>,
+    pub CallStaticIntMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jint,
+    >,
     pub CallStaticIntMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jint>,
     pub CallStaticLongMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jlong>,
-    pub CallStaticLongMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jlong>,
+    pub CallStaticLongMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jlong,
+    >,
     pub CallStaticLongMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jlong>,
     pub CallStaticFloatMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> jfloat>,
-    pub CallStaticFloatMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jfloat>,
+    pub CallStaticFloatMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> jfloat,
+    >,
     pub CallStaticFloatMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jfloat>,
     pub CallStaticDoubleMethod:
@@ -588,8 +629,9 @@ pub struct JNINativeInterface_ {
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> jdouble>,
     pub CallStaticVoidMethod:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, ...) -> ()>,
-    pub CallStaticVoidMethodV:
-        Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> ()>,
+    pub CallStaticVoidMethodV: Option<
+        unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *mut ::core::ffi::c_void) -> (),
+    >,
     pub CallStaticVoidMethodA:
         Option<unsafe extern "C" fn(*mut JNIEnv, jclass, jmethodID, *const jvalue) -> ()>,
     pub GetStaticFieldID: Option<

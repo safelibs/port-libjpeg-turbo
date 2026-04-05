@@ -1,8 +1,6 @@
 use core::ptr;
 
-use ffi_types::{
-    j_decompress_ptr, jpeg_component_info, JCOEFPTR, JSAMPARRAY, JSAMPLE, JDIMENSION,
-};
+use ffi_types::{j_decompress_ptr, jpeg_component_info, JCOEFPTR, JDIMENSION, JSAMPARRAY, JSAMPLE};
 
 use crate::ported::decompress::jidctred;
 
@@ -148,13 +146,7 @@ macro_rules! rect_idct_wrapper {
             output_col: JDIMENSION,
         ) {
             jpeg_idct_rect_bridge(
-                cinfo,
-                compptr,
-                coef_block,
-                output_buf,
-                output_col,
-                $width,
-                $height,
+                cinfo, compptr, coef_block, output_buf, output_col, $width, $height,
             )
         }
     };

@@ -302,7 +302,10 @@ fn abi_layouts_match_headers() {
 
     macro_rules! check_off {
         ($label:literal, $ty:ty, $field:tt) => {
-            check(concat!("off:", $label, ".", stringify!($field)), offset_of!($ty, $field));
+            check(
+                concat!("off:", $label, ".", stringify!($field)),
+                offset_of!($ty, $field),
+            );
         };
     }
 
@@ -350,45 +353,149 @@ fn abi_layouts_match_headers() {
     check_off!("struct jpeg_common_struct", jpeg_common_struct, mem);
     check_off!("struct jpeg_common_struct", jpeg_common_struct, progress);
     check_off!("struct jpeg_common_struct", jpeg_common_struct, client_data);
-    check_off!("struct jpeg_common_struct", jpeg_common_struct, is_decompressor);
-    check_off!("struct jpeg_common_struct", jpeg_common_struct, global_state);
+    check_off!(
+        "struct jpeg_common_struct",
+        jpeg_common_struct,
+        is_decompressor
+    );
+    check_off!(
+        "struct jpeg_common_struct",
+        jpeg_common_struct,
+        global_state
+    );
     check_off!("struct jpeg_compress_struct", jpeg_compress_struct, dest);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, input_gamma);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, comp_info);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, quant_tbl_ptrs);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, q_scale_factor);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, arith_dc_L);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, raw_data_in);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, restart_interval);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, next_scanline);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, total_iMCU_rows);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, MCU_membership);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, block_size);
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        input_gamma
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        comp_info
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        quant_tbl_ptrs
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        q_scale_factor
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        arith_dc_L
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        raw_data_in
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        restart_interval
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        next_scanline
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        total_iMCU_rows
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        MCU_membership
+    );
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        block_size
+    );
     check_off!("struct jpeg_compress_struct", jpeg_compress_struct, master);
-    check_off!("struct jpeg_compress_struct", jpeg_compress_struct, script_space_size);
+    check_off!(
+        "struct jpeg_compress_struct",
+        jpeg_compress_struct,
+        script_space_size
+    );
     check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, src);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, out_color_space);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, output_gamma);
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        out_color_space
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        output_gamma
+    );
     check_off!(
         "struct jpeg_decompress_struct",
         jpeg_decompress_struct,
         desired_number_of_colors
     );
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, output_width);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, colormap);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, coef_bits);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, comp_info);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, arith_ac_K);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, marker_list);
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        output_width
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        colormap
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        coef_bits
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        comp_info
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        arith_ac_K
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        marker_list
+    );
     check_off!(
         "struct jpeg_decompress_struct",
         jpeg_decompress_struct,
         sample_range_limit
     );
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, MCU_membership);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, unread_marker);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, idct);
-    check_off!("struct jpeg_decompress_struct", jpeg_decompress_struct, cquantize);
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        MCU_membership
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        unread_marker
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        idct
+    );
+    check_off!(
+        "struct jpeg_decompress_struct",
+        jpeg_decompress_struct,
+        cquantize
+    );
     check_off!("struct jpeg_error_mgr", jpeg_error_mgr, error_exit);
     check_off!("struct jpeg_error_mgr", jpeg_error_mgr, emit_message);
     check_off!("struct jpeg_error_mgr", jpeg_error_mgr, output_message);
@@ -402,14 +509,26 @@ fn abi_layouts_match_headers() {
         jpeg_destination_mgr,
         next_output_byte
     );
-    check_off!("struct jpeg_destination_mgr", jpeg_destination_mgr, free_in_buffer);
-    check_off!("struct jpeg_destination_mgr", jpeg_destination_mgr, init_destination);
+    check_off!(
+        "struct jpeg_destination_mgr",
+        jpeg_destination_mgr,
+        free_in_buffer
+    );
+    check_off!(
+        "struct jpeg_destination_mgr",
+        jpeg_destination_mgr,
+        init_destination
+    );
     check_off!(
         "struct jpeg_destination_mgr",
         jpeg_destination_mgr,
         empty_output_buffer
     );
-    check_off!("struct jpeg_destination_mgr", jpeg_destination_mgr, term_destination);
+    check_off!(
+        "struct jpeg_destination_mgr",
+        jpeg_destination_mgr,
+        term_destination
+    );
     check_off!("struct jpeg_source_mgr", jpeg_source_mgr, next_input_byte);
     check_off!("struct jpeg_source_mgr", jpeg_source_mgr, bytes_in_buffer);
     check_off!("struct jpeg_source_mgr", jpeg_source_mgr, init_source);
@@ -421,39 +540,83 @@ fn abi_layouts_match_headers() {
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, alloc_large);
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, alloc_sarray);
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, alloc_barray);
-    check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, request_virt_sarray);
-    check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, request_virt_barray);
-    check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, realize_virt_arrays);
-    check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, access_virt_sarray);
-    check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, access_virt_barray);
+    check_off!(
+        "struct jpeg_memory_mgr",
+        jpeg_memory_mgr,
+        request_virt_sarray
+    );
+    check_off!(
+        "struct jpeg_memory_mgr",
+        jpeg_memory_mgr,
+        request_virt_barray
+    );
+    check_off!(
+        "struct jpeg_memory_mgr",
+        jpeg_memory_mgr,
+        realize_virt_arrays
+    );
+    check_off!(
+        "struct jpeg_memory_mgr",
+        jpeg_memory_mgr,
+        access_virt_sarray
+    );
+    check_off!(
+        "struct jpeg_memory_mgr",
+        jpeg_memory_mgr,
+        access_virt_barray
+    );
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, free_pool);
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, self_destruct);
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, max_memory_to_use);
     check_off!("struct jpeg_memory_mgr", jpeg_memory_mgr, max_alloc_chunk);
     check_off!("jpeg_component_info", jpeg_component_info, quant_table);
-    check_off!("struct jpeg_comp_master", jpeg_comp_master, prepare_for_pass);
+    check_off!(
+        "struct jpeg_comp_master",
+        jpeg_comp_master,
+        prepare_for_pass
+    );
     check_off!("struct jpeg_comp_master", jpeg_comp_master, pass_startup);
     check_off!("struct jpeg_comp_master", jpeg_comp_master, finish_pass);
-    check_off!("struct jpeg_comp_master", jpeg_comp_master, call_pass_startup);
-    check_off!("struct jpeg_c_main_controller", jpeg_c_main_controller, start_pass);
+    check_off!(
+        "struct jpeg_comp_master",
+        jpeg_comp_master,
+        call_pass_startup
+    );
+    check_off!(
+        "struct jpeg_c_main_controller",
+        jpeg_c_main_controller,
+        start_pass
+    );
     check_off!(
         "struct jpeg_c_main_controller",
         jpeg_c_main_controller,
         process_data
     );
-    check_off!("struct jpeg_c_prep_controller", jpeg_c_prep_controller, start_pass);
+    check_off!(
+        "struct jpeg_c_prep_controller",
+        jpeg_c_prep_controller,
+        start_pass
+    );
     check_off!(
         "struct jpeg_c_prep_controller",
         jpeg_c_prep_controller,
         pre_process_data
     );
-    check_off!("struct jpeg_c_coef_controller", jpeg_c_coef_controller, start_pass);
+    check_off!(
+        "struct jpeg_c_coef_controller",
+        jpeg_c_coef_controller,
+        start_pass
+    );
     check_off!(
         "struct jpeg_c_coef_controller",
         jpeg_c_coef_controller,
         compress_data
     );
-    check_off!("struct jpeg_color_converter", jpeg_color_converter, start_pass);
+    check_off!(
+        "struct jpeg_color_converter",
+        jpeg_color_converter,
+        start_pass
+    );
     check_off!(
         "struct jpeg_color_converter",
         jpeg_color_converter,
@@ -468,9 +631,21 @@ fn abi_layouts_match_headers() {
     );
     check_off!("struct jpeg_forward_dct", jpeg_forward_dct, start_pass);
     check_off!("struct jpeg_forward_dct", jpeg_forward_dct, forward_DCT);
-    check_off!("struct jpeg_entropy_encoder", jpeg_entropy_encoder, start_pass);
-    check_off!("struct jpeg_entropy_encoder", jpeg_entropy_encoder, encode_mcu);
-    check_off!("struct jpeg_entropy_encoder", jpeg_entropy_encoder, finish_pass);
+    check_off!(
+        "struct jpeg_entropy_encoder",
+        jpeg_entropy_encoder,
+        start_pass
+    );
+    check_off!(
+        "struct jpeg_entropy_encoder",
+        jpeg_entropy_encoder,
+        encode_mcu
+    );
+    check_off!(
+        "struct jpeg_entropy_encoder",
+        jpeg_entropy_encoder,
+        finish_pass
+    );
     check_off!(
         "struct jpeg_marker_writer",
         jpeg_marker_writer,
@@ -491,7 +666,11 @@ fn abi_layouts_match_headers() {
         jpeg_decomp_master,
         prepare_for_output_pass
     );
-    check_off!("struct jpeg_decomp_master", jpeg_decomp_master, first_MCU_col);
+    check_off!(
+        "struct jpeg_decomp_master",
+        jpeg_decomp_master,
+        first_MCU_col
+    );
     check_off!(
         "struct jpeg_decomp_master",
         jpeg_decomp_master,
@@ -507,8 +686,16 @@ fn abi_layouts_match_headers() {
         jpeg_input_controller,
         has_multiple_scans
     );
-    check_off!("struct jpeg_input_controller", jpeg_input_controller, eoi_reached);
-    check_off!("struct jpeg_d_main_controller", jpeg_d_main_controller, start_pass);
+    check_off!(
+        "struct jpeg_input_controller",
+        jpeg_input_controller,
+        eoi_reached
+    );
+    check_off!(
+        "struct jpeg_d_main_controller",
+        jpeg_d_main_controller,
+        start_pass
+    );
     check_off!(
         "struct jpeg_d_main_controller",
         jpeg_d_main_controller,
@@ -519,14 +706,26 @@ fn abi_layouts_match_headers() {
         jpeg_d_coef_controller,
         start_input_pass
     );
-    check_off!("struct jpeg_d_coef_controller", jpeg_d_coef_controller, consume_data);
+    check_off!(
+        "struct jpeg_d_coef_controller",
+        jpeg_d_coef_controller,
+        consume_data
+    );
     check_off!(
         "struct jpeg_d_coef_controller",
         jpeg_d_coef_controller,
         decompress_data
     );
-    check_off!("struct jpeg_d_coef_controller", jpeg_d_coef_controller, coef_arrays);
-    check_off!("struct jpeg_d_post_controller", jpeg_d_post_controller, start_pass);
+    check_off!(
+        "struct jpeg_d_coef_controller",
+        jpeg_d_coef_controller,
+        coef_arrays
+    );
+    check_off!(
+        "struct jpeg_d_post_controller",
+        jpeg_d_post_controller,
+        start_pass
+    );
     check_off!(
         "struct jpeg_d_post_controller",
         jpeg_d_post_controller,
@@ -537,15 +736,31 @@ fn abi_layouts_match_headers() {
         jpeg_marker_reader,
         reset_marker_reader
     );
-    check_off!("struct jpeg_marker_reader", jpeg_marker_reader, read_markers);
+    check_off!(
+        "struct jpeg_marker_reader",
+        jpeg_marker_reader,
+        read_markers
+    );
     check_off!(
         "struct jpeg_marker_reader",
         jpeg_marker_reader,
         read_restart_marker
     );
-    check_off!("struct jpeg_marker_reader", jpeg_marker_reader, discarded_bytes);
-    check_off!("struct jpeg_entropy_decoder", jpeg_entropy_decoder, start_pass);
-    check_off!("struct jpeg_entropy_decoder", jpeg_entropy_decoder, decode_mcu);
+    check_off!(
+        "struct jpeg_marker_reader",
+        jpeg_marker_reader,
+        discarded_bytes
+    );
+    check_off!(
+        "struct jpeg_entropy_decoder",
+        jpeg_entropy_decoder,
+        start_pass
+    );
+    check_off!(
+        "struct jpeg_entropy_decoder",
+        jpeg_entropy_decoder,
+        decode_mcu
+    );
     check_off!(
         "struct jpeg_entropy_decoder",
         jpeg_entropy_decoder,
@@ -566,14 +781,26 @@ fn abi_layouts_match_headers() {
         jpeg_color_deconverter,
         color_convert
     );
-    check_off!("struct jpeg_color_quantizer", jpeg_color_quantizer, start_pass);
+    check_off!(
+        "struct jpeg_color_quantizer",
+        jpeg_color_quantizer,
+        start_pass
+    );
     check_off!(
         "struct jpeg_color_quantizer",
         jpeg_color_quantizer,
         color_quantize
     );
-    check_off!("struct jpeg_color_quantizer", jpeg_color_quantizer, finish_pass);
-    check_off!("struct jpeg_color_quantizer", jpeg_color_quantizer, new_color_map);
+    check_off!(
+        "struct jpeg_color_quantizer",
+        jpeg_color_quantizer,
+        finish_pass
+    );
+    check_off!(
+        "struct jpeg_color_quantizer",
+        jpeg_color_quantizer,
+        new_color_map
+    );
 
     check_const!(JPEG_LIB_VERSION);
     check_const!(C_MAX_BLOCKS_IN_MCU);

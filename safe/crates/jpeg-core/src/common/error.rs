@@ -1,9 +1,9 @@
 use core::ffi::c_char;
 
 use ffi_types::{
-    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_error_mgr, JHUFF_TBL,
-    JQUANT_TBL, J_MESSAGE_CODE, CSTATE_START, DSTATE_START, FALSE, JMSG_LASTMSGCODE,
-    JMSG_LENGTH_MAX, JPEG_STD_MESSAGE_TABLE_LEN, JPOOL_NUMPOOLS, JPOOL_PERMANENT,
+    boolean, int, j_common_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_error_mgr, CSTATE_START,
+    DSTATE_START, FALSE, JHUFF_TBL, JMSG_LASTMSGCODE, JMSG_LENGTH_MAX, JPEG_STD_MESSAGE_TABLE_LEN,
+    JPOOL_NUMPOOLS, JPOOL_PERMANENT, JQUANT_TBL, J_MESSAGE_CODE,
 };
 
 use crate::common::{memory, registry};
@@ -397,16 +397,22 @@ pub unsafe fn destroy(cinfo: j_common_ptr) {
 
 pub unsafe fn alloc_quant_table(cinfo: j_common_ptr) -> *mut JQUANT_TBL {
     let alloc_small = (*(*cinfo).mem).alloc_small.unwrap();
-    let tbl = alloc_small(cinfo, ffi_types::JPOOL_PERMANENT, core::mem::size_of::<JQUANT_TBL>())
-        as *mut JQUANT_TBL;
+    let tbl = alloc_small(
+        cinfo,
+        ffi_types::JPOOL_PERMANENT,
+        core::mem::size_of::<JQUANT_TBL>(),
+    ) as *mut JQUANT_TBL;
     (*tbl).sent_table = FALSE as boolean;
     tbl
 }
 
 pub unsafe fn alloc_huff_table(cinfo: j_common_ptr) -> *mut JHUFF_TBL {
     let alloc_small = (*(*cinfo).mem).alloc_small.unwrap();
-    let tbl = alloc_small(cinfo, ffi_types::JPOOL_PERMANENT, core::mem::size_of::<JHUFF_TBL>())
-        as *mut JHUFF_TBL;
+    let tbl = alloc_small(
+        cinfo,
+        ffi_types::JPOOL_PERMANENT,
+        core::mem::size_of::<JHUFF_TBL>(),
+    ) as *mut JHUFF_TBL;
     (*tbl).sent_table = FALSE as boolean;
     tbl
 }

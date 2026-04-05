@@ -8,7 +8,7 @@ MODE="reproduce"
 
 usage() {
   cat <<'EOF'
-usage: run-dependent-regressions.sh [--mode reproduce] [--summary <path>]
+usage: run-dependent-regressions.sh [--mode reproduce|verify] [--summary <path>]
 
 Run the committed dependent-regression reproducers that correspond to the
 failing rows captured in a dependent matrix summary. The default summary path is
@@ -43,7 +43,13 @@ while (($#)); do
   esac
 done
 
-[[ "$MODE" == "reproduce" ]] || die "unsupported mode: $MODE"
+case "$MODE" in
+  reproduce|verify)
+    ;;
+  *)
+    die "unsupported mode: $MODE"
+    ;;
+esac
 command -v jq >/dev/null 2>&1 || die "jq is required"
 [[ -d "$CASES_ROOT" ]] || die "missing case metadata root: $CASES_ROOT"
 [[ -f "$SUMMARY_PATH" ]] || die "missing dependent matrix summary: $SUMMARY_PATH"

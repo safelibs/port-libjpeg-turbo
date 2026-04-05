@@ -1,4 +1,4 @@
-get_filename_component(_libjpeg_turbo_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+get_filename_component(_libjpeg_turbo_prefix "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
 set(libjpeg_turbo_VERSION "2.1.5")
 set(libjpeg_turbo_INCLUDE_DIRS
   "${_libjpeg_turbo_prefix}/include"

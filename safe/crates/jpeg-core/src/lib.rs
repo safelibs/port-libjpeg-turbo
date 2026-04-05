@@ -23,6 +23,6 @@ pub mod transupp {
 
 pub mod turbojpeg {
     pub const FILE_BASENAME: &str = "turbojpeg";
-    pub use crate::ported::turbojpeg::turbojpeg::*;
     pub use crate::ported::turbojpeg::tjutil;
+    pub use crate::ported::turbojpeg::turbojpeg::*;
 }

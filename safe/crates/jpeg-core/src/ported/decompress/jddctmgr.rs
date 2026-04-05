@@ -1,9 +1,8 @@
 use core::{mem::size_of, ptr};
 
 use ffi_types::{
-    j_common_ptr, j_decompress_ptr, jpeg_component_info, jpeg_inverse_dct, JQUANT_TBL,
-    J_MESSAGE_CODE, DCTSIZE, DCTSIZE2, JDCT_FLOAT, JDCT_IFAST, JDCT_ISLOW, JPOOL_IMAGE,
-    MAX_COMPONENTS,
+    j_common_ptr, j_decompress_ptr, jpeg_component_info, jpeg_inverse_dct, DCTSIZE, DCTSIZE2,
+    JDCT_FLOAT, JDCT_IFAST, JDCT_ISLOW, JPOOL_IMAGE, JQUANT_TBL, J_MESSAGE_CODE, MAX_COMPONENTS,
 };
 
 use crate::{
@@ -76,14 +75,11 @@ unsafe fn select_inverse_dct(cinfo: j_decompress_ptr, scaled_size: i32) -> (i32,
 
 unsafe extern "C" fn start_pass(cinfo: j_decompress_ptr) {
     static AAN_SCALES: [i16; DCTSIZE2] = [
-        16384, 22725, 21407, 19266, 16384, 12873, 8867, 4520,
-        22725, 31521, 29692, 26722, 22725, 17855, 12299, 6270,
-        21407, 29692, 27969, 25172, 21407, 16819, 11585, 5906,
-        19266, 26722, 25172, 22654, 19266, 15137, 10426, 5315,
-        16384, 22725, 21407, 19266, 16384, 12873, 8867, 4520,
-        12873, 17855, 16819, 15137, 12873, 10114, 6967, 3552,
-        8867, 12299, 11585, 10426, 8867, 6967, 4799, 2446,
-        4520, 6270, 5906, 5315, 4520, 3552, 2446, 1247,
+        16384, 22725, 21407, 19266, 16384, 12873, 8867, 4520, 22725, 31521, 29692, 26722, 22725,
+        17855, 12299, 6270, 21407, 29692, 27969, 25172, 21407, 16819, 11585, 5906, 19266, 26722,
+        25172, 22654, 19266, 15137, 10426, 5315, 16384, 22725, 21407, 19266, 16384, 12873, 8867,
+        4520, 12873, 17855, 16819, 15137, 12873, 10114, 6967, 3552, 8867, 12299, 11585, 10426,
+        8867, 6967, 4799, 2446, 4520, 6270, 5906, 5315, 4520, 3552, 2446, 1247,
     ];
     static AAN_SCALE_FACTOR: [f64; DCTSIZE] = [
         1.0,

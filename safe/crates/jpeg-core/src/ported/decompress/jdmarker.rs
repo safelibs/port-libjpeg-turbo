@@ -28,10 +28,7 @@ pub unsafe fn jinit_marker_reader(cinfo: j_decompress_ptr) {
     translated::jinit_marker_reader(translated_cinfo(cinfo))
 }
 
-pub unsafe extern "C" fn jpeg_resync_to_restart(
-    cinfo: j_decompress_ptr,
-    desired: int,
-) -> boolean {
+pub unsafe extern "C" fn jpeg_resync_to_restart(cinfo: j_decompress_ptr, desired: int) -> boolean {
     translated::jpeg_resync_to_restart(translated_cinfo(cinfo), desired)
 }
 
@@ -54,7 +51,9 @@ pub unsafe extern "C" fn jpeg_set_marker_processor(
         routine.map(|func| unsafe {
             core::mem::transmute::<
                 unsafe extern "C" fn(j_decompress_ptr) -> boolean,
-                unsafe extern "C" fn(*mut translated::jpeg_decompress_struct) -> translated::boolean,
+                unsafe extern "C" fn(
+                    *mut translated::jpeg_decompress_struct,
+                ) -> translated::boolean,
             >(func)
         }),
     )

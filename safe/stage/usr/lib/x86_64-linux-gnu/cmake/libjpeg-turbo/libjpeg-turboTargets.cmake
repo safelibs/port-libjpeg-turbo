@@ -1,4 +1,4 @@
-get_filename_component(_libjpeg_turbo_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+get_filename_component(_libjpeg_turbo_prefix "${CMAKE_CURRENT_LIST_DIR}/../../../.." ABSOLUTE)
 set(_libjpeg_turbo_libdir "${_libjpeg_turbo_prefix}/lib/x86_64-linux-gnu")
 set(_libjpeg_turbo_include_dirs
   "${_libjpeg_turbo_prefix}/include"

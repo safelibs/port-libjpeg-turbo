@@ -1,10 +1,10 @@
 use core::ptr;
 
 use ffi_types::{
-    boolean, int, j_common_ptr, j_decompress_ptr, long, JSAMPARRAY, JSAMPIMAGE, JSAMPLE,
-    JDIMENSION, DSTATE_BUFIMAGE, DSTATE_BUFPOST, DSTATE_PRESCAN, DSTATE_PRELOAD, DSTATE_RAW_OK,
-    DSTATE_READY, DSTATE_SCANNING, J_MESSAGE_CODE, JPEG_REACHED_EOI, JPEG_REACHED_SOS,
-    JPEG_ROW_COMPLETED, JPEG_SUSPENDED, FALSE, TRUE,
+    boolean, int, j_common_ptr, j_decompress_ptr, long, DSTATE_BUFIMAGE, DSTATE_BUFPOST,
+    DSTATE_PRELOAD, DSTATE_PRESCAN, DSTATE_RAW_OK, DSTATE_READY, DSTATE_SCANNING, FALSE,
+    JDIMENSION, JPEG_REACHED_EOI, JPEG_REACHED_SOS, JPEG_ROW_COMPLETED, JPEG_SUSPENDED, JSAMPARRAY,
+    JSAMPIMAGE, JSAMPLE, J_MESSAGE_CODE, TRUE,
 };
 
 use crate::{
@@ -54,7 +54,12 @@ unsafe fn output_pass_setup(cinfo: j_decompress_ptr) -> boolean {
             update_output_progress(cinfo, (*cinfo).output_scanline, (*cinfo).output_height);
 
             let last_scanline = (*cinfo).output_scanline;
-            (*(*cinfo).main).process_data.unwrap()(cinfo, ptr::null_mut(), &mut (*cinfo).output_scanline, 0);
+            (*(*cinfo).main).process_data.unwrap()(
+                cinfo,
+                ptr::null_mut(),
+                &mut (*cinfo).output_scanline,
+                0,
+            );
             if (*cinfo).output_scanline == last_scanline {
                 return FALSE;
             }
@@ -183,8 +188,7 @@ pub unsafe fn jpeg_crop_scanline(
         if (*compptr).downsampled_width < 2 && orig_downsampled_width >= 2 {
             reinit_upsampler = TRUE;
         }
-        (*(*cinfo).master).first_MCU_col[ci] =
-            ((*xoffset * hsf as u32) / align) as JDIMENSION;
+        (*(*cinfo).master).first_MCU_col[ci] = ((*xoffset * hsf as u32) / align) as JDIMENSION;
         (*(*cinfo).master).last_MCU_col[ci] = utils::div_round_up(
             ((*xoffset + (*cinfo).output_width) * hsf as u32) as ffi_types::long,
             align as ffi_types::long,
@@ -290,7 +294,10 @@ unsafe fn increment_simple_rowgroup_ctr(cinfo: j_decompress_ptr, rows: JDIMENSIO
     read_and_discard_scanlines(cinfo, rows_left);
 }
 
-pub unsafe fn jpeg_skip_scanlines(cinfo: j_decompress_ptr, mut num_lines: JDIMENSION) -> JDIMENSION {
+pub unsafe fn jpeg_skip_scanlines(
+    cinfo: j_decompress_ptr,
+    mut num_lines: JDIMENSION,
+) -> JDIMENSION {
     let main_ptr = (*cinfo).main as *mut my_main_controller;
     let coef = (*cinfo).coef as *mut my_coef_controller;
     let master = (*cinfo).master as *mut my_decomp_master;

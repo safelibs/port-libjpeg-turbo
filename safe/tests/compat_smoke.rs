@@ -9,7 +9,7 @@ use ffi_types::{
     boolean, j_compress_ptr, j_decompress_ptr, jpeg_common_struct, jpeg_compress_struct,
     jpeg_decompress_struct, jpeg_error_mgr, jpeg_marker_struct, jpeg_marker_writer,
     CSTATE_SCANNING, CSTATE_START, DSTATE_READY, DSTATE_START, FALSE, FILE, JCS_EXT_RGB,
-    JCS_EXT_RGBA, JMSG_LENGTH_MAX, JPOOL_IMAGE, JPEG_LIB_VERSION, J_MESSAGE_CODE, TRUE,
+    JCS_EXT_RGBA, JMSG_LENGTH_MAX, JPEG_LIB_VERSION, JPOOL_IMAGE, J_MESSAGE_CODE, TRUE,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());

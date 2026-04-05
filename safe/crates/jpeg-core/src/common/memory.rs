@@ -1,9 +1,10 @@
 use core::{ffi::c_void, mem::size_of, ptr};
 
 use ffi_types::{
-    backing_store_info, backing_store_ptr, boolean, int, j_common_ptr, jvirt_barray_ptr,
-    jvirt_sarray_ptr, jpeg_memory_mgr, JBLOCK, JBLOCKARRAY, JBLOCKROW, JDIMENSION, JPOOL_IMAGE,
-    JPOOL_NUMPOOLS, JSAMPARRAY, JSAMPROW, JSAMPLE, J_MESSAGE_CODE, MAX_ALLOC_CHUNK, FALSE, TRUE,
+    backing_store_info, backing_store_ptr, boolean, int, j_common_ptr, jpeg_memory_mgr,
+    jvirt_barray_ptr, jvirt_sarray_ptr, FALSE, JBLOCK, JBLOCKARRAY, JBLOCKROW, JDIMENSION,
+    JPOOL_IMAGE, JPOOL_NUMPOOLS, JSAMPARRAY, JSAMPLE, JSAMPROW, J_MESSAGE_CODE, MAX_ALLOC_CHUNK,
+    TRUE,
 };
 
 use crate::common::error;
@@ -85,7 +86,11 @@ unsafe fn mem(cinfo: j_common_ptr) -> *mut MyMemoryMgr {
 
 #[inline]
 const fn min_u32(a: JDIMENSION, b: JDIMENSION) -> JDIMENSION {
-    if a < b { a } else { b }
+    if a < b {
+        a
+    } else {
+        b
+    }
 }
 
 #[inline]
@@ -141,7 +146,11 @@ pub unsafe fn jpeg_mem_init(_cinfo: j_common_ptr) -> ffi_types::long {
 
 pub unsafe fn jpeg_mem_term(_cinfo: j_common_ptr) {}
 
-unsafe extern "C" fn alloc_small(cinfo: j_common_ptr, pool_id: int, sizeofobject: usize) -> *mut c_void {
+unsafe extern "C" fn alloc_small(
+    cinfo: j_common_ptr,
+    pool_id: int,
+    sizeofobject: usize,
+) -> *mut c_void {
     let mem = mem(cinfo);
     let mut hdr_ptr = (*mem).small_list[pool_id as usize];
     let mut prev_hdr_ptr: *mut SmallPoolHdr = ptr::null_mut();
@@ -212,7 +221,11 @@ unsafe extern "C" fn alloc_small(cinfo: j_common_ptr, pool_id: int, sizeofobject
     data_ptr as *mut c_void
 }
 
-unsafe extern "C" fn alloc_large(cinfo: j_common_ptr, pool_id: int, sizeofobject: usize) -> *mut c_void {
+unsafe extern "C" fn alloc_large(
+    cinfo: j_common_ptr,
+    pool_id: int,
+    sizeofobject: usize,
+) -> *mut c_void {
     let mem = mem(cinfo);
     let mut sizeofobject = sizeofobject;
 
@@ -227,8 +240,10 @@ unsafe extern "C" fn alloc_large(cinfo: j_common_ptr, pool_id: int, sizeofobject
         error::errexit1(cinfo, J_MESSAGE_CODE::JERR_BAD_POOL_ID, pool_id);
     }
 
-    let hdr_ptr = jpeg_get_large(cinfo, sizeofobject + size_of::<LargePoolHdr>() + ALIGN_SIZE - 1)
-        as *mut LargePoolHdr;
+    let hdr_ptr = jpeg_get_large(
+        cinfo,
+        sizeofobject + size_of::<LargePoolHdr>() + ALIGN_SIZE - 1,
+    ) as *mut LargePoolHdr;
     if hdr_ptr.is_null() {
         out_of_memory(cinfo, 4);
     }
@@ -358,7 +373,8 @@ unsafe extern "C" fn request_virt_sarray(
     if pool_id != JPOOL_IMAGE {
         error::errexit1(cinfo, J_MESSAGE_CODE::JERR_BAD_POOL_ID, pool_id);
     }
-    let result = alloc_small(cinfo, pool_id, size_of::<JVirtSArrayControl>()) as *mut JVirtSArrayControl;
+    let result =
+        alloc_small(cinfo, pool_id, size_of::<JVirtSArrayControl>()) as *mut JVirtSArrayControl;
     ptr::write_bytes(result as *mut u8, 0, size_of::<JVirtSArrayControl>());
     (*result).rows_in_array = numrows;
     (*result).samplesperrow = samplesperrow;
@@ -382,7 +398,8 @@ unsafe extern "C" fn request_virt_barray(
     if pool_id != JPOOL_IMAGE {
         error::errexit1(cinfo, J_MESSAGE_CODE::JERR_BAD_POOL_ID, pool_id);
     }
-    let result = alloc_small(cinfo, pool_id, size_of::<JVirtBArrayControl>()) as *mut JVirtBArrayControl;
+    let result =
+        alloc_small(cinfo, pool_id, size_of::<JVirtBArrayControl>()) as *mut JVirtBArrayControl;
     ptr::write_bytes(result as *mut u8, 0, size_of::<JVirtBArrayControl>());
     (*result).rows_in_array = numrows;
     (*result).blocksperrow = blocksperrow;
@@ -402,7 +419,9 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
     let mut sptr = (*mem).virt_sarray_list;
     while !sptr.is_null() {
         if (*sptr).mem_buffer.is_null() {
-            let new_space = (*sptr).rows_in_array as usize * (*sptr).samplesperrow as usize * size_of::<JSAMPLE>();
+            let new_space = (*sptr).rows_in_array as usize
+                * (*sptr).samplesperrow as usize
+                * size_of::<JSAMPLE>();
             space_per_minheight +=
                 (*sptr).maxaccess as usize * (*sptr).samplesperrow as usize * size_of::<JSAMPLE>();
             if usize::MAX - maximum_space < new_space {
@@ -416,7 +435,9 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
     let mut bptr = (*mem).virt_barray_list;
     while !bptr.is_null() {
         if (*bptr).mem_buffer.is_null() {
-            let new_space = (*bptr).rows_in_array as usize * (*bptr).blocksperrow as usize * size_of::<JBLOCK>();
+            let new_space = (*bptr).rows_in_array as usize
+                * (*bptr).blocksperrow as usize
+                * size_of::<JBLOCK>();
             space_per_minheight +=
                 (*bptr).maxaccess as usize * (*bptr).blocksperrow as usize * size_of::<JBLOCK>();
             if usize::MAX - maximum_space < new_space {
@@ -431,12 +452,21 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
         return;
     }
 
-    let avail_mem = jpeg_mem_available(cinfo, space_per_minheight, maximum_space, (*mem).total_space_allocated);
+    let avail_mem = jpeg_mem_available(
+        cinfo,
+        space_per_minheight,
+        maximum_space,
+        (*mem).total_space_allocated,
+    );
     let max_minheights = if avail_mem >= maximum_space {
         1_000_000_000usize
     } else {
         let value = avail_mem / space_per_minheight;
-        if value == 0 { 1 } else { value }
+        if value == 0 {
+            1
+        } else {
+            value
+        }
     };
 
     sptr = (*mem).virt_sarray_list;
@@ -456,7 +486,12 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
                 );
                 (*sptr).b_s_open = TRUE;
             }
-            (*sptr).mem_buffer = alloc_sarray(cinfo, JPOOL_IMAGE, (*sptr).samplesperrow, (*sptr).rows_in_mem);
+            (*sptr).mem_buffer = alloc_sarray(
+                cinfo,
+                JPOOL_IMAGE,
+                (*sptr).samplesperrow,
+                (*sptr).rows_in_mem,
+            );
             (*sptr).rowsperchunk = (*mem).last_rowsperchunk;
             (*sptr).cur_start_row = 0;
             (*sptr).first_undef_row = 0;
@@ -482,7 +517,12 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
                 );
                 (*bptr).b_s_open = TRUE;
             }
-            (*bptr).mem_buffer = alloc_barray(cinfo, JPOOL_IMAGE, (*bptr).blocksperrow, (*bptr).rows_in_mem);
+            (*bptr).mem_buffer = alloc_barray(
+                cinfo,
+                JPOOL_IMAGE,
+                (*bptr).blocksperrow,
+                (*bptr).rows_in_mem,
+            );
             (*bptr).rowsperchunk = (*mem).last_rowsperchunk;
             (*bptr).cur_start_row = 0;
             (*bptr).first_undef_row = 0;
@@ -493,7 +533,8 @@ unsafe extern "C" fn realize_virt_arrays(cinfo: j_common_ptr) {
 }
 
 unsafe fn do_sarray_io(cinfo: j_common_ptr, ptr_: *mut JVirtSArrayControl, writing: bool) {
-    let bytesperrow = (*ptr_).samplesperrow as ffi_types::long * size_of::<JSAMPLE>() as ffi_types::long;
+    let bytesperrow =
+        (*ptr_).samplesperrow as ffi_types::long * size_of::<JSAMPLE>() as ffi_types::long;
     let mut file_offset = (*ptr_).cur_start_row as ffi_types::long * bytesperrow;
     let mut i = 0i64;
     while i < (*ptr_).rows_in_mem as i64 {
@@ -530,7 +571,8 @@ unsafe fn do_sarray_io(cinfo: j_common_ptr, ptr_: *mut JVirtSArrayControl, writi
 }
 
 unsafe fn do_barray_io(cinfo: j_common_ptr, ptr_: *mut JVirtBArrayControl, writing: bool) {
-    let bytesperrow = (*ptr_).blocksperrow as ffi_types::long * size_of::<JBLOCK>() as ffi_types::long;
+    let bytesperrow =
+        (*ptr_).blocksperrow as ffi_types::long * size_of::<JBLOCK>() as ffi_types::long;
     let mut file_offset = (*ptr_).cur_start_row as ffi_types::long * bytesperrow;
     let mut i = 0i64;
     while i < (*ptr_).rows_in_mem as i64 {
@@ -576,7 +618,10 @@ unsafe extern "C" fn access_virt_sarray(
     let ptr_ = ptr_ as *mut JVirtSArrayControl;
     let mut end_row = start_row + num_rows;
 
-    if end_row > (*ptr_).rows_in_array || num_rows > (*ptr_).maxaccess || (*ptr_).mem_buffer.is_null() {
+    if end_row > (*ptr_).rows_in_array
+        || num_rows > (*ptr_).maxaccess
+        || (*ptr_).mem_buffer.is_null()
+    {
         error::errexit(cinfo, J_MESSAGE_CODE::JERR_BAD_VIRTUAL_ACCESS);
     }
 
@@ -614,7 +659,10 @@ unsafe extern "C" fn access_virt_sarray(
             undef_row -= (*ptr_).cur_start_row;
             end_row -= (*ptr_).cur_start_row;
             while undef_row < end_row {
-                crate::common::utils::zero_far(*(*ptr_).mem_buffer.add(undef_row as usize) as *mut c_void, bytesperrow);
+                crate::common::utils::zero_far(
+                    *(*ptr_).mem_buffer.add(undef_row as usize) as *mut c_void,
+                    bytesperrow,
+                );
                 undef_row += 1;
             }
         } else if writable == FALSE {
@@ -625,7 +673,9 @@ unsafe extern "C" fn access_virt_sarray(
     if writable != FALSE {
         (*ptr_).dirty = TRUE;
     }
-    (*ptr_).mem_buffer.add((start_row - (*ptr_).cur_start_row) as usize)
+    (*ptr_)
+        .mem_buffer
+        .add((start_row - (*ptr_).cur_start_row) as usize)
 }
 
 unsafe extern "C" fn access_virt_barray(
@@ -638,7 +688,10 @@ unsafe extern "C" fn access_virt_barray(
     let ptr_ = ptr_ as *mut JVirtBArrayControl;
     let mut end_row = start_row + num_rows;
 
-    if end_row > (*ptr_).rows_in_array || num_rows > (*ptr_).maxaccess || (*ptr_).mem_buffer.is_null() {
+    if end_row > (*ptr_).rows_in_array
+        || num_rows > (*ptr_).maxaccess
+        || (*ptr_).mem_buffer.is_null()
+    {
         error::errexit(cinfo, J_MESSAGE_CODE::JERR_BAD_VIRTUAL_ACCESS);
     }
 
@@ -676,7 +729,10 @@ unsafe extern "C" fn access_virt_barray(
             undef_row -= (*ptr_).cur_start_row;
             end_row -= (*ptr_).cur_start_row;
             while undef_row < end_row {
-                crate::common::utils::zero_far(*(*ptr_).mem_buffer.add(undef_row as usize) as *mut c_void, bytesperrow);
+                crate::common::utils::zero_far(
+                    *(*ptr_).mem_buffer.add(undef_row as usize) as *mut c_void,
+                    bytesperrow,
+                );
                 undef_row += 1;
             }
         } else if writable == FALSE {
@@ -687,7 +743,9 @@ unsafe extern "C" fn access_virt_barray(
     if writable != FALSE {
         (*ptr_).dirty = TRUE;
     }
-    (*ptr_).mem_buffer.add((start_row - (*ptr_).cur_start_row) as usize)
+    (*ptr_)
+        .mem_buffer
+        .add((start_row - (*ptr_).cur_start_row) as usize)
 }
 
 unsafe extern "C" fn free_pool(cinfo: j_common_ptr, pool_id: int) {
@@ -726,7 +784,11 @@ unsafe extern "C" fn free_pool(cinfo: j_common_ptr, pool_id: int) {
     (*mem).large_list[pool_id as usize] = ptr::null_mut();
     while !lhdr_ptr.is_null() {
         let next = (*lhdr_ptr).next;
-        let space_freed = (*lhdr_ptr).bytes_used + (*lhdr_ptr).bytes_left + size_of::<LargePoolHdr>() + ALIGN_SIZE - 1;
+        let space_freed = (*lhdr_ptr).bytes_used
+            + (*lhdr_ptr).bytes_left
+            + size_of::<LargePoolHdr>()
+            + ALIGN_SIZE
+            - 1;
         jpeg_free_large(cinfo, lhdr_ptr as *mut c_void, space_freed);
         (*mem).total_space_allocated -= space_freed;
         lhdr_ptr = next;
@@ -736,7 +798,11 @@ unsafe extern "C" fn free_pool(cinfo: j_common_ptr, pool_id: int) {
     (*mem).small_list[pool_id as usize] = ptr::null_mut();
     while !shdr_ptr.is_null() {
         let next = (*shdr_ptr).next;
-        let space_freed = (*shdr_ptr).bytes_used + (*shdr_ptr).bytes_left + size_of::<SmallPoolHdr>() + ALIGN_SIZE - 1;
+        let space_freed = (*shdr_ptr).bytes_used
+            + (*shdr_ptr).bytes_left
+            + size_of::<SmallPoolHdr>()
+            + ALIGN_SIZE
+            - 1;
         jpeg_free_small(cinfo, shdr_ptr as *mut c_void, space_freed);
         (*mem).total_space_allocated -= space_freed;
         shdr_ptr = next;
@@ -764,7 +830,9 @@ unsafe fn parse_jpegmem() -> Option<ffi_types::long> {
     let mut any = false;
     while *cursor >= b'0' as i8 && *cursor <= b'9' as i8 {
         any = true;
-        result = result.saturating_mul(10).saturating_add((*cursor - b'0' as i8) as ffi_types::long);
+        result = result
+            .saturating_mul(10)
+            .saturating_add((*cursor - b'0' as i8) as ffi_types::long);
         cursor = cursor.add(1);
     }
     if !any {
@@ -782,7 +850,9 @@ pub unsafe fn jinit_memory_mgr(cinfo: j_common_ptr) {
         error::errexit(cinfo, J_MESSAGE_CODE::JERR_BAD_ALIGN_TYPE);
     }
     let test_mac = MAX_ALLOC_CHUNK as usize;
-    if test_mac as ffi_types::long != MAX_ALLOC_CHUNK || (MAX_ALLOC_CHUNK as usize % ALIGN_SIZE) != 0 {
+    if test_mac as ffi_types::long != MAX_ALLOC_CHUNK
+        || (MAX_ALLOC_CHUNK as usize % ALIGN_SIZE) != 0
+    {
         error::errexit(cinfo, J_MESSAGE_CODE::JERR_BAD_ALLOC_CHUNK);
     }
 

@@ -73,10 +73,8 @@ pub const TJ_MCU_WIDTH: [c_int; TJ_NUMSAMP as usize] = [8, 16, 16, 8, 8, 32];
 pub const TJ_MCU_HEIGHT: [c_int; TJ_NUMSAMP as usize] = [8, 8, 16, 8, 16, 8];
 
 pub const TJ_RED_OFFSET: [c_int; TJ_NUMPF as usize] = [0, 2, 0, 2, 3, 1, 0, 0, 2, 3, 1, -1];
-pub const TJ_GREEN_OFFSET: [c_int; TJ_NUMPF as usize] =
-    [1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2, -1];
-pub const TJ_BLUE_OFFSET: [c_int; TJ_NUMPF as usize] =
-    [2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3, -1];
+pub const TJ_GREEN_OFFSET: [c_int; TJ_NUMPF as usize] = [1, 1, 1, 1, 2, 2, 0, 1, 1, 2, 2, -1];
+pub const TJ_BLUE_OFFSET: [c_int; TJ_NUMPF as usize] = [2, 0, 2, 0, 1, 3, 0, 2, 0, 1, 3, -1];
 pub const TJ_ALPHA_OFFSET: [c_int; TJ_NUMPF as usize] =
     [-1, -1, -1, -1, -1, -1, -1, 3, 3, 0, 0, -1];
 pub const TJ_PIXEL_SIZE: [c_int; TJ_NUMPF as usize] = [3, 3, 4, 4, 4, 4, 1, 4, 4, 4, 4, 4];
@@ -346,6 +344,10 @@ pub fn buf_size_yuv2_checked(
     }
 }
 
-pub fn buf_size_yuv_checked(width: c_int, height: c_int, subsamp: c_int) -> Result<c_ulong, TjMathError> {
+pub fn buf_size_yuv_checked(
+    width: c_int,
+    height: c_int,
+    subsamp: c_int,
+) -> Result<c_ulong, TjMathError> {
     buf_size_yuv2_checked(width, 4, height, subsamp)
 }

@@ -16,22 +16,20 @@ fn main() {
     for (source_name, object_name) in shim_sources {
         let shim_source = safe_root.join("c_shim").join(source_name);
         let shim_object = out_dir.join(object_name);
-        run(
-            std::process::Command::new("gcc")
-                .arg("-std=c99")
-                .arg("-O2")
-                .arg("-fPIC")
-                .arg("-I")
-                .arg(&generated_include)
-                .arg("-I")
-                .arg(&generated_multiarch)
-                .arg("-I")
-                .arg(&original_root)
-                .arg("-c")
-                .arg(&shim_source)
-                .arg("-o")
-                .arg(&shim_object),
-        );
+        run(std::process::Command::new("gcc")
+            .arg("-std=c99")
+            .arg("-O2")
+            .arg("-fPIC")
+            .arg("-I")
+            .arg(&generated_include)
+            .arg("-I")
+            .arg(&generated_multiarch)
+            .arg("-I")
+            .arg(&original_root)
+            .arg("-c")
+            .arg(&shim_source)
+            .arg("-o")
+            .arg(&shim_object));
         objects.push(shim_object);
     }
     let mut archive = std::process::Command::new("ar");
@@ -71,7 +69,10 @@ fn multiarch() -> String {
     format!("{}-linux-gnu", std::env::consts::ARCH)
 }
 
-fn write_generated_headers(generated_include: &std::path::Path, generated_multiarch: &std::path::Path) {
+fn write_generated_headers(
+    generated_include: &std::path::Path,
+    generated_multiarch: &std::path::Path,
+) {
     const UPSTREAM_VERSION: &str = "2.1.5";
     const LIBJPEG_TURBO_VERSION_NUMBER: &str = "2001005";
     const BUILD_STRING: &str = "20260403";

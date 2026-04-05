@@ -1338,7 +1338,9 @@ static mut xformtypes: [JXFORM_CODE; 8] = [
     JXFORM_ROT_270,
 ];
 pub const NUMSF: ::core::ffi::c_int = 16 as ::core::ffi::c_int;
-static mut sf: [tjscalingfactor; 16] = [
+/* timg 1.5.2 starts iterating at factors + count, so keep a guard copy of the
+ * smallest factor one slot past the logical end of the table. */
+static mut sf: [tjscalingfactor; 17] = [
     tjscalingfactor {
         num: 2 as ::core::ffi::c_int,
         denom: 1 as ::core::ffi::c_int,
@@ -1398,6 +1400,10 @@ static mut sf: [tjscalingfactor; 16] = [
     tjscalingfactor {
         num: 1 as ::core::ffi::c_int,
         denom: 4 as ::core::ffi::c_int,
+    },
+    tjscalingfactor {
+        num: 1 as ::core::ffi::c_int,
+        denom: 8 as ::core::ffi::c_int,
     },
     tjscalingfactor {
         num: 1 as ::core::ffi::c_int,

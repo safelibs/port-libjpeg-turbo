@@ -1,6 +1,6 @@
 {
   "id": "timg-sigfpe",
-  "description": "Both the source-built and packaged timg consumers abort with SIGFPE when rendering the dependent JPEG fixture.",
+  "description": "Both the source-built and packaged timg consumers render the dependent JPEG fixture without reintroducing the historical SIGFPE in TurboJPEG scaling-factor iteration.",
   "rows": [
     {
       "kind": "compile",

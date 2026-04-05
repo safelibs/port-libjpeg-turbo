@@ -7,15 +7,7 @@ mkdir -p "$ROOT/safe/target/dependent-regressions"
 REPORT_DIR="$(mktemp -d "$ROOT/safe/target/dependent-regressions/timg-sigfpe.XXXXXX")"
 SUMMARY="$REPORT_DIR/summary.json"
 
-set +e
 "$ROOT/test-original.sh" --checks all --only timg --report-dir "$REPORT_DIR"
-status=$?
-set -e
-
-if [[ "$status" -eq 0 ]]; then
-  printf 'expected ./test-original.sh --checks all --only timg to fail\n' >&2
-  exit 1
-fi
 
 [[ -f "$SUMMARY" ]] || {
   printf 'missing summary: %s\n' "$SUMMARY" >&2
@@ -23,9 +15,9 @@ fi
 }
 
 jq -e '
-  [.compile[] | select(.status == "fail") | .source_package] == ["timg"]
+  all(.compile[]; if .source_package == "timg" then .status == "pass" else .status == "skipped" end)
   and
-  [.runtime[] | select(.status == "fail") | .name] == ["timg"]
+  all(.runtime[]; if .name == "timg" then .status == "pass" else .status == "skipped" end)
 ' "$SUMMARY" >/dev/null
 
 for log_path in \
@@ -37,9 +29,9 @@ do
     exit 1
   }
 
-  grep -E 'SIGFPE|Arithmetic Exception|signal 8' "$log_path" >/dev/null || {
-    printf 'missing SIGFPE marker in %s\n' "$log_path" >&2
+  if grep -E 'SIGFPE|Arithmetic Exception|signal 8' "$log_path" >/dev/null; then
+    printf 'unexpected SIGFPE marker in %s\n' "$log_path" >&2
     cat "$log_path" >&2
     exit 1
-  }
+  fi
 done

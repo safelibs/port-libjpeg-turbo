@@ -14,28 +14,24 @@ fn main() {
     let shim_object = out_dir.join("jpeg_tools_error_bridge.o");
     let shim_archive = out_dir.join("libjpeg_tools_error_bridge.a");
 
-    run(
-        std::process::Command::new("gcc")
-            .arg("-std=c99")
-            .arg("-O2")
-            .arg("-fPIC")
-            .arg("-I")
-            .arg(&generated_include)
-            .arg("-I")
-            .arg(&generated_multiarch)
-            .arg("-I")
-            .arg(&original_root)
-            .arg("-c")
-            .arg(&shim_source)
-            .arg("-o")
-            .arg(&shim_object),
-    );
-    run(
-        std::process::Command::new("ar")
-            .arg("crus")
-            .arg(&shim_archive)
-            .arg(&shim_object),
-    );
+    run(std::process::Command::new("gcc")
+        .arg("-std=c99")
+        .arg("-O2")
+        .arg("-fPIC")
+        .arg("-I")
+        .arg(&generated_include)
+        .arg("-I")
+        .arg(&generated_multiarch)
+        .arg("-I")
+        .arg(&original_root)
+        .arg("-c")
+        .arg(&shim_source)
+        .arg("-o")
+        .arg(&shim_object));
+    run(std::process::Command::new("ar")
+        .arg("crus")
+        .arg(&shim_archive)
+        .arg(&shim_object));
 
     for path in [
         "Cargo.toml",
@@ -67,10 +63,7 @@ fn main() {
         "tjexample",
         "wrjpgcom",
     ] {
-        println!(
-            "cargo:rustc-link-arg-bin={bin}={}",
-            shim_archive.display()
-        );
+        println!("cargo:rustc-link-arg-bin={bin}={}", shim_archive.display());
     }
 }
 
@@ -92,7 +85,10 @@ fn multiarch() -> String {
     format!("{}-linux-gnu", std::env::consts::ARCH)
 }
 
-fn write_generated_headers(generated_include: &std::path::Path, generated_multiarch: &std::path::Path) {
+fn write_generated_headers(
+    generated_include: &std::path::Path,
+    generated_multiarch: &std::path::Path,
+) {
     const UPSTREAM_VERSION: &str = "2.1.5";
     const LIBJPEG_TURBO_VERSION_NUMBER: &str = "2001005";
     const BUILD_STRING: &str = "20260403";

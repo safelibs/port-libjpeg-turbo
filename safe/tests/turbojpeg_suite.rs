@@ -682,12 +682,36 @@ fn turbojpeg_exports_and_geometry_match_reference_tables() {
         let mut num_scaling_factors = 0;
         let scaling_factors = tj_get_scaling_factors(&mut num_scaling_factors);
         assert!(!scaling_factors.is_null());
-        assert!(num_scaling_factors > 0);
+        assert_eq!(num_scaling_factors, 16);
         let scaling_slice =
             std::slice::from_raw_parts(scaling_factors, num_scaling_factors as usize);
-        assert!(scaling_slice
+        let actual_scaling_factors = scaling_slice
             .iter()
-            .any(|factor| factor.num == 1 && factor.denom == 1));
+            .map(|factor| (factor.num, factor.denom))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            actual_scaling_factors,
+            vec![
+                (2, 1),
+                (15, 8),
+                (7, 4),
+                (13, 8),
+                (3, 2),
+                (11, 8),
+                (5, 4),
+                (9, 8),
+                (1, 1),
+                (7, 8),
+                (3, 4),
+                (5, 8),
+                (1, 2),
+                (3, 8),
+                (1, 4),
+                (1, 8),
+            ]
+        );
+        let timg_guard = *scaling_factors.add(num_scaling_factors as usize);
+        assert_eq!((timg_guard.num, timg_guard.denom), (1, 8));
 
         for &(width, height, align, subsamp) in &[
             (35, 39, 1, TJSAMP_444),
