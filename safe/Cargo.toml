@@ -40,7 +40,7 @@ libturbojpeg-abi = { path = "crates/libturbojpeg-abi" }
 
 [dev-dependencies]
 libtest-mimic = "0.8"
-md5 = "0.7"
+md5 = "0.8"
 
 [[test]]
 name = "upstream_matrix"
